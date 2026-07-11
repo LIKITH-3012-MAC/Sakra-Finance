@@ -354,189 +354,159 @@ function setupCommandPalette(user) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  CINEMATIC INTRO EXPERIENCE V3.0
+// ═══════════════════════════════════════════════════════════════
+
+const CI_LOGO_PATH = "M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z";
+
+function buildCinematicHTML() {
+  return `
+    <!-- Volumetric depth -->
+    <div class="ci-depth">
+      <div class="ci-orb ci-orb-1"></div>
+      <div class="ci-orb ci-orb-2"></div>
+    </div>
+
+    <!-- Glass reflection -->
+    <div class="ci-glass"></div>
+
+    <!-- Content stage -->
+    <div class="ci-stage">
+      <!-- Logo -->
+      <div class="ci-logo-wrap">
+        <svg class="ci-logo-svg" viewBox="0 0 48 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Stroke outline (draws progressively) -->
+          <path class="ci-stroke" d="${CI_LOGO_PATH}"/>
+          <!-- Branded fill (revealed after stroke) -->
+          <path class="ci-fill" d="${CI_LOGO_PATH}" fill="#863bff" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/>
+        </svg>
+        <div class="ci-pulse"></div>
+        <div class="ci-sweep"></div>
+      </div>
+
+      <!-- Welcome text -->
+      <div class="ci-welcome" aria-hidden="true">
+        <span>W</span><span>E</span><span>L</span><span>C</span><span>O</span><span>M</span><span>E</span><span style="width:0.6em;letter-spacing:0"></span><span>T</span><span>O</span>
+      </div>
+
+      <!-- Brand -->
+      <div class="ci-brand">
+        <span class="ci-brand-sakra">SAKRA</span>
+        <span class="ci-brand-finance">FINANCE</span>
+      </div>
+
+      <!-- Subtitle -->
+      <p class="ci-subtitle">Enterprise Finance Operating System</p>
+    </div>
+
+    <!-- Background glow expansion -->
+    <div class="ci-expand"></div>
+  `;
+}
+
+/** Schedule a single class-add at a specific ms offset from startTime */
+function scheduleActivation(el, cls, startTime, atMs) {
+  const now = Date.now();
+  const delay = Math.max(0, atMs - (now - startTime));
+  setTimeout(() => el && el.classList.add(cls), delay);
+}
+
+/** Orchestrate the full cinematic timeline */
+function orchestrateCinematic(loader, startTime) {
+  // 0.6s — SVG stroke begins drawing
+  const strokePath = loader.querySelector('.ci-stroke');
+  if (strokePath) {
+    const len = strokePath.getTotalLength();
+    strokePath.style.strokeDasharray = len;
+    strokePath.style.strokeDashoffset = len;
+    scheduleActivation(strokePath, 'ci-active', startTime, 600);
+  }
+
+  // 1.0s — Fill reveals after stroke completes
+  const fillPath = loader.querySelector('.ci-fill');
+  scheduleActivation(fillPath, 'ci-active', startTime, 1000);
+
+  // 1.1s — Cyan pulse
+  const pulse = loader.querySelector('.ci-pulse');
+  scheduleActivation(pulse, 'ci-active', startTime, 1100);
+
+  // 1.3s — "WELCOME TO" letter-by-letter reveal
+  const letters = loader.querySelectorAll('.ci-welcome span');
+  letters.forEach((span, i) => {
+    if (span.style.width) return; // skip spacer
+    const delay = 1300 + (i * 40);
+    const d = Math.max(0, delay - (Date.now() - startTime));
+    setTimeout(() => {
+      span.style.animation = `ci-letter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards`;
+    }, d);
+  });
+
+  // 1.6s — SAKRA/FINANCE convergence
+  const sakra = loader.querySelector('.ci-brand-sakra');
+  const finance = loader.querySelector('.ci-brand-finance');
+  scheduleActivation(sakra, 'ci-active', startTime, 1600);
+  scheduleActivation(finance, 'ci-active', startTime, 1600);
+
+  // 1.9s — Subtitle
+  const subtitle = loader.querySelector('.ci-subtitle');
+  scheduleActivation(subtitle, 'ci-active', startTime, 1900);
+
+  // 2.1s — Light sweep
+  const sweep = loader.querySelector('.ci-sweep');
+  scheduleActivation(sweep, 'ci-active', startTime, 2100);
+
+  // 2.3s — Background glow expansion
+  const expand = loader.querySelector('.ci-expand');
+  scheduleActivation(expand, 'ci-active', startTime, 2300);
+}
+
+/** Dissolve the intro overlay smoothly */
+function dissolveIntro(loader) {
+  return new Promise((resolve) => {
+    loader.classList.add('ci-dissolve');
+    const onEnd = () => {
+      loader.removeEventListener('transitionend', onEnd);
+      loader.style.display = 'none';
+      resolve();
+    };
+    loader.addEventListener('transitionend', onEnd);
+    // Safety fallback in case transitionend doesn't fire
+    setTimeout(() => {
+      loader.style.display = 'none';
+      resolve();
+    }, 600);
+  });
+}
+
 // Core execution workflow
 async function executeMain() {
-  const splashStart = Date.now();
+  const bootStart = Date.now();
   const loader = document.getElementById("global-page-loader");
-  
+  const isFirstLoad = !sessionStorage.getItem('sakra-intro-played');
+
   if (loader) {
-    loader.className = ""; // Reset class list to rely on CSS
-    loader.innerHTML = `
-      <div class="sakra-splash-content">
-        <div class="sakra-splash-logo-container">
-          <svg class="sakra-splash-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 46" fill="none">
-            <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/>
-            <mask id="splash-mask-a" width="48" height="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha">
-              <path fill="#000" d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" style="fill:#000;fill-opacity:1"/>
-            </mask>
-            <g mask="url(#splash-mask-a)">
-              <g filter="url(#splash-filt-b)">
-                <ellipse cx="5.508" cy="14.704" fill="#ede6ff" rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -4.47 31.516)"/>
-              </g>
-              <g filter="url(#splash-filt-c)">
-                <ellipse cx="10.399" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -39.328 7.883)"/>
-              </g>
-              <g filter="url(#splash-filt-d)">
-                <ellipse cx="5.508" cy="30.487" fill="#7e14ff" rx="5.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.639)scale(1 -1)"/>
-              </g>
-              <g filter="url(#splash-filt-e)">
-                <ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -32.644 -3.334)scale(1 -1)"/>
-              </g>
-              <g filter="url(#splash-filt-f)">
-                <ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -34.34 30.47)"/>
-              </g>
-              <g filter="url(#splash-filt-g)">
-                <ellipse cx="14.072" cy="22.078" fill="#ede6ff" rx="14.072" ry="22.078" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="rotate(93.35 24.506 48.493)scale(-1 1)"/>
-              </g>
-              <g filter="url(#splash-filt-h)">
-                <ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/>
-              </g>
-              <g filter="url(#splash-filt-i)">
-                <ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/>
-              </g>
-              <g filter="url(#splash-filt-j)">
-                <ellipse cx=".387" cy="8.972" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(39.51 .387 8.972)"/>
-              </g>
-              <g filter="url(#splash-filt-k)">
-                <ellipse cx="47.523" cy="-6.092" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 47.523 -6.092)"/>
-              </g>
-              <g filter="url(#splash-filt-l)">
-                <ellipse cx="41.412" cy="6.333" fill="#47bfff" rx="5.971" ry="9.665" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 41.412 6.333)"/>
-              </g>
-              <g filter="url(#splash-filt-m)">
-                <ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/>
-              </g>
-              <g filter="url(#splash-filt-n)">
-                <ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/>
-              </g>
-              <g filter="url(#splash-filt-o)">
-                <ellipse cx="35.651" cy="29.907" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 35.651 29.907)"/>
-              </g>
-              <g filter="url(#splash-filt-p)">
-                <ellipse cx="38.418" cy="32.4" fill="#47bfff" rx="5.971" ry="15.297" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 38.418 32.4)"/>
-              </g>
-            </g>
-            <defs>
-              <filter id="splash-filt-b" width="60.045" height="41.654" x="-19.77" y="16.149" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="7.659"/>
-              </filter>
-              <filter id="splash-filt-c" width="90.34" height="51.437" x="-54.613" y="-7.533" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="7.659"/>
-              </filter>
-              <filter id="splash-filt-d" width="79.355" height="29.4" x="-49.64" y="2.03" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-e" width="79.579" height="29.4" x="-45.045" y="20.029" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-f" width="79.579" height="29.4" x="-43.513" y="21.178" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-g" width="74.749" height="58.852" x="15.756" y="-17.901" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="7.659"/>
-              </filter>
-              <filter id="splash-filt-h" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-i" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-j" width="56.045" height="63.649" x="-27.636" y="-22.853" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-k" width="54.814" height="64.646" x="20.116" y="-38.415" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-l" width="33.541" height="35.313" x="24.641" y="-11.323" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-m" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-n" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-o" width="54.814" height="64.646" x="8.244" y="-2.416" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-              <filter id="splash-filt-p" width="39.409" height="43.623" x="18.713" y="10.588" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
-                <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                <feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4.596"/>
-              </filter>
-            </defs>
-          </svg>
-        </div>
-        <div class="sakra-splash-text">
-          <h1 class="sakra-splash-title">
-            <span class="sakra-title-primary">SAKRA</span>
-            <span class="sakra-title-secondary">FINANCE</span>
-          </h1>
-          <p class="sakra-splash-subtitle">Enterprise Finance Operating System</p>
-        </div>
-        <div class="sakra-splash-loading">
-          <div class="sakra-loading-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-          <p id="sakra-splash-status" class="sakra-loading-status">Verifying Secure Gateway...</p>
-        </div>
-      </div>
-    `;
+    loader.className = ""; // Reset — CSS styles via #global-page-loader
+    if (isFirstLoad) {
+      loader.innerHTML = buildCinematicHTML();
+      orchestrateCinematic(loader, bootStart);
+      sessionStorage.setItem('sakra-intro-played', '1');
+    }
+    // Subsequent loads: loader is empty = pure black screen, dissolves quickly
   }
 
-  // Update status function helper
-  const setSplashStatus = (text) => {
-    const statusEl = document.getElementById("sakra-splash-status");
-    if (statusEl) statusEl.textContent = text;
-  };
-
-  // 1. Verify connection and check session
-  setSplashStatus("Establishing secure node...");
+  // ── Boot checks run IN PARALLEL with the animation ──────────
   const user = await checkSession();
-
-  // 2. Initialize translation dictionary
-  setSplashStatus("Loading system languages...");
   await initI18n(user);
 
-  // 3. Load configurations & check display mode
-  setSplashStatus("Finalizing Secure Gateway...");
-
-  // Enforce minimal splash screen hold time (900ms) for high-grade animation experience
-  const elapsed = Date.now() - splashStart;
-  if (elapsed < 900) {
-    await new Promise((resolve) => setTimeout(resolve, 900 - elapsed));
+  // ── Enforce minimum animation duration ──────────────────────
+  const elapsed = Date.now() - bootStart;
+  const minDuration = isFirstLoad ? 2800 : 350;
+  if (elapsed < minDuration) {
+    await new Promise((r) => setTimeout(r, minDuration - elapsed));
   }
 
+  // ── Route to correct page ───────────────────────────────────
   const path = getPageFilename();
   const unauthenticatedPages = ["login.html", "activate.html", "forgot.html", "404.html", "500.html", "403.html"];
   const isUnauth = unauthenticatedPages.includes(path);
@@ -547,7 +517,13 @@ async function executeMain() {
       window.location.href = "/dashboard.html";
       return;
     }
-    if (loader) loader.classList.add("hidden");
+    if (loader) {
+      if (isFirstLoad) {
+        await dissolveIntro(loader);
+      } else {
+        loader.classList.add("hidden");
+      }
+    }
     window.translatePage();
     return;
   }
@@ -564,8 +540,13 @@ async function executeMain() {
     return;
   }
 
+  // ── Dissolve into dashboard ─────────────────────────────────
   if (loader) {
-    loader.classList.add("hidden");
+    if (isFirstLoad) {
+      await dissolveIntro(loader);
+    } else {
+      loader.classList.add("hidden");
+    }
   }
 
   // Setup layouts

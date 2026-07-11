@@ -864,9 +864,11 @@ label, .text-\[10px\] {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PREMIUM PWA SPLASH SCREEN
+   CINEMATIC INTRO EXPERIENCE V3.0
+   "The first impression of an enterprise operating system"
    ═══════════════════════════════════════════════════════════════ */
 
+/* ── Container ────────────────────────────────────────────────── */
 #global-page-loader {
   position: fixed !important;
   inset: 0 !important;
@@ -877,137 +879,342 @@ label, .text-\[10px\] {
   justify-content: center !important;
   z-index: 999999 !important;
   opacity: 1;
-  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* Quick hide for redirects — no transition */
+#global-page-loader.hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Cinematic dissolve — smooth 0.5s fade */
+#global-page-loader.ci-dissolve {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ── Volumetric Depth Background ──────────────────────────────── */
+.ci-depth {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
 }
 
-#global-page-loader.hidden {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  display: flex !important; /* Keep display flex for animation but ignore layout */
-  visibility: hidden !important;
+.ci-orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform, opacity;
 }
 
-.sakra-splash-content {
+.ci-orb-1 {
+  width: 500px;
+  height: 500px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(37,99,235,0.08) 0%, transparent 70%);
+  filter: blur(60px);
+  opacity: 0;
+  animation: ci-ambient 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards,
+             ci-float-a 12s ease-in-out 2s infinite alternate;
+}
+
+.ci-orb-2 {
+  width: 350px;
+  height: 350px;
+  top: 45%;
+  left: 55%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%);
+  filter: blur(50px);
+  opacity: 0;
+  animation: ci-ambient 2s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards,
+             ci-float-b 14s ease-in-out 2.5s infinite alternate;
+}
+
+/* ── Glass Reflection Sweep ───────────────────────────────────── */
+.ci-glass {
+  position: absolute;
+  width: 250%;
+  height: 1px;
+  top: 47%;
+  left: -150%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.025) 40%,
+    rgba(255,255,255,0.05) 50%,
+    rgba(255,255,255,0.025) 60%,
+    transparent 100%
+  );
+  transform: rotate(-12deg);
+  opacity: 0;
+  animation: ci-glass-appear 0.3s ease 0.35s forwards,
+             ci-glass-move 4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.4s forwards;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ── Content Stage ────────────────────────────────────────────── */
+.ci-stage {
+  position: relative;
+  z-index: 10;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 1.75rem;
-  opacity: 0;
-  transform: scale(0.96);
-  animation: sakra-splash-fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.sakra-splash-logo-container {
-  width: 90px;
-  height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 0 20px rgba(134, 59, 255, 0.25));
-  animation: sakra-splash-logo-glow 2.5s ease-in-out infinite alternate;
+/* ── Logo Container ───────────────────────────────────────────── */
+.ci-logo-wrap {
+  position: relative;
+  width: 160px;
+  height: 154px;
+  margin-bottom: 2.25rem;
 }
 
-.sakra-splash-logo {
+@media (max-width: 768px) {
+  .ci-logo-wrap {
+    width: 120px;
+    height: 115px;
+    margin-bottom: 1.75rem;
+  }
+}
+
+.ci-logo-svg {
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
-.sakra-splash-text {
-  text-align: center;
+/* Stroke path — draws itself */
+.ci-stroke {
+  fill: none;
+  stroke: #863bff;
+  stroke-width: 0.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  will-change: stroke-dashoffset, opacity;
 }
 
-.sakra-splash-title {
-  font-family: 'Outfit', 'Inter', sans-serif;
-  font-size: 1.625rem;
-  letter-spacing: 0.12em;
-  margin: 0 0 0.5rem 0;
-  display: flex;
-  gap: 0.35rem;
-  justify-content: center;
-  line-height: 1.2;
+.ci-stroke.ci-active {
+  opacity: 1;
+  animation: ci-draw var(--draw-dur, 0.5s) cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }
 
-.sakra-title-primary {
-  font-weight: 800;
-  color: #ffffff;
+/* Full branded fill — revealed after stroke */
+.ci-fill {
+  opacity: 0;
+  will-change: opacity;
 }
 
-.sakra-title-secondary {
-  font-weight: 500;
-  color: #863bff;
+.ci-fill.ci-active {
+  animation: ci-reveal 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.sakra-splash-subtitle {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.725rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0;
-  font-weight: 400;
-  letter-spacing: 0.05em;
-}
-
-.sakra-splash-loading {
-  margin-top: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.sakra-loading-dots {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: center;
-  height: 12px;
-}
-
-.sakra-loading-dots span {
-  width: 6px;
-  height: 6px;
-  background-color: #863bff;
+/* Cyan pulse ring */
+.ci-pulse {
+  position: absolute;
+  inset: -25%;
   border-radius: 50%;
+  background: radial-gradient(circle, rgba(6,182,212,0.12) 0%, transparent 65%);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.ci-pulse.ci-active {
+  animation: ci-pulse-ring 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Light sweep across logo */
+.ci-sweep {
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ci-sweep.ci-active {
+  opacity: 1;
+  animation: ci-sweep-go 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* ── Welcome Text ─────────────────────────────────────────────── */
+.ci-welcome {
+  display: flex;
+  justify-content: center;
+  gap: 0.12em;
+  margin-bottom: 0.625rem;
+  height: 1.2em;
+  overflow: hidden;
+}
+
+.ci-welcome span {
   display: inline-block;
-  animation: sakra-bounce-dot 1.2s infinite ease-in-out both;
-}
-
-.sakra-loading-dots span:nth-child(1) { animation-delay: -0.32s; }
-.sakra-loading-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-.sakra-loading-status {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.625rem;
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  letter-spacing: 0.55em;
   text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+  opacity: 0;
+  transform: translateY(6px);
+  will-change: transform, opacity;
+}
+
+/* ── Brand Typography ─────────────────────────────────────────── */
+.ci-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.ci-brand-sakra {
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  font-weight: 900;
+  font-size: 2.75rem;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  opacity: 0;
+  transform: translateY(6px);
+  will-change: transform, opacity;
+}
+
+.ci-brand-sakra.ci-active {
+  animation: ci-converge-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ci-brand-finance {
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  font-weight: 500;
+  font-size: 2.75rem;
   letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.4);
+  color: #863bff;
+  opacity: 0;
+  transform: translateY(-6px);
+  will-change: transform, opacity;
 }
 
-@keyframes sakra-splash-fade-in {
-  to {
-    opacity: 1;
-    transform: scale(1);
+.ci-brand-finance.ci-active {
+  animation: ci-converge-down 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (max-width: 768px) {
+  .ci-brand-sakra,
+  .ci-brand-finance {
+    font-size: 1.875rem;
+  }
+  .ci-welcome span {
+    font-size: 0.5625rem;
   }
 }
 
-@keyframes sakra-splash-logo-glow {
-  0% {
-    filter: drop-shadow(0 0 15px rgba(134, 59, 255, 0.2)) saturate(100%);
-  }
-  100% {
-    filter: drop-shadow(0 0 35px rgba(134, 59, 255, 0.55)) saturate(120%);
-  }
+/* ── Subtitle ─────────────────────────────────────────────────── */
+.ci-subtitle {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-weight: 300;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0;
+  margin: 0;
+  will-change: opacity;
 }
 
-@keyframes sakra-bounce-dot {
-  0%, 80%, 100% { 
-    transform: scale(0.6);
-    opacity: 0.3;
-  } 40% { 
-    transform: scale(1.2);
-    opacity: 1;
-  }
+.ci-subtitle.ci-active {
+  animation: ci-fade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Background Glow Expansion ────────────────────────────────── */
+.ci-expand {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.7);
+  background: radial-gradient(ellipse, rgba(37,99,235,0.035) 0%, transparent 65%);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.ci-expand.ci-active {
+  animation: ci-glow-expand 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYFRAMES — GPU-optimized (opacity, transform only)
+   ═══════════════════════════════════════════════════════════════ */
+
+@keyframes ci-ambient {
+  to { opacity: 1; }
+}
+
+@keyframes ci-float-a {
+  0%   { transform: translate(-50%, -50%) translate(-20px, 10px); }
+  100% { transform: translate(-50%, -50%) translate(20px, -10px); }
+}
+
+@keyframes ci-float-b {
+  0%   { transform: translate(-50%, -50%) translate(15px, -15px); }
+  100% { transform: translate(-50%, -50%) translate(-15px, 15px); }
+}
+
+@keyframes ci-glass-appear {
+  to { opacity: 1; }
+}
+
+@keyframes ci-glass-move {
+  to { left: 100%; }
+}
+
+@keyframes ci-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ci-reveal {
+  to { opacity: 1; }
+}
+
+@keyframes ci-pulse-ring {
+  0%   { opacity: 0; transform: scale(0.85); }
+  40%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+
+@keyframes ci-sweep-go {
+  to { left: 160%; opacity: 1; }
+}
+
+@keyframes ci-letter {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ci-converge-up {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ci-converge-down {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ci-fade {
+  to { opacity: 1; }
+}
+
+@keyframes ci-glow-expand {
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1.03); }
 }
 
 /* PWA AUTO-UPDATE PROMPT */
