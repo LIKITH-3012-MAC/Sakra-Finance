@@ -5,7 +5,7 @@ import logging
 import json
 from typing import Optional, Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.requests import Request
 
 from app.models.audit_log import AuditLog
@@ -13,8 +13,8 @@ from app.models.audit_log import AuditLog
 logger = logging.getLogger("sakra.audit")
 
 
-def log_audit(
-    db: Session,
+async def log_audit(
+    db: AsyncSession,
     actor_id: int,
     action: str,
     table_name: str,
@@ -68,7 +68,7 @@ def log_audit(
     )
 
     db.add(audit_entry)
-    db.flush()
+    await db.flush()
 
     logger.info(
         "audit | actor=%d action=%s table=%s record=%s ip=%s",

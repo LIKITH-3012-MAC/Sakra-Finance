@@ -4,7 +4,7 @@ User model – represents application users (admins, agents, etc.).
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -12,6 +12,13 @@ from app.database.connection import Base
 
 class User(Base):
     __tablename__ = "users"
+
+    __table_args__ = (
+        Index("idx_users_email_status", "email", "status"),
+        Index("idx_users_role_status", "role", "status"),
+        Index("idx_users_created_at", "created_at"),
+        Index("idx_users_updated_at", "updated_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
@@ -25,10 +32,10 @@ class User(Base):
     
     
     # Password Reset & OTP flow attributes
-    reset_otp_hash = Column(String(255), nullable=True)
+    reset_otp_hash = Column(String(255), nullable=True, index=True)
     reset_otp_expires_at = Column(DateTime, nullable=True)
     reset_otp_attempts = Column(Integer, default=0, nullable=False)
-    reset_token = Column(String(255), nullable=True)
+    reset_token = Column(String(255), nullable=True, index=True)
     reset_token_expires_at = Column(DateTime, nullable=True)
 
     # Employee profile attributes

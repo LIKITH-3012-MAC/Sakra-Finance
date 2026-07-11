@@ -8,7 +8,8 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database.session import get_db
 from app.middleware.auth import get_current_user, PermissionRequirement
@@ -20,6 +21,8 @@ from app.schemas.common import APIResponse
 from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
 from app.services.audit import log_audit
 from app.exceptions.handlers import PaymentError, ConflictError, ExportError
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.payments")
 
@@ -32,7 +35,7 @@ ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN"]
 async def record_payment(
     payment_data: PaymentCreate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -40,12 +43,12 @@ async def record_payment(
     in the loan schedule.
     """
     # Verify loan exists
-    loan = LoanRepository.get_by_id(db, payment_data.loan_id)
+    loan = await LoanRepository.get_by_id(db, payment_data.loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
     try:
-        payment = PaymentRepository.create(
+        payment = await PaymentRepository.create(
             db=db,
             schema=payment_data,
             customer_id=loan.customer_id,
@@ -55,10 +58,12 @@ async def record_payment(
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
     # Update matching loan schedule installment
-    schedule_entry = db.query(LoanSchedule).filter(
+    stmt = select(LoanSchedule).filter(
         LoanSchedule.loan_id == payment_data.loan_id,
         LoanSchedule.due_date == payment_data.payment_date,
-    ).first()
+    )
+    result = await db.execute(stmt)
+    schedule_entry = result.scalars().first()
 
     if schedule_entry:
         schedule_entry.paid_amount = payment_data.amount_paid
@@ -71,7 +76,7 @@ async def record_payment(
         else:
             schedule_entry.status = "PARTIAL"
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="RECORD_PAYMENT",
@@ -85,14 +90,17 @@ async def record_payment(
         },
         request=request,
     )
-    db.commit()
+    await db.commit()
     
-    # Invalidate dashboard metrics cache
-    from app.services.cache import cache
-    cache.delete("dashboard_metrics")
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("payments:*")
+        await cache.invalidate_pattern("loans:*")
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     # Re-fetch for dynamic calculations
-    db.refresh(loan)
+    await db.refresh(loan)
 
     from app.services.loan_service import (
         get_customer_summary_details,
@@ -101,17 +109,17 @@ async def record_payment(
     )
     from app.services.interest import calculate_interest
 
-    loan_payments = PaymentRepository.list_by_loan(db, loan.id)
+    loan_payments = await PaymentRepository.list_by_loan(db, loan.id)
     total_paid_for_loan = sum((p.amount_paid for p in loan_payments), Decimal("0"))
     loan_total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
     remaining_balance_val = float(max(loan_total_due - total_paid_for_loan, Decimal("0")))
 
-    repayment_rows = get_loan_repayment_rows(db, loan)
+    repayment_rows = await get_loan_repayment_rows(db, loan)
     recorded_row = next((r for r in repayment_rows if r["payment_date"] == payment_data.payment_date.isoformat()), None)
     repayment_status = recorded_row["payment_status"] if recorded_row else "PAID"
 
-    customer_summary = get_customer_summary_details(db, loan.customer_id)
-    dashboard_metrics = get_dashboard_metrics_details(db)
+    customer_summary = await get_customer_summary_details(db, loan.customer_id)
+    dashboard_metrics = await get_dashboard_metrics_details(db)
 
     payment_dict = PaymentResponse.model_validate(payment).model_dump(mode="json")
     payment_dict["payment_status"] = repayment_status
@@ -134,25 +142,25 @@ async def modify_payment(
     payment_id: int,
     update_data: PaymentUpdate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
     Modify an existing payment. Creates a PaymentAdjustment record.
     Requires ADMIN role. Uses optimistic locking.
     """
-    payment = PaymentRepository.get_by_id(db, payment_id)
+    payment = await PaymentRepository.get_by_id(db, payment_id)
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
     old_amount = str(payment.amount_paid)
 
     try:
-        updated = PaymentRepository.update(db, payment, update_data)
+        updated = await PaymentRepository.update(db, payment, update_data)
     except ConflictError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="MODIFY_PAYMENT",
@@ -162,11 +170,14 @@ async def modify_payment(
         new_values={"amount_paid": str(updated.amount_paid)},
         request=request,
     )
-    db.commit()
+    await db.commit()
     
-    # Invalidate dashboard metrics cache
-    from app.services.cache import cache
-    cache.delete("dashboard_metrics")
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("payments:*")
+        await cache.invalidate_pattern("loans:*")
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -178,14 +189,27 @@ async def modify_payment(
 @router.get("/customer/{customer_id}", response_model=APIResponse)
 async def get_payments_by_customer(
     customer_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get all payments for a specific customer.
     """
-    payments = PaymentRepository.list_by_customer(db, customer_id)
+    cache_key = f"payments:customer:{customer_id}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message=f"Retrieved payments for customer #{customer_id} (cached)",
+                data=cached_data,
+            )
+
+    payments = await PaymentRepository.list_by_customer(db, customer_id)
     payments_data = [PaymentResponse.model_validate(p).model_dump(mode="json") for p in payments]
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, payments_data, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
@@ -197,18 +221,31 @@ async def get_payments_by_customer(
 @router.get("/loan/{loan_id}", response_model=APIResponse)
 async def get_payments_by_loan(
     loan_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get all repayment rows (installments + payments) for a specific loan.
     """
-    loan = LoanRepository.get_by_id(db, loan_id)
+    cache_key = f"payments:loan:{loan_id}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message=f"Retrieved repayment rows for loan #{loan_id} (cached)",
+                data=cached_data,
+            )
+
+    loan = await LoanRepository.get_by_id(db, loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
     from app.services.loan_service import get_loan_repayment_rows
-    repayment_rows = get_loan_repayment_rows(db, loan)
+    repayment_rows = await get_loan_repayment_rows(db, loan)
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, repayment_rows, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
@@ -217,30 +254,43 @@ async def get_payments_by_loan(
     )
 
 
-
 @router.get("/today", response_model=APIResponse)
 async def get_today_payments(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get all payments recorded for today.
     """
     today = date.today()
-    payments = PaymentRepository.list_today(db, today)
+    cache_key = f"payments:today:{today.isoformat()}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message=f"Retrieved today's payments (cached)",
+                data=cached_data,
+            )
+
+    payments = await PaymentRepository.list_today(db, today)
     payments_data = [PaymentResponse.model_validate(p).model_dump(mode="json") for p in payments]
 
     total_amount = sum((p.amount_paid for p in payments), Decimal("0"))
+    response_data = {
+        "date": today.isoformat(),
+        "payments": payments_data,
+        "total_amount": str(total_amount),
+        "count": len(payments_data),
+    }
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, response_data, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
         message=f"Retrieved {len(payments_data)} payments for {today.isoformat()}",
-        data={
-            "date": today.isoformat(),
-            "payments": payments_data,
-            "total_amount": str(total_amount),
-            "count": len(payments_data),
-        },
+        data=response_data,
     )
 
 
@@ -248,7 +298,7 @@ async def get_today_payments(
 async def export_payments_csv(
     loan_id: int = Query(None, description="Filter by loan ID"),
     customer_id: int = Query(None, description="Filter by customer ID"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -257,17 +307,16 @@ async def export_payments_csv(
     """
     try:
         import pandas as pd
-
         from app.models.payment import Payment
 
-        query = db.query(Payment)
-
+        stmt = select(Payment)
         if loan_id:
-            query = query.filter(Payment.loan_id == loan_id)
+            stmt = stmt.filter(Payment.loan_id == loan_id)
         if customer_id:
-            query = query.filter(Payment.customer_id == customer_id)
+            stmt = stmt.filter(Payment.customer_id == customer_id)
 
-        payments = query.order_by(Payment.payment_date.desc()).all()
+        res = await db.execute(stmt.order_by(Payment.payment_date.desc()))
+        payments = res.scalars().all()
 
         # Build dataframe
         data = []

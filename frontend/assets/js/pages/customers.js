@@ -602,19 +602,23 @@ function renderRegistry() {
     window.lucide.createIcons();
   }
 
-  // Row navigation trigger click setup (Desktop rows)
+  // Row selection setup (Desktop rows)
   tableBody.querySelectorAll("tr").forEach(row => {
     row.addEventListener("click", () => {
       const id = row.getAttribute("data-id");
-      window.location.href = `/customer-profile.html?id=${id}`;
+      tableBody.querySelectorAll("tr").forEach(r => r.classList.remove("bg-blue-50/40", "border-l-4", "border-primary"));
+      row.classList.add("bg-blue-50/40", "border-l-4", "border-primary");
+      selectCustomer(id);
     });
   });
 
-  // Card navigation trigger click setup (Mobile cards)
+  // Card selection setup (Mobile cards)
   mobileCardsContainer.querySelectorAll(".glass-card").forEach(card => {
     card.addEventListener("click", () => {
       const id = card.getAttribute("data-id");
-      window.location.href = `/customer-profile.html?id=${id}`;
+      mobileCardsContainer.querySelectorAll(".glass-card").forEach(c => c.classList.remove("border-primary"));
+      card.classList.add("border-primary");
+      selectCustomer(id);
     });
   });
 }
@@ -811,3 +815,430 @@ setTimeout(init, 100);
 window.addEventListener("language-changed", () => {
   renderRegistry();
 });
+
+let selectedCustomerId = null;
+let customerAnalyticsCache = {};
+
+let activeCharts = {
+  repaymentTimeline: null,
+  paymentPattern: null,
+  outstandingBalance: null,
+  paymentConsistency: null,
+  cumulativeCollection: null
+};
+
+function destroyExistingCharts() {
+  Object.keys(activeCharts).forEach(key => {
+    if (activeCharts[key]) {
+      activeCharts[key].destroy();
+      activeCharts[key] = null;
+    }
+  });
+}
+
+async function selectCustomer(id) {
+  if (selectedCustomerId === id) return;
+  selectedCustomerId = id;
+
+  const emptyState = document.getElementById("analytics-empty-state");
+  const activePanel = document.getElementById("analytics-active-panel");
+
+  // Fade out old charts if they are visible
+  if (!activePanel.classList.contains("hidden")) {
+    activePanel.classList.remove("opacity-100");
+    activePanel.classList.add("opacity-0");
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+
+  // Check cache first
+  let data;
+  if (customerAnalyticsCache[id]) {
+    data = customerAnalyticsCache[id];
+  } else {
+    try {
+      const res = await api.get(`/customers/${id}`);
+      data = res.data || res;
+      customerAnalyticsCache[id] = data;
+    } catch (err) {
+      console.error("Failed to fetch customer details for analytics:", err);
+      alert("Error loading customer analytics data.");
+      return;
+    }
+  }
+
+  // Populate Profile Header
+  const { customer, loans = [], aggregate_payments = [], credit_score, summary = {} } = data;
+  const activeLoan = loans.find(l => l.status === "ACTIVE" || l.status === "OVERDUE") || loans[0];
+
+  document.getElementById("detail-profile-photo").src = `/api/v1/customers/${customer.id}/photo?t=${new Date().getTime()}`;
+  document.getElementById("detail-profile-name").innerText = customer.name;
+  document.getElementById("detail-profile-phone").innerText = customer.phone_number;
+  document.getElementById("detail-profile-aadhar").innerText = customer.aadhar_masked || "—";
+  document.getElementById("detail-profile-id").innerText = `#${customer.id}`;
+  document.getElementById("detail-profile-dob-gender").innerText = `${customer.date_of_birth || "—"} / ${customer.gender || "—"}`;
+  document.getElementById("detail-profile-occupation").innerText = customer.occupation || "—";
+  document.getElementById("detail-profile-address").innerText = customer.address || "—";
+
+  // KPIs
+  const principal = activeLoan ? parseFloat(activeLoan.principal_amount) : 0;
+  const interest = activeLoan ? parseFloat(activeLoan.interest_amount) : 0;
+  const repayable = activeLoan ? parseFloat(activeLoan.total_repayable_amount) : 0;
+  const paid = activeLoan ? parseFloat(activeLoan.balance_summary.total_paid) : 0;
+  const remaining = activeLoan ? parseFloat(activeLoan.balance_summary.remaining_balance) : 0;
+  const completion = repayable > 0 ? (paid / repayable) * 100 : 0;
+  const cScore = credit_score || 700;
+
+  // Risk Rating
+  let riskLevel = "MEDIUM";
+  if (cScore >= 750) riskLevel = "LOW RISK";
+  else if (cScore < 650) riskLevel = "HIGH RISK";
+
+  // Timeline & Payments Info
+  let daysRemaining = 0;
+  let nextPaymentText = "—";
+  if (activeLoan) {
+    const today = new Date();
+    const dueDate = new Date(activeLoan.loan_end_date);
+    const diffTime = dueDate.getTime() - today.getTime();
+    daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    
+    // Find next unpaid schedule
+    const sortedSchedules = [...(activeLoan.schedules || [])].sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    const nextUnpaid = sortedSchedules.find(s => s.status !== "PAID");
+    if (nextUnpaid) {
+      nextPaymentText = `${nextUnpaid.due_date} (₹${parseFloat(nextUnpaid.installment_amount).toLocaleString("en-IN")})`;
+    }
+  }
+
+  const sortedPayments = [...(aggregate_payments || [])].sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
+  const lastPayment = sortedPayments[sortedPayments.length - 1];
+  const lastPaymentText = lastPayment ? `${lastPayment.payment_date} (₹${parseFloat(lastPayment.amount_paid).toLocaleString("en-IN")})` : "—";
+
+  document.getElementById("kpi-principal").innerText = formatCurrency(principal);
+  document.getElementById("kpi-interest").innerText = formatCurrency(interest);
+  document.getElementById("kpi-repayable").innerText = formatCurrency(repayable);
+  document.getElementById("kpi-collected").innerText = formatCurrency(paid);
+  document.getElementById("kpi-remaining").innerText = formatCurrency(remaining);
+  document.getElementById("kpi-completion").innerText = `${completion.toFixed(2)}%`;
+  document.getElementById("kpi-credit-score").innerText = cScore;
+  document.getElementById("kpi-risk-score").innerText = riskLevel;
+  document.getElementById("kpi-expected-emi").innerText = activeLoan ? formatCurrency(parseFloat(activeLoan.daily_installment)) : "₹0.00";
+  document.getElementById("kpi-days-remaining").innerText = activeLoan ? `${daysRemaining} days` : "—";
+  document.getElementById("kpi-last-payment").innerText = lastPaymentText;
+  document.getElementById("kpi-next-payment").innerText = nextPaymentText;
+
+  // Render Charts
+  destroyExistingCharts();
+  renderRepaymentTimeline(sortedPayments, repayable);
+  renderPaymentPattern(loans, sortedPayments);
+  renderOutstandingTrend(loans, sortedPayments, repayable);
+  renderPaymentConsistency(activeLoan, sortedPayments);
+  renderCumulativeCollection(sortedPayments);
+
+  // Update Icons inside summary
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+
+  // Animate Entrance
+  emptyState.classList.add("hidden");
+  activePanel.classList.remove("hidden");
+  
+  // Force reflow and add opacity class for transitions
+  activePanel.offsetHeight;
+  activePanel.classList.remove("opacity-0");
+  activePanel.classList.add("opacity-100");
+
+  // Scroll smoothly to analytics section
+  document.getElementById("customer-analytics-workspace").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderRepaymentTimeline(payments, totalRepayable) {
+  const ctx = document.getElementById("chart-repayment-timeline").getContext("2d");
+  
+  let running = totalRepayable;
+  const data = payments.map(p => {
+    running -= parseFloat(p.amount_paid);
+    return {
+      x: p.payment_date,
+      y: parseFloat(p.amount_paid),
+      mode: p.payment_mode || "CASH",
+      running: running
+    };
+  });
+
+  activeCharts.repaymentTimeline = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: data.map(d => d.x),
+      datasets: [{
+        label: "Repayments",
+        data: data,
+        borderColor: "rgb(59, 130, 246)",
+        backgroundColor: "rgba(59, 130, 246, 0.1)",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const raw = context.raw;
+              return [
+                `Amount: ₹${raw.y.toLocaleString("en-IN")}`,
+                `Mode: ${raw.mode}`,
+                `Running Balance: ₹${Math.max(0, raw.running).toLocaleString("en-IN")}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+function renderPaymentPattern(loans, payments) {
+  const ctx = document.getElementById("chart-payment-pattern").getContext("2d");
+  
+  const firstLoanStart = loans.length > 0 ? new Date(loans[0].loan_start_date) : new Date();
+
+  const data = payments.map(p => {
+    const payDate = new Date(p.payment_date);
+    const dayIndex = Math.max(0, Math.round((payDate - firstLoanStart) / (1000 * 60 * 60 * 24)));
+    
+    let color = "rgb(16, 185, 129)"; // Green
+    if (p.payment_status === "PARTIAL") {
+      color = "rgb(245, 158, 11)"; // Yellow
+    } else if (p.payment_status === "LATE") {
+      color = "rgb(239, 68, 68)"; // Red
+    }
+
+    return {
+      x: dayIndex,
+      y: parseFloat(p.amount_paid),
+      id: p.id,
+      mode: p.payment_mode,
+      color: color,
+      date: p.payment_date
+    };
+  });
+
+  activeCharts.paymentPattern = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        data: data,
+        pointBackgroundColor: data.map(d => d.color),
+        pointBorderColor: data.map(d => d.color),
+        pointRadius: 6,
+        pointHoverRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const raw = context.raw;
+              return [
+                `Payment ID: #${raw.id}`,
+                `Date: ${raw.date} (Day ${raw.x})`,
+                `Amount: ₹${raw.y.toLocaleString("en-IN")}`,
+                `Mode: ${raw.mode}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { 
+          title: { display: true, text: "Days offset since loan start", font: { size: 9 } },
+          grid: { color: "rgba(0, 0, 0, 0.05)" }, 
+          ticks: { font: { size: 9 } } 
+        },
+        y: { 
+          title: { display: true, text: "Amount Paid (₹)", font: { size: 9 } },
+          grid: { color: "rgba(0, 0, 0, 0.05)" }, 
+          ticks: { font: { size: 9 } } 
+        }
+      }
+    }
+  });
+}
+
+function renderOutstandingTrend(loans, payments, totalRepayable) {
+  const ctx = document.getElementById("chart-outstanding-balance").getContext("2d");
+
+  const trendData = [{ x: loans[0]?.loan_start_date || new Date().toISOString().split("T")[0], y: totalRepayable }];
+  let currentBal = totalRepayable;
+  payments.forEach(p => {
+    currentBal = Math.max(0, currentBal - parseFloat(p.amount_paid));
+    trendData.push({ x: p.payment_date, y: currentBal });
+  });
+
+  activeCharts.outstandingBalance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: trendData.map(d => d.x),
+      datasets: [{
+        label: "Outstanding Balance",
+        data: trendData,
+        borderColor: "rgb(6, 182, 212)",
+        backgroundColor: "rgba(6, 182, 212, 0.1)",
+        tension: 0.4,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `Outstanding: ₹${context.raw.y.toLocaleString("en-IN")}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+function renderPaymentConsistency(loan, payments) {
+  const ctx = document.getElementById("chart-payment-consistency").getContext("2d");
+
+  const expectedEmi = loan ? parseFloat(loan.daily_installment || 0) : 0;
+  
+  const data = payments.map(p => {
+    const amt = parseFloat(p.amount_paid);
+    let comparison = "On-time";
+    if (amt > expectedEmi) comparison = "Extra payment";
+    else if (amt < expectedEmi) comparison = "Missed/Partial payment";
+    
+    return {
+      x: p.payment_date,
+      y: amt,
+      expected: expectedEmi,
+      comparison: comparison
+    };
+  });
+
+  activeCharts.paymentConsistency = new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [
+        {
+          label: "Actual Payments",
+          data: data,
+          pointBackgroundColor: "rgb(59, 130, 246)",
+          pointBorderColor: "rgb(59, 130, 246)",
+          pointRadius: 5,
+          pointHoverRadius: 7
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const raw = context.raw;
+              return [
+                `Date: ${raw.x}`,
+                `Paid: ₹${raw.y.toLocaleString("en-IN")}`,
+                `Expected EMI: ₹${raw.expected.toLocaleString("en-IN")}`,
+                `Status: ${raw.comparison}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } },
+        y: { 
+          grid: { color: "rgba(0, 0, 0, 0.05)" }, 
+          ticks: { font: { size: 9 } }
+        }
+      }
+    }
+  });
+}
+
+function renderCumulativeCollection(payments) {
+  const ctx = document.getElementById("chart-cumulative-collection").getContext("2d");
+
+  const cumulativeData = [];
+  let cumulativeSum = 0;
+  payments.forEach(p => {
+    cumulativeSum += parseFloat(p.amount_paid);
+    cumulativeData.push({ x: p.payment_date, y: cumulativeSum });
+  });
+
+  activeCharts.cumulativeCollection = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: cumulativeData.map(d => d.x),
+      datasets: [{
+        label: "Cumulative Collected",
+        data: cumulativeData,
+        borderColor: "rgb(37, 99, 235)",
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        backgroundColor: function(context) {
+          const chart = context.chart;
+          const {ctx, chartArea} = chart;
+          if (!chartArea) return null;
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, "rgba(59, 130, 246, 0.25)");
+          gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
+          return gradient;
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `Cumulative Paid: ₹${context.raw.y.toLocaleString("en-IN")}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: "rgba(0, 0, 0, 0.05)" }, ticks: { font: { size: 9 } } }
+      }
+    }
+  });
+}

@@ -4,7 +4,7 @@ Customer model – represents loan customers with encrypted Aadhaar data.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -12,6 +12,12 @@ from app.database.connection import Base
 
 class Customer(Base):
     __tablename__ = "customers"
+
+    __table_args__ = (
+        Index("idx_customers_created_at", "created_at"),
+        Index("idx_customers_updated_at", "updated_at"),
+        Index("idx_customers_is_deleted_created_at", "is_deleted", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False, index=True)

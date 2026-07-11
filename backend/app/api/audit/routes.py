@@ -1,6 +1,8 @@
 import logging
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
+import asyncio
+from fastapi import APIRouter, Depends, Query, status, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import Any
 
 from app.database.session import get_db
@@ -16,15 +18,22 @@ router = APIRouter()
 @router.get("/", response_model=APIResponse)
 async def get_audit_logs(
     page: int = Query(1, ge=1),
-    limit: int = Query(25, ge=1, le=100),
+    limit: int = Query(25, ge=1, le=1000),  # Max limit up to 1000 records
     action_filter: str = Query(None),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Retrieve security audit logs (immutability logs).
     Super Admin role clearance only.
     """
+    # Enforce maximum pagination limit check
+    if limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum allowed limit is 1000 records per request"
+        )
+
     if current_user.role != "SUPER_ADMIN":
         return APIResponse(
             success=False,
@@ -32,8 +41,8 @@ async def get_audit_logs(
             errors={"detail": "Unauthorized"},
         )
 
-    # Base Query
-    query = db.query(
+    # Base query specifying only required columns (avoiding SELECT *)
+    stmt = select(
         AuditLog.id,
         AuditLog.action,
         AuditLog.table_name,
@@ -46,16 +55,24 @@ async def get_audit_logs(
         User.username.label("actor_username")
     ).outerjoin(User, AuditLog.actor_id == User.id)
 
-    # Filter
+    # Count query
+    count_stmt = select(func.count(AuditLog.id))
+
+    # Apply filters
     if action_filter:
-        query = query.filter(AuditLog.action.like(f"%{action_filter}%"))
+        stmt = stmt.filter(AuditLog.action.like(f"%{action_filter}%"))
+        count_stmt = count_stmt.filter(AuditLog.action.like(f"%{action_filter}%"))
 
-    # Total Count
-    total = query.count()
-
-    # Pagination
+    # Pagination calculation
     skip = (page - 1) * limit
-    logs_result = query.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit).all()
+    
+    # Run queries in parallel
+    res_task = db.execute(stmt.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
+    count_task = db.execute(count_stmt)
+
+    res, count_res = await asyncio.gather(res_task, count_task)
+    logs_result = res.all()
+    total = count_res.scalar() or 0
 
     # Convert row objects to dictionaries
     logs_data = []

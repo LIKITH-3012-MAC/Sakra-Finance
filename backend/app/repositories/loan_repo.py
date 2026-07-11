@@ -3,8 +3,8 @@ Loan repository with schedule generation and optimistic locking.
 """
 from typing import Optional
 from decimal import Decimal
-
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.loan import Loan
 from app.models.loan_schedule import LoanSchedule
@@ -17,19 +17,23 @@ class LoanRepository:
     """Repository for Loan model database operations."""
 
     @staticmethod
-    def get_by_id(db: Session, loan_id: int) -> Optional[Loan]:
+    async def get_by_id(db: AsyncSession, loan_id: int) -> Optional[Loan]:
         """Get a loan by ID."""
-        return db.query(Loan).filter(Loan.id == loan_id).first()
+        stmt = select(Loan).filter(Loan.id == loan_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def list_by_customer(db: Session, customer_id: int) -> list[Loan]:
+    async def list_by_customer(db: AsyncSession, customer_id: int) -> list[Loan]:
         """Get all loans for a specific customer."""
-        return db.query(Loan).filter(
+        stmt = select(Loan).filter(
             Loan.customer_id == customer_id,
-        ).order_by(Loan.created_at.desc()).all()
+        ).order_by(Loan.created_at.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     @staticmethod
-    def create(db: Session, schema: LoanCreate, creator_id: int) -> Loan:
+    async def create(db: AsyncSession, schema: LoanCreate, creator_id: int) -> Loan:
         """
         Create a new loan with calculated end date and auto-generated schedule.
 
@@ -76,7 +80,7 @@ class LoanRepository:
         )
 
         db.add(loan)
-        db.flush()  # Get the loan ID
+        await db.flush()  # Get the loan ID
 
         # Generate and insert schedule records
         schedule_data = generate_loan_schedule(
@@ -100,11 +104,11 @@ class LoanRepository:
             )
             db.add(schedule_record)
 
-        db.flush()
+        await db.flush()
         return loan
 
     @staticmethod
-    def update(db: Session, loan: Loan, schema: LoanUpdate) -> Loan:
+    async def update(db: AsyncSession, loan: Loan, schema: LoanUpdate) -> Loan:
         """
         Update loan fields with optimistic locking.
 
@@ -153,7 +157,9 @@ class LoanRepository:
             daily_inst = (total_repayable / Decimal(str(duration))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             
             # Fetch all payments to subtract from total repayable
-            all_payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
+            stmt = select(Payment).filter(Payment.loan_id == loan.id)
+            result = await db.execute(stmt)
+            all_payments = result.scalars().all()
             total_paid = sum(p.amount_paid for p in all_payments)
             remaining = max(total_repayable - total_paid, Decimal("0"))
             
@@ -163,10 +169,12 @@ class LoanRepository:
             loan.remaining_balance = remaining
 
         loan.version_id += 1
-        db.flush()
+        await db.flush()
         return loan
 
     @staticmethod
-    def get_active_loans(db: Session) -> list[Loan]:
+    async def get_active_loans(db: AsyncSession) -> list[Loan]:
         """Get all loans with ACTIVE status."""
-        return db.query(Loan).filter(Loan.status == "ACTIVE").all()
+        stmt = select(Loan).filter(Loan.status == "ACTIVE")
+        result = await db.execute(stmt)
+        return list(result.scalars().all())

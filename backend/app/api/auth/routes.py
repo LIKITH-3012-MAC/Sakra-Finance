@@ -4,11 +4,12 @@ Authentication routes: login, refresh, logout, current user, invitations, accoun
 import uuid
 import secrets
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, and_
 from pydantic import BaseModel, EmailStr
 
 from app.core.security import hash_password, verify_password, validate_password_strength
@@ -20,11 +21,14 @@ from app.models.user_session import UserSession
 from app.models.user_invitation import UserInvitation
 from app.models.user_password_history import UserPasswordHistory
 from app.models.login_log import LoginLog
+from app.models.notification import Notification
 from app.repositories.user_repo import UserRepository
 from app.schemas.common import APIResponse
 from app.schemas.user import UserLogin, UserResponse, TokenResponse
 from app.services.audit import log_audit
 from app.core.celery_app import send_email_async
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.auth")
 
@@ -50,12 +54,12 @@ async def login(
     credentials: UserLogin,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Authenticate user. Creates a database session and returns access + refresh tokens.
     """
-    user = UserRepository.get_by_username(db, credentials.username)
+    user = await UserRepository.get_by_username(db, credentials.username)
 
     user_agent = request.headers.get("user-agent", "")
     ip_addr = request.client.host
@@ -76,7 +80,7 @@ async def login(
             reason="INVALID_PASSWORD"
         )
         db.add(log)
-        db.commit()
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -97,7 +101,7 @@ async def login(
             reason=f"ACCOUNT_LOCKED_{user.status.upper()}"
         )
         db.add(log)
-        db.commit()
+        await db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Account is {user.status}. Please contact an administrator.",
@@ -133,7 +137,7 @@ async def login(
         reason="LOGIN_SUCCESS"
     )
     db.add(log)
-    db.commit()
+    await db.commit()
 
     # Generate tokens including session ID (`sid`)
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": session_id})
@@ -166,7 +170,7 @@ async def login(
 async def refresh_token(
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Rotate tokens. Restricts rotation to active session hashes.
@@ -189,7 +193,9 @@ async def refresh_token(
 
     sid = payload.get("sid")
     if sid:
-        active_sess = db.query(UserSession).filter(UserSession.id == sid, UserSession.is_active == True).first()
+        stmt = select(UserSession).filter(UserSession.id == sid, UserSession.is_active == True)
+        result = await db.execute(stmt)
+        active_sess = result.scalars().first()
         if not active_sess:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -197,7 +203,7 @@ async def refresh_token(
             )
 
     user_id = payload.get("sub")
-    user = UserRepository.get_by_id(db, int(user_id))
+    user = await UserRepository.get_by_id(db, int(user_id))
 
     if not user or user.status != "active":
         raise HTTPException(
@@ -232,7 +238,7 @@ async def refresh_token(
 async def logout(
     request: Request,
     response: Response,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -248,10 +254,15 @@ async def logout(
             payload = decode_token(token)
             sid = payload.get("sid")
             if sid:
-                sess = db.query(UserSession).filter(UserSession.id == sid).first()
+                stmt = select(UserSession).filter(UserSession.id == sid)
+                result = await db.execute(stmt)
+                sess = result.scalars().first()
                 if sess:
                     sess.is_active = False
-                    db.commit()
+                    await db.commit()
+                    # Evict session cache
+                    if settings.CACHE_ENABLED:
+                        await cache.delete(f"auth:session:{sid}")
         except Exception:
             pass
 
@@ -259,11 +270,14 @@ async def logout(
 
 
 @router.get("/invite-validate", response_model=APIResponse)
-async def invite_validate(token: str, db: Session = Depends(get_db)):
+async def invite_validate(token: str, db: AsyncSession = Depends(get_db)):
     """
     Validates a pending invitation token.
     """
-    invite = db.query(UserInvitation).filter(UserInvitation.token == token).first()
+    stmt = select(UserInvitation).filter(UserInvitation.token == token)
+    result = await db.execute(stmt)
+    invite = result.scalars().first()
+
     if not invite:
         raise HTTPException(status_code=400, detail="Invalid onboarding token.")
     if invite.status != "PENDING":
@@ -289,12 +303,15 @@ async def activate_account(
     payload: AccountActivateRequest,
     request: Request,
     response: Response,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Onboard invited employee. Validates temp credentials, checks password policy and history.
     """
-    invite = db.query(UserInvitation).filter(UserInvitation.token == payload.token).first()
+    stmt = select(UserInvitation).filter(UserInvitation.token == payload.token)
+    result = await db.execute(stmt)
+    invite = result.scalars().first()
+
     if not invite or invite.status != "PENDING" or invite.expires_at < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Invalid or expired invitation token.")
 
@@ -312,7 +329,12 @@ async def activate_account(
     base_username = invite.email.split("@")[0].lower()
     username = base_username
     counter = 1
-    while db.query(User).filter(User.username == username).first():
+
+    while True:
+        stmt = select(User).filter(User.username == username)
+        result = await db.execute(stmt)
+        if not result.scalars().first():
+            break
         username = f"{base_username}{counter}"
         counter += 1
 
@@ -320,7 +342,10 @@ async def activate_account(
     new_hash = hash_password(payload.new_password)
 
     # Check for existing invited user record to update
-    user = db.query(User).filter(User.email == invite.email, User.is_deleted == False).first()
+    stmt = select(User).filter(User.email == invite.email, User.is_deleted == False)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
     if not user:
         user = User(
             username=username,
@@ -349,7 +374,7 @@ async def activate_account(
         user.designation = invite.designation
         user.phone_number = invite.phone_number
 
-    db.flush()
+    await db.flush()
 
     # Commit to password history
     history = UserPasswordHistory(user_id=user.id, password_hash=new_hash)
@@ -357,7 +382,7 @@ async def activate_account(
 
     # Update invite record status
     invite.status = "USED"
-    db.commit()
+    await db.commit()
 
     # Start login session
     session_id = str(uuid.uuid4())
@@ -393,7 +418,7 @@ async def activate_account(
         reason="ACTIVATION_SUCCESS"
     )
     db.add(log)
-    db.commit()
+    await db.commit()
 
     # Generate and set cookies
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": session_id})
@@ -434,11 +459,14 @@ class ResetPasswordWithTokenRequest(BaseModel):
     new_password: str
 
 @router.post("/forgot-password", response_model=APIResponse)
-async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """
     Generate a 6-digit OTP code for password resets, hash it, and dispatch via Resend.
     """
-    user = db.query(User).filter(User.email == payload.email, User.is_deleted == False).first()
+    stmt = select(User).filter(User.email == payload.email, User.is_deleted == False)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
     if not user:
         # Prevent username enumeration checks by returning success message anyway
         return APIResponse(success=True, message="If the email exists, a verification code has been dispatched.")
@@ -448,7 +476,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
     user.reset_otp_hash = hash_password(otp)
     user.reset_otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
     user.reset_otp_attempts = 0
-    db.commit()
+    await db.commit()
 
     otp_html = f"""
     <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; background: #0b0f19; color: #f1f5f9; padding: 32px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
@@ -474,11 +502,14 @@ async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(
 
 
 @router.post("/verify-otp", response_model=APIResponse)
-async def verify_otp(payload: VerifyOTPRequest, request: Request, db: Session = Depends(get_db)):
+async def verify_otp(payload: VerifyOTPRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """
     Verify the 6-digit OTP code. If correct, generate a short-lived reset token and return it.
     """
-    user = db.query(User).filter(User.email == payload.email, User.is_deleted == False).first()
+    stmt = select(User).filter(User.email == payload.email, User.is_deleted == False)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
     if not user:
         raise HTTPException(status_code=400, detail="Invalid request parameters.")
 
@@ -493,7 +524,7 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: Session = 
     # Validate OTP value
     if not user.reset_otp_hash or not verify_password(payload.otp, user.reset_otp_hash):
         user.reset_otp_attempts += 1
-        db.commit()
+        await db.commit()
         raise HTTPException(status_code=400, detail="Incorrect verification code.")
 
     # OTP is valid, generate secure random reset token
@@ -506,7 +537,7 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: Session = 
     user.reset_otp_expires_at = None
     user.reset_otp_attempts = 0
     
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=user.id,
         action="VERIFY_OTP_SUCCESS",
@@ -514,7 +545,7 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: Session = 
         record_id=user.id,
         request=request
     )
-    db.commit()
+    await db.commit()
 
     return APIResponse(
         success=True,
@@ -524,11 +555,14 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: Session = 
 
 
 @router.post("/reset-password", response_model=APIResponse)
-async def reset_password(payload: ResetPasswordWithTokenRequest, request: Request, db: Session = Depends(get_db)):
+async def reset_password(payload: ResetPasswordWithTokenRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """
     Validate the reset token, verify password strength rules, check history, and update password hash.
     """
-    user = db.query(User).filter(User.email == payload.email, User.is_deleted == False).first()
+    stmt = select(User).filter(User.email == payload.email, User.is_deleted == False)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
     if not user:
         raise HTTPException(status_code=400, detail="Invalid request parameters.")
 
@@ -546,7 +580,10 @@ async def reset_password(payload: ResetPasswordWithTokenRequest, request: Reques
         raise HTTPException(status_code=400, detail="Password rules failed: " + "; ".join(strength_errors))
 
     # Password history constraints (last 5 checks)
-    history_entries = db.query(UserPasswordHistory).filter(UserPasswordHistory.user_id == user.id).order_by(UserPasswordHistory.created_at.desc()).limit(5).all()
+    stmt = select(UserPasswordHistory).filter(UserPasswordHistory.user_id == user.id).order_by(UserPasswordHistory.created_at.desc()).limit(5)
+    result = await db.execute(stmt)
+    history_entries = result.scalars().all()
+
     for row in history_entries:
         if verify_password(payload.new_password, row.password_hash):
             raise HTTPException(status_code=400, detail="You cannot reuse any of your last 5 passwords.")
@@ -564,7 +601,11 @@ async def reset_password(payload: ResetPasswordWithTokenRequest, request: Reques
     db.add(history)
 
     # Invalidate all active user login sessions
-    db.query(UserSession).filter(UserSession.user_id == user.id).update({UserSession.is_active: False})
+    await db.execute(
+        update(UserSession)
+        .where(UserSession.user_id == user.id)
+        .values(is_active=False)
+    )
 
     # Notification
     notif = Notification(
@@ -574,7 +615,7 @@ async def reset_password(payload: ResetPasswordWithTokenRequest, request: Reques
     )
     db.add(notif)
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=user.id,
         action="RESET_PASSWORD_SUCCESS",
@@ -582,7 +623,11 @@ async def reset_password(payload: ResetPasswordWithTokenRequest, request: Reques
         record_id=user.id,
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Clear auth caches
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:user:{user.id}")
 
     return APIResponse(success=True, message="Password updated successfully. Active sessions terminated.")
 
@@ -605,11 +650,14 @@ async def get_me(
 
 @router.get("/me/sessions", response_model=APIResponse)
 async def get_my_sessions(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List active devices for current employee profile."""
-    sessions = db.query(UserSession).filter(UserSession.user_id == current_user.id, UserSession.is_active == True).order_by(UserSession.last_active_at.desc()).all()
+    stmt = select(UserSession).filter(UserSession.user_id == current_user.id, UserSession.is_active == True).order_by(UserSession.last_active_at.desc())
+    res = await db.execute(stmt)
+    sessions = res.scalars().all()
+
     out = []
     for s in sessions:
         out.append({
@@ -627,22 +675,29 @@ async def get_my_sessions(
 @router.post("/me/sessions/{session_id}/revoke", response_model=APIResponse)
 async def revoke_my_session(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Logout a specific active device profile."""
-    sess = db.query(UserSession).filter(UserSession.id == session_id, UserSession.user_id == current_user.id).first()
+    stmt = select(UserSession).filter(UserSession.id == session_id, UserSession.user_id == current_user.id)
+    res = await db.execute(stmt)
+    sess = res.scalars().first()
+
     if not sess:
         raise HTTPException(status_code=404, detail="Device session not found.")
     sess.is_active = False
-    db.commit()
+    await db.commit()
+
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:session:{session_id}")
+
     return APIResponse(success=True, message="Device profile logged out successfully")
 
 
 @router.post("/me/sessions/revoke-all", response_model=APIResponse)
 async def revoke_all_other_sessions(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Logout all other devices, keeping current session active."""
@@ -656,12 +711,19 @@ async def revoke_all_other_sessions(
         except Exception:
             pass
 
-    query = db.query(UserSession).filter(UserSession.user_id == current_user.id, UserSession.is_active == True)
+    upd_stmt = update(UserSession).where(
+        and_(UserSession.user_id == current_user.id, UserSession.is_active == True)
+    )
     if current_sid:
-        query = query.filter(UserSession.id != current_sid)
+        upd_stmt = upd_stmt.where(UserSession.id != current_sid)
 
-    query.update({UserSession.is_active: False}, synchronize_session=False)
-    db.commit()
+    await db.execute(upd_stmt.values(is_active=False))
+    await db.commit()
+
+    # Clear other session caches
+    if settings.CACHE_ENABLED:
+        # Invalidate pattern is safest
+        await cache.invalidate_pattern("auth:session:*")
 
     return APIResponse(success=True, message="All other device sessions revoked.")
 
@@ -673,7 +735,7 @@ class LanguageUpdateRequest(BaseModel):
 @router.patch("/me/language", response_model=APIResponse)
 async def update_my_language(
     payload: LanguageUpdateRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -685,10 +747,14 @@ async def update_my_language(
             detail="Unsupported language code. Supported: 'en', 'te'."
         )
     current_user.preferred_language = payload.preferred_language
-    db.commit()
+    await db.commit()
+
+    # Clear cached user record
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:user:{current_user.id}")
+
     return APIResponse(
         success=True,
         message="Language preference updated successfully",
         data={"preferred_language": current_user.preferred_language}
     )
-

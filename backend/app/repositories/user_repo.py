@@ -3,8 +3,8 @@ User repository with static methods for CRUD operations.
 All queries automatically filter out soft-deleted users.
 """
 from typing import Optional
-
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.core.security import hash_password
@@ -15,31 +15,37 @@ class UserRepository:
     """Repository for User model database operations."""
 
     @staticmethod
-    def get_by_id(db: Session, user_id: int) -> Optional[User]:
+    async def get_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
         """Get a user by their ID, excluding soft-deleted users."""
-        return db.query(User).filter(
+        stmt = select(User).filter(
             User.id == user_id,
             User.is_deleted == False,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def get_by_username(db: Session, username: str) -> Optional[User]:
+    async def get_by_username(db: AsyncSession, username: str) -> Optional[User]:
         """Get a user by their username, excluding soft-deleted users."""
-        return db.query(User).filter(
+        stmt = select(User).filter(
             User.username == username,
             User.is_deleted == False,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def get_by_email(db: Session, email: str) -> Optional[User]:
+    async def get_by_email(db: AsyncSession, email: str) -> Optional[User]:
         """Get a user by their email, excluding soft-deleted users."""
-        return db.query(User).filter(
+        stmt = select(User).filter(
             User.email == email,
             User.is_deleted == False,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def create(db: Session, schema: UserCreate, status: str = "active") -> User:
+    async def create(db: AsyncSession, schema: UserCreate, status: str = "active") -> User:
         """
         Create a new user with hashed password.
 
@@ -59,11 +65,11 @@ class UserRepository:
             status=status,
         )
         db.add(user)
-        db.flush()
+        await db.flush()
         return user
 
     @staticmethod
-    def update(db: Session, user: User, schema: UserUpdate) -> User:
+    async def update(db: AsyncSession, user: User, schema: UserUpdate) -> User:
         """
         Update user fields from schema, only updating provided fields.
 
@@ -78,20 +84,22 @@ class UserRepository:
         update_data = schema.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(user, field, value)
-        db.flush()
+        await db.flush()
         return user
 
     @staticmethod
-    def list_all(db: Session) -> list[User]:
+    async def list_all(db: AsyncSession) -> list[User]:
         """Get all non-deleted users, ordered by creation date descending."""
-        return db.query(User).filter(
+        stmt = select(User).filter(
             User.is_deleted == False,
-        ).order_by(User.created_at.desc()).all()
+        ).order_by(User.created_at.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     @staticmethod
-    def soft_delete(db: Session, user: User) -> User:
+    async def soft_delete(db: AsyncSession, user: User) -> User:
         """Soft delete a user by setting is_deleted flag."""
         user.is_deleted = True
         user.status = "inactive"
-        db.flush()
+        await db.flush()
         return user

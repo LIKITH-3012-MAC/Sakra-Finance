@@ -4,8 +4,8 @@ import time
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
-from sqlalchemy import or_, func
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.groq_client import GroqClient
 from app.ai.prompts import SYSTEM_PROMPT
@@ -24,6 +24,7 @@ from app.services.credit_score import calculate_credit_score
 from app.utils.crypto import hash_aadhaar
 
 logger = logging.getLogger("sakra.ai.agent")
+
 
 class SakraCopilotAgent:
     """
@@ -104,7 +105,7 @@ class SakraCopilotAgent:
         query: str,
         user_role: str,
         session_id: str,
-        db: Session,
+        db: AsyncSession,
     ) -> str:
         """Central execution pipeline for SAKRA AI COPILOT."""
         start_time = time.time()
@@ -114,7 +115,9 @@ class SakraCopilotAgent:
             return "❌ SECURITY WARNING: The query contains expressions flagged as potentially unsafe by the database protection shield."
 
         # Find current user ID for auditing
-        user = db.query(User).filter(User.role == user_role, User.is_deleted == False).first()
+        stmt = select(User).filter(User.role == user_role, User.is_deleted == False)
+        res = await db.execute(stmt)
+        user = res.scalars().first()
         user_id = user.id if user else 1
 
         # Check transaction confirmation
@@ -126,19 +129,23 @@ class SakraCopilotAgent:
             tx = self.pending_transactions.pop(session_id)
             try:
                 # Find customer
-                customer = db.query(Customer).filter(Customer.name.ilike(f"%{tx['customer_name']}%"), Customer.is_deleted == False).first()
+                stmt_cust = select(Customer).filter(Customer.name.ilike(f"%{tx['customer_name']}%"), Customer.is_deleted == False)
+                res_cust = await db.execute(stmt_cust)
+                customer = res_cust.scalars().first()
                 if not customer:
                     return f"Could not complete transaction. Customer '{tx['customer_name']}' not found."
                 
                 # Find active loan
-                loans = db.query(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False).all()
+                stmt_loans = select(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False)
+                res_loans = await db.execute(stmt_loans)
+                loans = res_loans.scalars().all()
                 active_loan = next((l for l in loans if l.status in ["ACTIVE", "OVERDUE"]), None)
                 if not active_loan:
                     return f"No active loan found for customer '{customer.name}'."
 
                 # Create Payment
                 payment_date = tx.get("date") or date.today().isoformat()
-                payment = PaymentRepository.create(
+                payment = await PaymentRepository.create(
                     db=db,
                     schema=PaymentCreate(
                         loan_id=active_loan.id,
@@ -149,14 +156,14 @@ class SakraCopilotAgent:
                     customer_id=customer.id,
                     recorder_id=user_id
                 )
-                db.commit()
+                await db.commit()
                 
                 response_text = f"✅ **Transaction Completed:** Recorded payment of **₹{tx['amount']:,}** for **{customer.name}** on **{payment_date}**."
-                self._log_ai_interaction(db, user_id, session_id, query, "CREATE_PAYMENT_REQUEST", "PaymentRepository.create", response_text, start_time)
+                await self._log_ai_interaction(db, user_id, session_id, query, "CREATE_PAYMENT_REQUEST", "PaymentRepository.create", response_text, start_time)
                 return response_text
             except Exception as err:
                 logger.error("Failed to commit AI payment: %s", str(err))
-                db.rollback()
+                await db.rollback()
                 return f"❌ Transaction failed: {str(err)}"
 
         # 2. Intent Classification & Entity Extraction
@@ -189,7 +196,7 @@ class SakraCopilotAgent:
 
         try:
             # Check DB Connection
-            db.execute(func.now())
+            await db.execute(select(func.now()))
         except Exception:
             return "Unable to retrieve customer information because the database connection is unavailable. Do NOT fabricate answers."
 
@@ -197,72 +204,88 @@ class SakraCopilotAgent:
         if entities.get("aadhaar"):
             searched_entities.append(f"Aadhaar Hash: {entities['aadhaar']}")
             hashed = hash_aadhaar(entities["aadhaar"])
-            customer = db.query(Customer).filter(Customer.aadhar_hash == hashed, Customer.is_deleted == False).first()
+            stmt_cust = select(Customer).filter(Customer.aadhar_hash == hashed, Customer.is_deleted == False)
+            res_cust = await db.execute(stmt_cust)
+            customer = res_cust.scalars().first()
             if customer:
-                context_data += self._build_customer_context(db, customer, user_role)
+                context_data += await self._build_customer_context(db, customer, user_role)
                 database_hit = True
 
         # Search Customer by ID
         elif entities.get("customer_id"):
             searched_entities.append(f"Customer ID: {entities['customer_id']}")
-            customer = db.query(Customer).filter(Customer.id == entities["customer_id"], Customer.is_deleted == False).first()
+            stmt_cust = select(Customer).filter(Customer.id == entities["customer_id"], Customer.is_deleted == False)
+            res_cust = await db.execute(stmt_cust)
+            customer = res_cust.scalars().first()
             if customer:
-                context_data += self._build_customer_context(db, customer, user_role)
+                context_data += await self._build_customer_context(db, customer, user_role)
                 database_hit = True
 
         # Search Customer by Phone
         elif entities.get("phone_number"):
             searched_entities.append(f"Phone: {entities['phone_number']}")
-            customer = db.query(Customer).filter(Customer.phone_number.ilike(f"%{entities['phone_number']}%"), Customer.is_deleted == False).first()
+            stmt_cust = select(Customer).filter(Customer.phone_number.ilike(f"%{entities['phone_number']}%"), Customer.is_deleted == False)
+            res_cust = await db.execute(stmt_cust)
+            customer = res_cust.scalars().first()
             if customer:
-                context_data += self._build_customer_context(db, customer, user_role)
+                context_data += await self._build_customer_context(db, customer, user_role)
                 database_hit = True
 
         # Search Customer by Name
         elif entities.get("customer_name"):
             searched_entities.append(f"Customer Name: {entities['customer_name']}")
-            # Support fuzzy/typo search and spaces
             cleaned_name = entities["customer_name"].strip()
-            customers = db.query(Customer).filter(Customer.name.ilike(f"%{cleaned_name}%"), Customer.is_deleted == False).all()
+            stmt_custs = select(Customer).filter(Customer.name.ilike(f"%{cleaned_name}%"), Customer.is_deleted == False)
+            res_custs = await db.execute(stmt_custs)
+            customers = res_custs.scalars().all()
             if customers:
                 for customer in customers:
-                    context_data += self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role)
                 database_hit = True
 
         # Search Customer by Address
         elif entities.get("address"):
             searched_entities.append(f"Address: {entities['address']}")
-            customers = db.query(Customer).filter(Customer.address.ilike(f"%{entities['address']}%"), Customer.is_deleted == False).all()
+            stmt_custs = select(Customer).filter(Customer.address.ilike(f"%{entities['address']}%"), Customer.is_deleted == False)
+            res_custs = await db.execute(stmt_custs)
+            customers = res_custs.scalars().all()
             if customers:
                 for customer in customers:
-                    context_data += self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role)
                 database_hit = True
 
         # Search by Loan ID
         elif entities.get("loan_id"):
             searched_entities.append(f"Loan ID: {entities['loan_id']}")
-            loan = db.query(Loan).filter(Loan.id == entities["loan_id"], Loan.is_deleted == False).first()
+            stmt_loan = select(Loan).filter(Loan.id == entities["loan_id"], Loan.is_deleted == False)
+            res_loan = await db.execute(stmt_loan)
+            loan = res_loan.scalars().first()
             if loan:
-                customer = db.query(Customer).filter(Customer.id == loan.customer_id, Customer.is_deleted == False).first()
+                stmt_cust = select(Customer).filter(Customer.id == loan.customer_id, Customer.is_deleted == False)
+                res_cust = await db.execute(stmt_cust)
+                customer = res_cust.scalars().first()
                 if customer:
-                    context_data += self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role)
                     database_hit = True
 
         # Search by Payment ID
         elif entities.get("payment_id"):
             searched_entities.append(f"Payment ID: {entities['payment_id']}")
-            payment = db.query(Payment).filter(Payment.id == entities["payment_id"]).first()
+            stmt_pay = select(Payment).filter(Payment.id == entities["payment_id"])
+            res_pay = await db.execute(stmt_pay)
+            payment = res_pay.scalars().first()
             if payment:
-                customer = db.query(Customer).filter(Customer.id == payment.customer_id, Customer.is_deleted == False).first()
+                stmt_cust = select(Customer).filter(Customer.id == payment.customer_id, Customer.is_deleted == False)
+                res_cust = await db.execute(stmt_cust)
+                customer = res_cust.scalars().first()
                 if customer:
-                    context_data += self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role)
                     database_hit = True
 
         # General/Portfolio Dashboard intents
         if not database_hit:
-            # Check if this is a general dashboard or metrics search query
             if intent in ["DASHBOARD_ANALYTICS", "TODAYS_COLLECTION", "OVERDUE_CUSTOMERS", "COMPLETED_LOANS", "RISK_ANALYSIS", "RECOVERY_SUGGESTIONS"]:
-                context_data += self._build_portfolio_context(db, intent, user_role)
+                context_data += await self._build_portfolio_context(db, intent, user_role)
                 database_hit = True
 
         # If a search was performed but zero matches were found, NEVER hallucinate
@@ -294,15 +317,15 @@ class SakraCopilotAgent:
             final_content = "Failed to compile AI response. Live database data is secured but Groq service is temporarily unreachable."
 
         # 5. Save interaction audit trail
-        self._log_ai_interaction(db, user_id, session_id, query, intent, "SQLAlchemy DB Search", final_content, start_time)
+        await self._log_ai_interaction(db, user_id, session_id, query, intent, "SQLAlchemy DB Search", final_content, start_time)
         
         return final_content
 
-    def _build_customer_context(self, db: Session, customer: Customer, role: str) -> str:
+    async def _build_customer_context(self, db: AsyncSession, customer: Customer, role: str) -> str:
         """Fetch all customer details, calculate business metrics and format into context."""
-        from app.services.interest import calculate_interest
-        
-        loans = db.query(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False).all()
+        stmt_loans = select(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False)
+        res_loans = await db.execute(stmt_loans)
+        loans = res_loans.scalars().all()
         today = date.today()
 
         context = f"\n### Customer Profile: {customer.name} (ID: {customer.id})\n"
@@ -332,13 +355,14 @@ class SakraCopilotAgent:
         context += f"- Occupation: {customer.occupation or '—'}\n"
         context += f"- Remarks: {customer.remarks or '—'}\n"
 
-
         for idx, loan in enumerate(loans, 1):
-            payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
+            stmt_pay = select(Payment).filter(Payment.loan_id == loan.id)
+            res_pay = await db.execute(stmt_pay)
+            payments = res_pay.scalars().all()
             total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
             
             # Dynamic calculations
-            interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+            interest = loan.interest_amount if loan.interest_amount is not None else calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
             total_due = loan.principal_amount + interest
             remaining_balance = max(total_due - total_paid, Decimal("0"))
             
@@ -400,12 +424,12 @@ class SakraCopilotAgent:
 
         return context
 
-    def _build_portfolio_context(self, db: Session, intent: str, role: str) -> str:
+    async def _build_portfolio_context(self, db: AsyncSession, intent: str, role: str) -> str:
         """Fetch general dashboard, collections, and overdue list context from DB."""
         from app.services.loan_service import get_dashboard_metrics_details
         today = date.today()
         
-        metrics = get_dashboard_metrics_details(db)
+        metrics = await get_dashboard_metrics_details(db)
         
         context = "### SAKRA FINANCE Portfolio Analytics Summary (Live MySQL Data)\n"
         context += f"- Total Registered Customers: {metrics['total_customers']}\n"
@@ -423,20 +447,24 @@ class SakraCopilotAgent:
         # Overdue customers list details
         if intent in ["OVERDUE_CUSTOMERS", "RECOVERY_SUGGESTIONS", "RISK_ANALYSIS"]:
             context += "\n#### Overdue Customer Dockets:\n"
-            from app.models.loan import Loan
-            overdue_loans = db.query(Loan).filter(Loan.loan_end_date < today, Loan.is_deleted == False).all()
+            stmt_overdue = select(Loan).filter(Loan.loan_end_date < today, Loan.is_deleted == False)
+            res_overdue = await db.execute(stmt_overdue)
+            overdue_loans = res_overdue.scalars().all()
             
             count = 0
             for idx, o_loan in enumerate(overdue_loans, 1):
-                # Calculate remaining balance
-                payments = db.query(Payment).filter(Payment.loan_id == o_loan.id).all()
+                stmt_pay = select(Payment).filter(Payment.loan_id == o_loan.id)
+                res_pay = await db.execute(stmt_pay)
+                payments = res_pay.scalars().all()
                 total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
                 interest = calculate_interest(o_loan.principal_amount, o_loan.interest_rate, o_loan.interest_formula, o_loan.duration_days)
                 total_due = o_loan.principal_amount + interest
                 remaining = max(total_due - total_paid, Decimal("0"))
 
                 if remaining > 0:
-                    cust = db.query(Customer).filter(Customer.id == o_loan.customer_id).first()
+                    stmt_cust = select(Customer).filter(Customer.id == o_loan.customer_id)
+                    res_cust = await db.execute(stmt_cust)
+                    cust = res_cust.scalars().first()
                     if cust:
                         count += 1
                         overdue_days = (today - o_loan.loan_end_date).days
@@ -448,18 +476,23 @@ class SakraCopilotAgent:
         # Completed loans list
         if intent == "COMPLETED_LOANS":
             context += "\n#### Completed Loan Accounts:\n"
-            from app.models.loan import Loan
-            completed_loans = db.query(Loan).filter(Loan.is_deleted == False).all()
+            stmt_loans = select(Loan).filter(Loan.is_deleted == False)
+            res_loans = await db.execute(stmt_loans)
+            completed_loans = res_loans.scalars().all()
             count = 0
             for idx, c_loan in enumerate(completed_loans, 1):
-                payments = db.query(Payment).filter(Payment.loan_id == c_loan.id).all()
+                stmt_pay = select(Payment).filter(Payment.loan_id == c_loan.id)
+                res_pay = await db.execute(stmt_pay)
+                payments = res_pay.scalars().all()
                 total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
                 interest = calculate_interest(c_loan.principal_amount, c_loan.interest_rate, c_loan.interest_formula, c_loan.duration_days)
                 total_due = c_loan.principal_amount + interest
                 remaining = max(total_due - total_paid, Decimal("0"))
 
                 if remaining == 0:
-                    cust = db.query(Customer).filter(Customer.id == c_loan.customer_id).first()
+                    stmt_cust = select(Customer).filter(Customer.id == c_loan.customer_id)
+                    res_cust = await db.execute(stmt_cust)
+                    cust = res_cust.scalars().first()
                     if cust:
                         count += 1
                         context += f"{count}. **{cust.name}** (ID: {cust.id}) - Loan ID: {c_loan.id}, Disbursed: ₹{c_loan.principal_amount:,}, Fully Settled.\n"
@@ -468,9 +501,9 @@ class SakraCopilotAgent:
 
         return context
 
-    def _log_ai_interaction(
+    async def _log_ai_interaction(
         self,
-        db: Session,
+        db: AsyncSession,
         user_id: int,
         session_id: str,
         query: str,
@@ -492,7 +525,7 @@ class SakraCopilotAgent:
                 tokens_used=len(query.split()) + len(response.split())  # rough word estimate fallback
             )
             db.add(log_entry)
-            db.commit()
+            await db.commit()
         except Exception as e:
             logger.error("Failed to commit AI interaction log: %s", str(e))
-            db.rollback()
+            await db.rollback()

@@ -4,12 +4,12 @@ IAM Admin Control panel routes: employee invitations, session monitoring, mail l
 import uuid
 import secrets
 import logging
-import json
-from datetime import datetime, timedelta, timezone
+import asyncio
+from datetime import datetime, timedelta
 from typing import Optional, Any
-
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, and_, func
 from pydantic import BaseModel, EmailStr
 
 from app.database.session import get_db
@@ -19,13 +19,13 @@ from app.models.user_invitation import UserInvitation
 from app.models.user_session import UserSession
 from app.models.mail_log import MailLog
 from app.models.login_log import LoginLog
-from app.models.user_permission import UserPermission
 from app.models.notification import Notification
-from app.models.audit_log import AuditLog
 from app.core.security import hash_password
 from app.services.email_service import send_email
 from app.services.audit import log_audit
 from app.schemas.common import APIResponse
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.iam")
 
@@ -59,7 +59,7 @@ class EmployeeUpdateRequest(BaseModel):
 async def invite_employee(
     payload: EmployeeInviteRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """
@@ -67,16 +67,20 @@ async def invite_employee(
     then dispatching a Resend invite email.
     """
     # Check if email is already in use
-    existing_user = db.query(User).filter(User.email == payload.email, User.is_deleted == False).first()
+    stmt = select(User).filter(User.email == payload.email, User.is_deleted == False)
+    result = await db.execute(stmt)
+    existing_user = result.scalars().first()
     if existing_user:
         raise HTTPException(status_code=400, detail="An active employee account with this email already exists.")
 
     # Check if active invite is pending
-    existing_invite = db.query(UserInvitation).filter(
+    stmt_invite = select(UserInvitation).filter(
         UserInvitation.email == payload.email,
         UserInvitation.status == "PENDING",
         UserInvitation.expires_at > datetime.utcnow()
-    ).first()
+    )
+    result_invite = await db.execute(stmt_invite)
+    existing_invite = result_invite.scalars().first()
     if existing_invite:
         raise HTTPException(status_code=400, detail="A pending invitation has already been sent to this email.")
 
@@ -93,7 +97,11 @@ async def invite_employee(
     base_username = payload.email.split("@")[0].lower().replace(".", "_")
     username = base_username
     counter = 1
-    while db.query(User).filter(User.username == username).first():
+    while True:
+        stmt_chk = select(User).filter(User.username == username)
+        res_chk = await db.execute(stmt_chk)
+        if not res_chk.scalars().first():
+            break
         username = f"{base_username}_{counter}"
         counter += 1
 
@@ -113,7 +121,7 @@ async def invite_employee(
         is_deleted=False
     )
     db.add(new_emp)
-    db.flush()
+    await db.flush()
 
     invite = UserInvitation(
         id=invite_id,
@@ -132,7 +140,7 @@ async def invite_employee(
         created_by=current_user.id
     )
     db.add(invite)
-    db.flush()
+    await db.flush()
 
     # Compose template
     from zoneinfo import ZoneInfo
@@ -173,7 +181,6 @@ async def invite_employee(
     </div>
     """
 
-    # Dispatch email synchronously or eager celery to get Resend message ID immediately
     mail_entry = MailLog(
         recipient=payload.email,
         subject="SAKRA FINANCE — Invitation to Join OS Platform",
@@ -182,7 +189,7 @@ async def invite_employee(
         provider_message_id=None
     )
     db.add(mail_entry)
-    db.flush()
+    await db.flush()
 
     success, msg_id = send_email(payload.email, "SAKRA FINANCE — Invitation to Join OS Platform", email_html)
     
@@ -193,10 +200,10 @@ async def invite_employee(
     else:
         mail_entry.status = "FAILED"
         invite.status = "EMAIL_FAILED"
-        new_emp.status = "suspended" # lock until retry/resend
+        new_emp.status = "suspended"
 
     # Audit log
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="CREATE_INVITATION",
@@ -213,7 +220,7 @@ async def invite_employee(
         message=f"Invitation sent to {payload.name} ({payload.email}). Status: {invite.status}"
     )
     db.add(notif)
-    db.commit()
+    await db.commit()
 
     return APIResponse(
         success=success,
@@ -224,11 +231,13 @@ async def invite_employee(
 
 @router.get("/invitations", response_model=APIResponse)
 async def list_invitations(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """List all sent employee invites."""
-    invites = db.query(UserInvitation).order_by(UserInvitation.created_at.desc()).all()
+    stmt = select(UserInvitation).order_by(UserInvitation.created_at.desc())
+    res = await db.execute(stmt)
+    invites = res.scalars().all()
     out = []
     for i in invites:
         out.append({
@@ -250,15 +259,19 @@ async def list_invitations(
 async def resend_invitation(
     invite_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Resend a pending or failed employee invitation."""
-    invite = db.query(UserInvitation).filter(UserInvitation.id == invite_id).first()
+    stmt = select(UserInvitation).filter(UserInvitation.id == invite_id)
+    res = await db.execute(stmt)
+    invite = res.scalars().first()
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found.")
 
-    emp = db.query(User).filter(User.email == invite.email, User.is_deleted == False).first()
+    stmt_emp = select(User).filter(User.email == invite.email, User.is_deleted == False)
+    res_emp = await db.execute(stmt_emp)
+    emp = res_emp.scalars().first()
 
     # Regenerate credentials
     token = secrets.token_urlsafe(32)
@@ -319,7 +332,7 @@ async def resend_invitation(
         provider_message_id=None
     )
     db.add(mail_entry)
-    db.flush()
+    await db.flush()
 
     success, msg_id = send_email(invite.email, "SAKRA FINANCE — Invitation to Join OS Platform", email_html)
     
@@ -331,7 +344,7 @@ async def resend_invitation(
         mail_entry.status = "FAILED"
         invite.status = "EMAIL_FAILED"
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="RESEND_INVITATION",
@@ -340,7 +353,7 @@ async def resend_invitation(
         new_values={"email": invite.email, "status": invite.status},
         request=request
     )
-    db.commit()
+    await db.commit()
 
     return APIResponse(
         success=success,
@@ -353,21 +366,25 @@ async def resend_invitation(
 async def revoke_invitation(
     invite_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Revoke a pending employee invite and disable their invited user account."""
-    invite = db.query(UserInvitation).filter(UserInvitation.id == invite_id).first()
+    stmt = select(UserInvitation).filter(UserInvitation.id == invite_id)
+    res = await db.execute(stmt)
+    invite = res.scalars().first()
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found.")
 
     invite.status = "REVOKED"
     
-    emp = db.query(User).filter(User.email == invite.email, User.is_deleted == False).first()
+    stmt_emp = select(User).filter(User.email == invite.email, User.is_deleted == False)
+    res_emp = await db.execute(stmt_emp)
+    emp = res_emp.scalars().first()
     if emp:
         emp.status = "inactive"
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="REVOKE_INVITATION",
@@ -376,7 +393,11 @@ async def revoke_invitation(
         new_values={"email": invite.email, "status": "REVOKED"},
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Clear cached state
+    if settings.CACHE_ENABLED and emp:
+        await cache.delete(f"auth:user:{emp.id}")
 
     return APIResponse(success=True, message="Invitation revoked successfully")
 
@@ -385,23 +406,30 @@ async def revoke_invitation(
 async def delete_invitation(
     invite_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Delete invitation record completely and soft-delete user."""
-    invite = db.query(UserInvitation).filter(UserInvitation.id == invite_id).first()
+    stmt = select(UserInvitation).filter(UserInvitation.id == invite_id)
+    res = await db.execute(stmt)
+    invite = res.scalars().first()
     if not invite:
         raise HTTPException(status_code=404, detail="Invitation not found.")
 
-    emp = db.query(User).filter(User.email == invite.email).first()
+    stmt_emp = select(User).filter(User.email == invite.email)
+    res_emp = await db.execute(stmt_emp)
+    emp = res_emp.scalars().first()
     if emp:
         emp.is_deleted = True
-        # Terminate active sessions
-        db.query(UserSession).filter(UserSession.user_id == emp.id).update({UserSession.is_active: False})
+        await db.execute(
+            update(UserSession)
+            .where(UserSession.user_id == emp.id)
+            .values(is_active=False)
+        )
 
-    db.delete(invite)
+    await db.delete(invite)
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="DELETE_INVITATION",
@@ -409,7 +437,10 @@ async def delete_invitation(
         record_id=invite_id,
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    if settings.CACHE_ENABLED and emp:
+        await cache.delete(f"auth:user:{emp.id}")
 
     return APIResponse(success=True, message="Invitation deleted successfully")
 
@@ -419,11 +450,11 @@ async def list_employees(
     search: Optional[str] = Query(None),
     role: Optional[str] = Query(None),
     status_filter: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """List all active and invited employees with profiles."""
-    query = db.query(User).filter(User.is_deleted == False)
+    query = select(User).filter(User.is_deleted == False)
 
     if search:
         query = query.filter(
@@ -441,7 +472,8 @@ async def list_employees(
     if status_filter:
         query = query.filter(User.status == status_filter)
 
-    employees = query.order_by(User.created_at.desc()).all()
+    res = await db.execute(query.order_by(User.created_at.desc()))
+    employees = res.scalars().all()
     
     out = []
     for e in employees:
@@ -465,11 +497,13 @@ async def list_employees(
 @router.get("/employees/{emp_id}", response_model=APIResponse)
 async def get_employee(
     emp_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Retrieve details of a single employee."""
-    emp = db.query(User).filter(User.id == emp_id, User.is_deleted == False).first()
+    stmt = select(User).filter(User.id == emp_id, User.is_deleted == False)
+    res = await db.execute(stmt)
+    emp = res.scalars().first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found.")
     return APIResponse(
@@ -497,11 +531,13 @@ async def update_employee(
     emp_id: int,
     payload: EmployeeUpdateRequest,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
-    """Update employee details, role, or status status."""
-    emp = db.query(User).filter(User.id == emp_id, User.is_deleted == False).first()
+    """Update employee details, role, or status."""
+    stmt = select(User).filter(User.id == emp_id, User.is_deleted == False)
+    res = await db.execute(stmt)
+    emp = res.scalars().first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found.")
 
@@ -528,9 +564,13 @@ async def update_employee(
 
     # If deactivating, revoke active sessions
     if payload.status in ["inactive", "suspended", "locked"]:
-        db.query(UserSession).filter(UserSession.user_id == emp.id).update({UserSession.is_active: False})
+        await db.execute(
+            update(UserSession)
+            .where(UserSession.user_id == emp.id)
+            .values(is_active=False)
+        )
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="UPDATE_EMPLOYEE",
@@ -540,7 +580,12 @@ async def update_employee(
         new_values=payload.model_dump(exclude_unset=True),
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Clear cached user and permissions
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:user:{emp.id}")
+        await cache.invalidate_pattern(f"auth:permission:{emp.id}:*")
 
     return APIResponse(success=True, message="Employee updated successfully")
 
@@ -549,11 +594,13 @@ async def update_employee(
 async def delete_employee(
     emp_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Soft-delete an employee and terminate all active sessions."""
-    emp = db.query(User).filter(User.id == emp_id, User.is_deleted == False).first()
+    stmt = select(User).filter(User.id == emp_id, User.is_deleted == False)
+    res = await db.execute(stmt)
+    emp = res.scalars().first()
     if not emp:
         raise HTTPException(status_code=404, detail="Employee not found.")
 
@@ -563,9 +610,13 @@ async def delete_employee(
     emp.is_deleted = True
     
     # Revoke sessions
-    db.query(UserSession).filter(UserSession.user_id == emp.id).update({UserSession.is_active: False})
+    await db.execute(
+        update(UserSession)
+        .where(UserSession.user_id == emp.id)
+        .values(is_active=False)
+    )
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="DELETE_EMPLOYEE",
@@ -573,21 +624,30 @@ async def delete_employee(
         record_id=emp.id,
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Clear cached user and permissions
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:user:{emp_id}")
+        await cache.invalidate_pattern(f"auth:permission:{emp_id}:*")
 
     return APIResponse(success=True, message="Employee account soft-deleted successfully")
 
 
 @router.get("/sessions", response_model=APIResponse)
 async def list_sessions(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """List active user login sessions."""
-    sessions = db.query(UserSession).filter(UserSession.is_active == True).order_by(UserSession.last_active_at.desc()).all()
+    stmt = select(UserSession).filter(UserSession.is_active == True).order_by(UserSession.last_active_at.desc())
+    res = await db.execute(stmt)
+    sessions = res.scalars().all()
     out = []
     for s in sessions:
-        user = db.query(User).filter(User.id == s.user_id).first()
+        stmt_user = select(User).filter(User.id == s.user_id)
+        res_user = await db.execute(stmt_user)
+        user = res_user.scalars().first()
         out.append({
             "session_id": s.id,
             "username": user.username if user else "Unknown",
@@ -606,17 +666,19 @@ async def list_sessions(
 async def revoke_session(
     session_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Revoke a specific active session."""
-    s = db.query(UserSession).filter(UserSession.id == session_id).first()
+    stmt = select(UserSession).filter(UserSession.id == session_id)
+    res = await db.execute(stmt)
+    s = res.scalars().first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found.")
 
     s.is_active = False
     
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="TERMINATE_SESSION",
@@ -625,7 +687,10 @@ async def revoke_session(
         new_values={"session_id": session_id},
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:session:{session_id}")
 
     return APIResponse(success=True, message="Session terminated successfully")
 
@@ -633,7 +698,7 @@ async def revoke_session(
 @router.post("/sessions/terminate-all", response_model=APIResponse)
 async def terminate_all_sessions(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Force logout all device sessions except current user's active session."""
@@ -649,13 +714,14 @@ async def terminate_all_sessions(
         except Exception:
             pass
 
-    query = db.query(UserSession).filter(UserSession.is_active == True)
+    upd_stmt = update(UserSession).where(UserSession.is_active == True)
     if current_sid:
-        query = query.filter(UserSession.id != current_sid)
+        upd_stmt = upd_stmt.where(UserSession.id != current_sid)
 
-    count = query.update({UserSession.is_active: False}, synchronize_session=False)
+    res = await db.execute(upd_stmt.values(is_active=False))
+    count = res.rowcount
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="TERMINATE_ALL_SESSIONS",
@@ -664,7 +730,11 @@ async def terminate_all_sessions(
         new_values={"count": count},
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Clear cached session states
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("auth:session:*")
 
     return APIResponse(success=True, message=f"Successfully terminated {count} device sessions.")
 
@@ -672,7 +742,7 @@ async def terminate_all_sessions(
 @router.delete("/sessions/terminate-all", response_model=APIResponse)
 async def delete_all_sessions(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Force logout all device sessions (DELETE verb fallback)."""
@@ -683,7 +753,7 @@ async def delete_all_sessions(
 async def delete_session(
     session_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Revoke a specific session (DELETE verb fallback)."""
@@ -692,11 +762,13 @@ async def delete_session(
 
 @router.get("/mail-logs", response_model=APIResponse)
 async def list_mail_logs(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """List and audit all outgoing Resend emails."""
-    logs = db.query(MailLog).order_by(MailLog.created_at.desc()).limit(100).all()
+    stmt = select(MailLog).order_by(MailLog.created_at.desc()).limit(100)
+    res = await db.execute(stmt)
+    logs = res.scalars().all()
     out = []
     for l in logs:
         out.append({
@@ -713,47 +785,73 @@ async def list_mail_logs(
 
 @router.get("/security-metrics", response_model=APIResponse)
 async def get_security_metrics(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Gather aggregates for the Admin Security Dashboard."""
-    total_users = db.query(User).filter(User.is_deleted == False).count()
-    active_sessions = db.query(UserSession).filter(UserSession.is_active == True).count()
-    failed_logins = db.query(LoginLog).filter(LoginLog.success == False).count()
-    expired_invites = db.query(UserInvitation).filter(
+    # Build select statements
+    active_threshold = datetime.utcnow() - timedelta(minutes=15)
+    
+    total_users_stmt = select(func.count(User.id)).filter(User.is_deleted == False)
+    active_sessions_stmt = select(func.count(UserSession.id)).filter(UserSession.is_active == True)
+    failed_logins_stmt = select(func.count(LoginLog.id)).filter(LoginLog.success == False)
+    expired_invites_stmt = select(func.count(UserInvitation.id)).filter(
         UserInvitation.status == "PENDING",
         UserInvitation.expires_at < datetime.utcnow()
-    ).count()
-
-    # Active/Used count
-    accepted_invites = db.query(UserInvitation).filter(UserInvitation.status == "USED").count()
-    revoked_invites = db.query(UserInvitation).filter(UserInvitation.status == "REVOKED").count()
-    pending_invites = db.query(UserInvitation).filter(UserInvitation.status == "PENDING", UserInvitation.expires_at >= datetime.utcnow()).count()
-
-    # Locked/Inactive users count
-    locked_accounts = db.query(User).filter(User.status == "locked", User.is_deleted == False).count()
-
-    # Online / Offline count
-    active_threshold = datetime.utcnow() - timedelta(minutes=15)
-    online_count = db.query(UserSession.user_id).filter(
+    )
+    accepted_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.status == "USED")
+    revoked_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.status == "REVOKED")
+    pending_invites_stmt = select(func.count(UserInvitation.id)).filter(
+        UserInvitation.status == "PENDING",
+        UserInvitation.expires_at >= datetime.utcnow()
+    )
+    locked_accounts_stmt = select(func.count(User.id)).filter(User.status == "locked", User.is_deleted == False)
+    online_count_stmt = select(func.count(UserSession.user_id.distinct())).filter(
         UserSession.is_active == True,
         UserSession.last_active_at >= active_threshold
-    ).distinct().count()
-    
-    offline_count = max(0, total_users - online_count)
+    )
 
-    # Today's logs (midnight calculated in IST, converted to UTC for database query)
     from zoneinfo import ZoneInfo
     ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
     ist_midnight = ist_now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_midnight = ist_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
-    
-    today_logins = db.query(LoginLog).filter(LoginLog.created_at >= today_midnight).count()
-    today_invites = db.query(UserInvitation).filter(UserInvitation.created_at >= today_midnight).count()
 
-    # Reset OTP counters
-    otp_requests = db.query(MailLog).filter(MailLog.template == "OTP", MailLog.created_at >= today_midnight).count()
-    email_failures = db.query(MailLog).filter(MailLog.status == "FAILED").count()
+    today_logins_stmt = select(func.count(LoginLog.id)).filter(LoginLog.created_at >= today_midnight)
+    today_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.created_at >= today_midnight)
+    otp_requests_stmt = select(func.count(MailLog.id)).filter(MailLog.template == "OTP", MailLog.created_at >= today_midnight)
+    email_failures_stmt = select(func.count(MailLog.id)).filter(MailLog.status == "FAILED")
+
+    # Run queries in parallel
+    results = await asyncio.gather(
+        db.execute(total_users_stmt),
+        db.execute(active_sessions_stmt),
+        db.execute(failed_logins_stmt),
+        db.execute(expired_invites_stmt),
+        db.execute(accepted_invites_stmt),
+        db.execute(revoked_invites_stmt),
+        db.execute(pending_invites_stmt),
+        db.execute(locked_accounts_stmt),
+        db.execute(online_count_stmt),
+        db.execute(today_logins_stmt),
+        db.execute(today_invites_stmt),
+        db.execute(otp_requests_stmt),
+        db.execute(email_failures_stmt)
+    )
+
+    total_users = results[0].scalar() or 0
+    active_sessions = results[1].scalar() or 0
+    failed_logins = results[2].scalar() or 0
+    expired_invites = results[3].scalar() or 0
+    accepted_invites = results[4].scalar() or 0
+    revoked_invites = results[5].scalar() or 0
+    pending_invites = results[6].scalar() or 0
+    locked_accounts = results[7].scalar() or 0
+    online_count = results[8].scalar() or 0
+    offline_count = max(0, total_users - online_count)
+    today_logins = results[9].scalar() or 0
+    today_invites = results[10].scalar() or 0
+    otp_requests = results[11].scalar() or 0
+    email_failures = results[12].scalar() or 0
 
     return APIResponse(
         success=True,
@@ -779,7 +877,7 @@ async def get_security_metrics(
 
 @router.get("/permissions", response_model=APIResponse)
 async def list_permissions(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement("admin_control")),
 ):
     """Get role default permissions template map."""

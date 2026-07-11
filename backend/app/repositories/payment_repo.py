@@ -4,8 +4,8 @@ Payment repository with duplicate detection, optimistic locking, and adjustment 
 from typing import Optional
 from datetime import date
 from decimal import Decimal
-
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.payment import Payment
 from app.models.payment_adjustment import PaymentAdjustment
@@ -17,37 +17,43 @@ class PaymentRepository:
     """Repository for Payment model database operations."""
 
     @staticmethod
-    def get_by_id(db: Session, payment_id: int) -> Optional[Payment]:
+    async def get_by_id(db: AsyncSession, payment_id: int) -> Optional[Payment]:
         """Get a payment by ID."""
-        return db.query(Payment).filter(
-            Payment.id == payment_id,
-        ).first()
+        stmt = select(Payment).filter(Payment.id == payment_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def get_by_loan_and_date(db: Session, loan_id: int, payment_date: date) -> Optional[Payment]:
+    async def get_by_loan_and_date(db: AsyncSession, loan_id: int, payment_date: date) -> Optional[Payment]:
         """Get a payment for a specific loan on a specific date."""
-        return db.query(Payment).filter(
+        stmt = select(Payment).filter(
             Payment.loan_id == loan_id,
             Payment.payment_date == payment_date,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def list_by_loan(db: Session, loan_id: int) -> list[Payment]:
+    async def list_by_loan(db: AsyncSession, loan_id: int) -> list[Payment]:
         """Get all payments for a specific loan, ordered by date."""
-        return db.query(Payment).filter(
+        stmt = select(Payment).filter(
             Payment.loan_id == loan_id,
-        ).order_by(Payment.payment_date.asc()).all()
+        ).order_by(Payment.payment_date.asc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     @staticmethod
-    def list_by_customer(db: Session, customer_id: int) -> list[Payment]:
+    async def list_by_customer(db: AsyncSession, customer_id: int) -> list[Payment]:
         """Get all payments for a specific customer, ordered by date descending."""
-        return db.query(Payment).filter(
+        stmt = select(Payment).filter(
             Payment.customer_id == customer_id,
-        ).order_by(Payment.payment_date.desc()).all()
+        ).order_by(Payment.payment_date.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     @staticmethod
-    def create(
-        db: Session,
+    async def create(
+        db: AsyncSession,
         schema: PaymentCreate,
         customer_id: int,
         recorder_id: int,
@@ -70,10 +76,12 @@ class PaymentRepository:
             PaymentError: If a payment already exists for this loan on this date
         """
         # Check for duplicate payment
-        existing = db.query(Payment).filter(
+        stmt = select(Payment).filter(
             Payment.loan_id == schema.loan_id,
             Payment.payment_date == schema.payment_date,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        existing = result.scalars().first()
 
         if existing:
             raise PaymentError(
@@ -82,7 +90,9 @@ class PaymentRepository:
 
         # Retrieve loan to check and update remaining amount/payment status
         from app.models.loan import Loan
-        loan = db.query(Loan).filter(Loan.id == schema.loan_id).first()
+        stmt = select(Loan).filter(Loan.id == schema.loan_id)
+        result = await db.execute(stmt)
+        loan = result.scalars().first()
         if not loan:
             raise PaymentError(f"Loan #{schema.loan_id} not found.")
 
@@ -94,9 +104,11 @@ class PaymentRepository:
             total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         
         # Calculate sum of other payments
-        other_payments_sum = db.query(Payment).filter(
+        stmt = select(Payment.amount_paid).filter(
             Payment.loan_id == loan.id
-        ).with_entities(Payment.amount_paid).all()
+        )
+        result = await db.execute(stmt)
+        other_payments_sum = result.all()
         
         already_paid = sum(float(p[0]) for p in other_payments_sum)
         amount_paid_decimal = Decimal(str(schema.amount_paid))
@@ -126,11 +138,11 @@ class PaymentRepository:
         )
 
         db.add(payment)
-        db.flush()
+        await db.flush()
         return payment
 
     @staticmethod
-    def update(db: Session, payment: Payment, schema: PaymentUpdate) -> Payment:
+    async def update(db: AsyncSession, payment: Payment, schema: PaymentUpdate) -> Payment:
         """
         Update a payment with optimistic locking and adjustment tracking.
 
@@ -167,16 +179,20 @@ class PaymentRepository:
         # Update payment
         payment.amount_paid = schema.amount_paid
         payment.version_id += 1
-        db.flush()
+        await db.flush()
 
         # Update loan remaining balance and status
         from app.models.loan import Loan
-        loan = db.query(Loan).filter(Loan.id == payment.loan_id).first()
+        stmt = select(Loan).filter(Loan.id == payment.loan_id)
+        result = await db.execute(stmt)
+        loan = result.scalars().first()
         if loan:
             # sum all payments
-            all_payments_sum = db.query(Payment).filter(
+            stmt = select(Payment.amount_paid).filter(
                 Payment.loan_id == loan.id
-            ).with_entities(Payment.amount_paid).all()
+            )
+            result = await db.execute(stmt)
+            all_payments_sum = result.all()
             total_paid = sum(p[0] for p in all_payments_sum)
 
             if loan.total_repayable_amount is not None:
@@ -195,8 +211,10 @@ class PaymentRepository:
         return payment
 
     @staticmethod
-    def list_today(db: Session, today: date) -> list[Payment]:
+    async def list_today(db: AsyncSession, today: date) -> list[Payment]:
         """Get all payments recorded for today."""
-        return db.query(Payment).filter(
+        stmt = select(Payment).filter(
             Payment.payment_date == today,
-        ).order_by(Payment.created_at.desc()).all()
+        ).order_by(Payment.created_at.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())

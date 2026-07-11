@@ -3,6 +3,8 @@ Customer management routes: CRUD with loan summaries, credit scores, and documen
 """
 import logging
 import re
+import io
+import asyncio
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
@@ -10,13 +12,16 @@ from io import BytesIO
 from PIL import Image
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, File, UploadFile, Form, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, or_
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.database.session import get_db
 from app.middleware.auth import get_current_user, PermissionRequirement
 from app.models.user import User
 from app.models.customer import Customer
 from app.models.customer_document import CustomerDocument
+from app.models.loan import Loan
 from app.repositories.customer_repo import CustomerRepository
 from app.repositories.loan_repo import LoanRepository
 from app.repositories.payment_repo import PaymentRepository
@@ -27,6 +32,8 @@ from app.services.audit import log_audit
 from app.services.interest import get_loan_balance_summary
 from app.services.credit_score import calculate_credit_score
 from app.exceptions.handlers import CustomerNotFound, DuplicateAadhaar, ConflictError
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.customers")
 
@@ -60,6 +67,7 @@ def validate_uploaded_file(file: UploadFile, max_size_mb: int, allowed_extension
         )
     return size
 
+
 def process_profile_photo(file_bytes: bytes) -> bytes:
     try:
         img = Image.open(BytesIO(file_bytes))
@@ -77,15 +85,33 @@ def process_profile_photo(file_bytes: bytes) -> bytes:
 async def list_customers(
     search: str = Query(None, description="Search by name, phone, customer ID, or Aadhaar Hash"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
+    limit: int = Query(20, ge=1, le=1000),  # Enforce pagination max 1000 limit
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     List customers with pagination and optional search.
     Includes loan details, dynamic document flags, and aggregate stats for each customer.
     """
-    customers, total = CustomerRepository.list_customers(db, search, skip, limit)
+    # Enforce maximum limit check
+    if limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum allowed limit is 1000 records per request"
+        )
+
+    # Redis Cache lookup
+    cache_key = f"customers:list:{search or 'none'}:{skip}:{limit}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message="Retrieved customers (cached)",
+                data=cached_data,
+            )
+
+    customers, total = await CustomerRepository.list_customers(db, search, skip, limit)
 
     customers_data = []
     for customer in customers:
@@ -148,15 +174,20 @@ async def list_customers(
 
         customers_data.append(customer_dict)
 
+    response_data = {
+        "customers": customers_data,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, response_data, expire_seconds=settings.CACHE_TTL)
+
     return APIResponse(
         success=True,
         message=f"Retrieved {len(customers_data)} customers",
-        data={
-            "customers": customers_data,
-            "total": total,
-            "skip": skip,
-            "limit": limit,
-        },
+        data=response_data,
     )
 
 
@@ -175,7 +206,7 @@ async def create_customer(
     profile_photo: Optional[UploadFile] = File(None),
     aadhaar: UploadFile = File(...),
     promissory_file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
@@ -199,15 +230,12 @@ async def create_customer(
         raise HTTPException(status_code=400, detail=str(ve))
 
     # 2. Validate Document Uploads
-    # Aadhaar (Required, Max 10MB)
     aadhaar_size = validate_uploaded_file(
         aadhaar, 10, ["pdf", "png", "jpeg", "jpg"], ["application/pdf", "image/jpeg", "image/png"]
     )
-    # Promissory Note (Required, Max 20MB)
     promissory_size = validate_uploaded_file(
         promissory_file, 20, ["pdf", "png", "jpeg", "jpg"], ["application/pdf", "image/jpeg", "image/png"]
     )
-    # Profile Photo (Optional, Max 5MB)
     photo_size = 0
     if profile_photo and profile_photo.filename:
         photo_size = validate_uploaded_file(
@@ -218,12 +246,12 @@ async def create_customer(
     try:
         # Create Customer
         try:
-            customer = CustomerRepository.create(db, schema_data, current_user.id)
+            customer = await CustomerRepository.create(db, schema_data, current_user.id)
         except DuplicateAadhaar as e:
             raise HTTPException(status_code=e.status_code, detail=e.message)
 
         # Save to get customer ID
-        db.flush()
+        await db.flush()
 
         # Save Aadhaar
         aadhaar_bytes = await aadhaar.read()
@@ -237,7 +265,7 @@ async def create_customer(
             uploaded_by=current_user.id
         )
         db.add(aadhaar_doc)
-        log_audit(
+        await log_audit(
             db=db,
             actor_id=current_user.id,
             action="AADHAAR_UPLOADED",
@@ -259,7 +287,7 @@ async def create_customer(
             uploaded_by=current_user.id
         )
         db.add(promissory_doc)
-        log_audit(
+        await log_audit(
             db=db,
             actor_id=current_user.id,
             action="PROMISSORY_UPLOADED",
@@ -283,7 +311,7 @@ async def create_customer(
                 uploaded_by=current_user.id
             )
             db.add(photo_doc)
-            log_audit(
+            await log_audit(
                 db=db,
                 actor_id=current_user.id,
                 action="PHOTO_UPLOADED",
@@ -294,7 +322,7 @@ async def create_customer(
             )
 
         # Main Customer Create Audit Log
-        log_audit(
+        await log_audit(
             db=db,
             actor_id=current_user.id,
             action="CREATE_CUSTOMER",
@@ -304,21 +332,22 @@ async def create_customer(
             request=request,
         )
 
-        db.commit()
-        # Invalidate dashboard metrics cache
-        from app.services.cache import cache
-        cache.delete("dashboard_metrics")
+        await db.commit()
+        
+        # Invalidate caches
+        if settings.CACHE_ENABLED:
+            await cache.invalidate_pattern("customers:*")
+            await cache.delete("dashboard_metrics")
     except HTTPException as http_err:
-        db.rollback()
+        await db.rollback()
         raise http_err
     except Exception as err:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail="Onboarding transaction failed: " + str(err))
-
 
     # Build response schema
     response_dict = CustomerResponse.model_validate(customer).model_dump(mode="json")
-    response_dict["has_profile_photo"] = profile_photo is not None
+    response_dict["has_profile_photo"] = (profile_photo is not None and profile_photo.filename is not None)
     response_dict["has_aadhaar"] = True
     response_dict["has_promissory_note"] = True
 
@@ -332,25 +361,33 @@ async def create_customer(
 @router.get("/{customer_id}", response_model=APIResponse)
 async def get_customer(
     customer_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get full customer profile with loans, aggregate payments, document presence, and metadata.
     """
-    from sqlalchemy.orm import selectinload, joinedload
-    from app.models.customer_document import CustomerDocument
-    from app.models.loan import Loan
-    from app.models.payment import Payment
-    from app.models.loan_schedule import LoanSchedule
-    customer = db.query(Customer).filter(
+    cache_key = f"customers:detail:{customer_id}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message="Customer profile retrieved (cached)",
+                data=cached_data,
+            )
+
+    stmt = select(Customer).filter(
         Customer.id == customer_id,
         Customer.is_deleted == False
     ).options(
         selectinload(Customer.documents).joinedload(CustomerDocument.uploader),
         selectinload(Customer.loans).selectinload(Loan.payments),
         selectinload(Customer.loans).selectinload(Loan.schedules)
-    ).first()
+    )
+    result = await db.execute(stmt)
+    customer = result.scalars().first()
+
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
@@ -378,14 +415,12 @@ async def get_customer(
     # Get all loans (using eager relationship)
     loans = [l for l in customer.loans if not l.is_deleted]
     loans_data = []
-    total_paid_all = Decimal("0")
     today = date.today()
 
     for loan in loans:
         loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
         payments = [p for p in loan.payments]
         loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
-        total_paid_all += loan_total_paid
 
         balance = get_loan_balance_summary(
             loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid, loan.duration_days
@@ -411,7 +446,7 @@ async def get_customer(
     from app.services.loan_service import get_loan_repayment_rows
     aggregate_payments = []
     for loan in loans:
-        repayment_rows = get_loan_repayment_rows(db, loan)
+        repayment_rows = await get_loan_repayment_rows(db, loan)
         aggregate_payments.extend(repayment_rows)
 
     # Sort payments by date descending
@@ -419,7 +454,7 @@ async def get_customer(
 
     # Fetch backend summary details to prevent frontend JavaScript calculations
     from app.services.loan_service import get_customer_summary_details
-    summary_details = get_customer_summary_details(db, customer_id)
+    summary_details = await get_customer_summary_details(db, customer_id)
 
     response_payload = {
         "customer": customer_dict,
@@ -428,6 +463,9 @@ async def get_customer(
         "credit_score": avg_credit_score,
         "summary": summary_details
     }
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, response_payload, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
@@ -441,14 +479,14 @@ async def update_customer(
     customer_id: int,
     update_data: CustomerUpdate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(WRITE_ROLES)),
 ):
     """
     Update customer data. Requires ASSISTANT_ADMIN or higher.
     Uses optimistic locking via version_id.
     """
-    customer = CustomerRepository.get_by_id(db, customer_id)
+    customer = await CustomerRepository.get_by_id(db, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
@@ -459,7 +497,7 @@ async def update_customer(
     }
 
     try:
-        updated = CustomerRepository.update(db, customer, update_data)
+        updated = await CustomerRepository.update(db, customer, update_data)
     except ConflictError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
@@ -469,7 +507,7 @@ async def update_customer(
         "address": updated.address,
     }
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="UPDATE_CUSTOMER",
@@ -479,11 +517,12 @@ async def update_customer(
         new_values=new_values,
         request=request,
     )
-    db.commit()
+    await db.commit()
     
-    # Invalidate dashboard metrics cache
-    from app.services.cache import cache
-    cache.delete("dashboard_metrics")
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -496,19 +535,19 @@ async def update_customer(
 async def delete_customer(
     customer_id: int,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
     Soft delete a customer. Requires ADMIN role.
     """
-    customer = CustomerRepository.get_by_id(db, customer_id)
+    customer = await CustomerRepository.get_by_id(db, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    CustomerRepository.soft_delete(db, customer)
+    await CustomerRepository.soft_delete(db, customer)
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="DELETE_CUSTOMER",
@@ -517,11 +556,12 @@ async def delete_customer(
         old_values={"name": customer.name},
         request=request,
     )
-    db.commit()
+    await db.commit()
     
-    # Invalidate dashboard metrics cache
-    from app.services.cache import cache
-    cache.delete("dashboard_metrics")
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -534,14 +574,17 @@ async def delete_customer(
 @router.get("/{customer_id}/photo")
 async def get_customer_photo(
     customer_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Serve customer profile photo blob or default vector avatar."""
-    doc = db.query(CustomerDocument).filter(
+    stmt = select(CustomerDocument).filter(
         CustomerDocument.customer_id == customer_id,
         CustomerDocument.document_type == "PROFILE_PHOTO"
-    ).first()
+    )
+    res = await db.execute(stmt)
+    doc = res.scalars().first()
+
     if not doc:
         default_avatar_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:100%;height:100%;color:#cbd5e1;background:#f1f5f9;"><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clip-rule="evenodd" /></svg>"""
         return Response(content=default_avatar_svg, media_type="image/svg+xml")
@@ -556,17 +599,20 @@ async def get_customer_photo(
 @router.get("/{customer_id}/aadhaar")
 async def get_customer_aadhaar(
     customer_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Serve Aadhaar PDF or image, restricting VIEWER role access."""
     if current_user.role == "VIEWER":
         raise HTTPException(status_code=403, detail="Access Denied: VIEWER role is not authorized to retrieve sensitive documents")
         
-    doc = db.query(CustomerDocument).filter(
+    stmt = select(CustomerDocument).filter(
         CustomerDocument.customer_id == customer_id,
         CustomerDocument.document_type == "AADHAAR"
-    ).first()
+    )
+    res = await db.execute(stmt)
+    doc = res.scalars().first()
+
     if not doc:
         raise HTTPException(status_code=404, detail="Aadhaar document not found")
         
@@ -580,17 +626,20 @@ async def get_customer_aadhaar(
 @router.get("/{customer_id}/promissory")
 async def get_customer_promissory(
     customer_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Serve Promissory Note blob, restricting VIEWER role access."""
     if current_user.role == "VIEWER":
         raise HTTPException(status_code=403, detail="Access Denied: VIEWER role is not authorized to retrieve sensitive documents")
         
-    doc = db.query(CustomerDocument).filter(
+    stmt = select(CustomerDocument).filter(
         CustomerDocument.customer_id == customer_id,
         CustomerDocument.document_type == "PROMISSORY_NOTE"
-    ).first()
+    )
+    res = await db.execute(stmt)
+    doc = res.scalars().first()
+
     if not doc:
         raise HTTPException(status_code=404, detail="Promissory note document not found")
         
@@ -607,7 +656,7 @@ async def upload_document_replacement(
     document_type: str,
     request: Request,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(WRITE_ROLES)),
 ):
     """Replace an existing KYC document or upload a missing one."""
@@ -631,10 +680,12 @@ async def upload_document_replacement(
         content_type = file.content_type
 
     # Check for existing document
-    doc = db.query(CustomerDocument).filter(
+    stmt = select(CustomerDocument).filter(
         CustomerDocument.customer_id == customer_id,
         CustomerDocument.document_type == document_type
-    ).first()
+    )
+    res = await db.execute(stmt)
+    doc = res.scalars().first()
 
     if doc:
         doc.file_blob = final_bytes
@@ -657,7 +708,7 @@ async def upload_document_replacement(
         db.add(doc)
         action = "PHOTO_UPLOADED" if document_type == "PROFILE_PHOTO" else f"{document_type}_UPLOADED"
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action=action,
@@ -666,7 +717,12 @@ async def upload_document_replacement(
         new_values={"filename": file.filename, "size": len(final_bytes)},
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("customers:*")
+
     return APIResponse(success=True, message=f"Document {document_type} successfully updated")
 
 
@@ -675,21 +731,23 @@ async def delete_customer_document(
     customer_id: int,
     document_type: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """Delete a document by type. Requires ADMIN or higher."""
     document_type = document_type.upper()
-    doc = db.query(CustomerDocument).filter(
+    stmt = select(CustomerDocument).filter(
         CustomerDocument.customer_id == customer_id,
         CustomerDocument.document_type == document_type
-    ).first()
+    )
+    res = await db.execute(stmt)
+    doc = res.scalars().first()
     
     if not doc:
         raise HTTPException(status_code=404, detail=f"Document {document_type} not found")
 
-    db.delete(doc)
-    log_audit(
+    await db.delete(doc)
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="PHOTO_DELETED" if document_type == "PROFILE_PHOTO" else "DOCUMENT_DELETED",
@@ -698,5 +756,10 @@ async def delete_customer_document(
         old_values={"filename": doc.filename},
         request=request
     )
-    db.commit()
+    await db.commit()
+
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("customers:*")
+
     return APIResponse(success=True, message=f"Document {document_type} successfully deleted")

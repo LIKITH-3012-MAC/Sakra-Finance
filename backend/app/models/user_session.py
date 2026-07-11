@@ -2,11 +2,17 @@
 UserSession model – handles employee active sessions, devices, and token rotation constraints.
 """
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Index
 from app.database.connection import Base
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
+
+    __table_args__ = (
+        Index("idx_sessions_created_at", "created_at"),
+        Index("idx_sessions_is_active", "is_active"),
+        Index("idx_sessions_user_created_at", "user_id", "created_at"),
+    )
 
     id = Column(String(36), primary_key=True, index=True) # UUID Session ID
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)

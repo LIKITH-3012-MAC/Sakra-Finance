@@ -4,7 +4,7 @@ AuditLog model – immutable audit trail for all data mutations.
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import relationship
 
@@ -13,6 +13,12 @@ from app.database.connection import Base
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+
+    __table_args__ = (
+        Index("idx_audit_logs_created_at", "created_at"),
+        Index("idx_audit_logs_actor_id", "actor_id"),
+        Index("idx_audit_logs_actor_created_at", "actor_id", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

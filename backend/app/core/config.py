@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     AI_MAX_TOKENS: int = 1000
     AI_TEMPERATURE: float = 0.2
 
+    # ── Performance Tuning (Production) ────────────────────────
+    CACHE_ENABLED: bool = True
+    CACHE_TTL: int = 300
+    DATABASE_POOL_SIZE: int = 30
+    DATABASE_MAX_OVERFLOW: int = 60
+    DATABASE_POOL_TIMEOUT: int = 30
+    ENABLE_GZIP: bool = True
+
 
 # Singleton settings instance
 settings = Settings()

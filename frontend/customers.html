@@ -19,6 +19,7 @@
   <meta name="msapplication-TileImage" content="/icons/icon-144x144.png">
   <link rel="stylesheet" href="/assets/css/main.css">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="relative">
   
@@ -155,6 +156,158 @@
             <i data-lucide="users" class="w-12 h-12 text-slate-300 mb-4"></i>
             <h4 class="text-sm font-bold text-text-primary uppercase tracking-wider" data-i18n="customers_no_records">No accounts found</h4>
             <button id="empty-state-add-btn" class="sakra-btn-tactile sakra-btn-primary h-10 px-4 text-xs font-bold uppercase tracking-wider mt-4" data-i18n="customers_register_btn">Add Customer</button>
+          </div>
+
+          <!-- CUSTOMER ANALYTICS VISUALIZATION PANEL -->
+          <div id="customer-analytics-workspace" class="flex flex-col gap-6 w-full mt-8 border-t border-border-default/40 pt-8 font-sans">
+            <!-- Header Title -->
+            <div class="flex items-center gap-2 select-none">
+              <i data-lucide="bar-chart-3" class="w-5 h-5 text-primary"></i>
+              <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary">Selected Customer Financial Analytics</h3>
+            </div>
+
+            <!-- Workspace State Switcher -->
+            <div id="analytics-empty-state" class="glass-card py-16 text-center flex flex-col items-center justify-center bg-white/50 border border-border-default/45">
+              <i data-lucide="line-chart" class="w-12 h-12 text-slate-400/80 mb-3 animate-pulse"></i>
+              <p class="text-xs font-medium text-text-secondary select-none">Select a customer from the registry to view financial analytics.</p>
+            </div>
+
+            <!-- Profile Details + KPIs + Graphs Panel (hidden initially) -->
+            <div id="analytics-active-panel" class="hidden flex flex-col gap-6 opacity-0 transition-opacity duration-300">
+              
+              <!-- 1. Customer Profile Summary Header -->
+              <div class="glass-card bg-white/65 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group/header border border-border-default/45">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-cyan-500/5 opacity-0 group-hover/header:opacity-100 transition-opacity pointer-events-none duration-500"></div>
+                <div class="flex items-center gap-5 relative z-10">
+                  <div class="w-16 h-16 rounded-full overflow-hidden border border-white shadow-md bg-slate-100 flex items-center justify-center shrink-0">
+                    <img id="detail-profile-photo" src="" class="w-full h-full object-cover" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23cbd5e1\' style=\'background:%23f1f5f9;\'><path fill-rule=\'evenodd\' d=\'M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z\' clip-rule=\'evenodd\' /></svg>'" />
+                  </div>
+                  <div>
+                    <h2 id="detail-profile-name" class="text-xl font-bold text-text-primary tracking-tight">—</h2>
+                    <p class="text-xs text-text-secondary mt-1 flex items-center gap-4 flex-wrap font-mono font-bold">
+                      <span class="inline-flex items-center gap-1.5"><i data-lucide="phone" class="w-3.5 h-3.5 text-text-muted"></i><span id="detail-profile-phone">—</span></span>
+                      <span class="inline-flex items-center gap-1.5"><i data-lucide="credit-card" class="w-3.5 h-3.5 text-text-muted"></i><span id="detail-profile-aadhar">—</span></span>
+                    </p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold relative z-10 md:ml-6 mt-4 md:mt-0 flex-1 justify-end">
+                  <div>
+                    <span class="text-text-muted block text-[9px] uppercase tracking-wider">DOB / Gender</span>
+                    <span id="detail-profile-dob-gender" class="text-text-secondary font-mono">—</span>
+                  </div>
+                  <div>
+                    <span class="text-text-muted block text-[9px] uppercase tracking-wider">Occupation</span>
+                    <span id="detail-profile-occupation" class="text-text-secondary">—</span>
+                  </div>
+                  <div>
+                    <span class="text-text-muted block text-[9px] uppercase tracking-wider">Address</span>
+                    <span id="detail-profile-address" class="text-text-secondary">—</span>
+                  </div>
+                  <div>
+                    <span class="text-text-muted block text-[9px] uppercase tracking-wider">Customer ID</span>
+                    <span id="detail-profile-id" class="text-text-secondary font-mono">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Financial KPI Cards Grid -->
+              <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Principal</span>
+                  <p id="kpi-principal" class="text-sm font-bold mt-1 font-mono text-text-primary">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Interest</span>
+                  <p id="kpi-interest" class="text-sm font-bold mt-1 font-mono text-text-primary">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Total Repayable</span>
+                  <p id="kpi-repayable" class="text-sm font-bold mt-1 font-mono text-text-primary">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Collected</span>
+                  <p id="kpi-collected" class="text-sm font-bold mt-1 font-mono text-success">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Remaining</span>
+                  <p id="kpi-remaining" class="text-sm font-bold mt-1 font-mono text-danger">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Completion</span>
+                  <p id="kpi-completion" class="text-sm font-bold mt-1 font-mono text-primary">0.00%</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Credit Score</span>
+                  <p id="kpi-credit-score" class="text-sm font-bold mt-1 font-mono text-text-primary">700</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Risk Score</span>
+                  <p id="kpi-risk-score" class="text-sm font-bold mt-1 font-mono text-text-primary">MEDIUM</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Expected EMI</span>
+                  <p id="kpi-expected-emi" class="text-sm font-bold mt-1 font-mono text-text-primary">₹0.00</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Days Remaining</span>
+                  <p id="kpi-days-remaining" class="text-sm font-bold mt-1 font-mono text-text-primary">0 days</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 col-span-2 md:col-span-1 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Last Payment</span>
+                  <p id="kpi-last-payment" class="text-xs font-semibold mt-1 font-mono text-text-secondary">—</p>
+                </div>
+                <div class="glass-card p-4 text-center bg-white/60 col-span-2 md:col-span-1 border border-border-default/45">
+                  <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Next Payment</span>
+                  <p id="kpi-next-payment" class="text-xs font-semibold mt-1 font-mono text-text-secondary">—</p>
+                </div>
+              </div>
+
+              <!-- 3. Dynamic Charts Panel (2-column grid on desktop, 1 on mobile) -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="charts-grid-container">
+                
+                <!-- Chart 1: Repayment Timeline -->
+                <div class="glass-card bg-white/60 p-5 flex flex-col h-[320px] border border-border-default/45 shadow-sm">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-3 select-none">Repayment Timeline</h4>
+                  <div class="flex-1 min-h-0 relative">
+                    <canvas id="chart-repayment-timeline"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 2: Payment Pattern Analysis -->
+                <div class="glass-card bg-white/60 p-5 flex flex-col h-[320px] border border-border-default/45 shadow-sm">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-3 select-none">Payment Pattern Analysis</h4>
+                  <div class="flex-1 min-h-0 relative">
+                    <canvas id="chart-payment-pattern"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 3: Outstanding Balance Over Time -->
+                <div class="glass-card bg-white/60 p-5 flex flex-col h-[320px] border border-border-default/45 shadow-sm">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-3 select-none">Outstanding Balance Over Time</h4>
+                  <div class="flex-1 min-h-0 relative">
+                    <canvas id="chart-outstanding-balance"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 4: Payment Consistency -->
+                <div class="glass-card bg-white/60 p-5 flex flex-col h-[320px] border border-border-default/45 shadow-sm">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-3 select-none">Payment Consistency (Expected vs Paid)</h4>
+                  <div class="flex-1 min-h-0 relative">
+                    <canvas id="chart-payment-consistency"></canvas>
+                  </div>
+                </div>
+
+                <!-- Chart 5: Cumulative Collection (Spans full width on LG grid) -->
+                <div class="glass-card bg-white/60 p-5 flex flex-col h-[320px] lg:col-span-2 border border-border-default/45 shadow-sm">
+                  <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-3 select-none">Cumulative Collection</h4>
+                  <div class="flex-1 min-h-0 relative">
+                    <canvas id="chart-cumulative-collection"></canvas>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
           </div>
 
         </div>

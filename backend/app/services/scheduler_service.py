@@ -5,7 +5,8 @@ import logging
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.models.loan import Loan
 from app.models.payment import Payment
@@ -17,7 +18,7 @@ from app.services.email_service import send_email
 logger = logging.getLogger("sakra.scheduler")
 
 
-def run_daily_overdue_check(db: Session, today_date: date) -> dict:
+async def run_daily_overdue_check(db: AsyncSession, today_date: date) -> dict:
     """
     Check all active loans for overdue status and send notifications.
 
@@ -39,15 +40,17 @@ def run_daily_overdue_check(db: Session, today_date: date) -> dict:
         - overdue_details: List of overdue loan details
     """
     # Get all active loans
-    active_loans = db.query(Loan).filter(Loan.status == "ACTIVE").all()
+    stmt = select(Loan).filter(Loan.status == "ACTIVE")
+    result = await db.execute(stmt)
+    active_loans = list(result.scalars().all())
     total_audited = len(active_loans)
     overdue_details = []
 
     for loan in active_loans:
         # Sum all payments for this loan
-        payments = db.query(Payment).filter(
-            Payment.loan_id == loan.id,
-        ).all()
+        stmt = select(Payment).filter(Payment.loan_id == loan.id)
+        res = await db.execute(stmt)
+        payments = list(res.scalars().all())
 
         total_paid = sum(
             (p.amount_paid for p in payments),
@@ -84,37 +87,38 @@ def run_daily_overdue_check(db: Session, today_date: date) -> dict:
             overdue_details.append(overdue_info)
 
             # Create notifications for admin users
-            admin_users = db.query(User).filter(
+            stmt = select(User).filter(
                 User.role.in_(["SUPER_ADMIN", "ADMIN"]),
                 User.is_deleted == False,
                 User.status == "active",
-            ).all()
+            )
+            res = await db.execute(stmt)
+            admin_users = list(res.scalars().all())
 
             for admin in admin_users:
                 notification = Notification(
                     user_id=admin.id,
-                    title="Loan Overdue Alert",
+                    notification_type="OVERDUE",  # Replaced invalid model key 'type' with correct field notification_type
                     message=(
                         f"Loan #{loan.id} (Customer #{loan.customer_id}) is overdue by "
                         f"{days_overdue} day(s). Remaining balance: ₹{remaining}"
                     ),
-                    type="OVERDUE",
                     is_read=False,
-                    reference_id=loan.id,
-                    reference_type="LOAN",
                 )
                 db.add(notification)
 
     # Commit all status updates and notifications
     if overdue_details:
-        db.commit()
+        await db.commit()
 
         # Send consolidated email to admins
-        admin_users = db.query(User).filter(
+        stmt = select(User).filter(
             User.role.in_(["SUPER_ADMIN", "ADMIN"]),
             User.is_deleted == False,
             User.status == "active",
-        ).all()
+        )
+        res = await db.execute(stmt)
+        admin_users = list(res.scalars().all())
 
         if admin_users:
             overdue_rows = ""

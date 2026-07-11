@@ -5,7 +5,8 @@ import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
 
 from app.database.session import get_db
 from app.middleware.auth import get_current_user, PermissionRequirement
@@ -24,16 +25,17 @@ ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN"]
 
 @router.get("/", response_model=APIResponse)
 async def list_notifications(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     List all notifications for the current user, ordered by newest first.
     """
-    notifications = db.query(Notification).filter(
+    stmt = select(Notification).filter(
         Notification.user_id == current_user.id,
-    ).order_by(Notification.sent_at.desc()).all()
-
+    ).order_by(Notification.sent_at.desc())
+    result = await db.execute(stmt)
+    notifications = result.scalars().all()
 
     notifications_data = [
         NotificationResponse.model_validate(n).model_dump(mode="json")
@@ -56,22 +58,24 @@ async def list_notifications(
 @router.patch("/{notification_id}/read", response_model=APIResponse)
 async def mark_notification_read(
     notification_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Mark a single notification as read.
     """
-    notification = db.query(Notification).filter(
+    stmt = select(Notification).filter(
         Notification.id == notification_id,
         Notification.user_id == current_user.id,
-    ).first()
+    )
+    result = await db.execute(stmt)
+    notification = result.scalars().first()
 
     if not notification:
         raise HTTPException(status_code=404, detail="Notification not found")
 
     notification.is_read = True
-    db.commit()
+    await db.commit()
 
     return APIResponse(
         success=True,
@@ -82,18 +86,20 @@ async def mark_notification_read(
 
 @router.post("/read-all", response_model=APIResponse)
 async def mark_all_notifications_read(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Mark all notifications for the current user as read.
     """
-    updated_count = db.query(Notification).filter(
+    stmt = update(Notification).where(
         Notification.user_id == current_user.id,
         Notification.is_read == False,
-    ).update({"is_read": True})
+    ).values(is_read=True)
+    res = await db.execute(stmt)
+    updated_count = res.rowcount
 
-    db.commit()
+    await db.commit()
 
     return APIResponse(
         success=True,
@@ -104,7 +110,7 @@ async def mark_all_notifications_read(
 
 @router.post("/trigger-audit", response_model=APIResponse)
 async def trigger_manual_audit(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
@@ -113,7 +119,7 @@ async def trigger_manual_audit(
     from zoneinfo import ZoneInfo
     from datetime import datetime
     today = datetime.now(ZoneInfo("Asia/Kolkata")).date()
-    result = run_daily_overdue_check(db, today)
+    result = await run_daily_overdue_check(db, today)
 
     return APIResponse(
         success=True,

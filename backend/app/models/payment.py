@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
@@ -25,6 +26,10 @@ class Payment(Base):
 
     __table_args__ = (
         UniqueConstraint("customer_id", "payment_date", "loan_id", name="uq_customer_payment_date_loan"),
+        Index("idx_payments_created_at", "created_at"),
+        Index("idx_payments_customer_payment_date", "customer_id", "payment_date"),
+        Index("idx_payments_loan_created_at", "loan_id", "created_at"),
+        Index("idx_payments_customer_created_at", "customer_id", "created_at"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

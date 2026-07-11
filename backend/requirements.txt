@@ -18,3 +18,5 @@ argon2-cffi>=23.1.0
 celery>=5.3.6
 redis>=5.0.1
 Pillow>=10.2.0
+aiomysql>=0.3.2
+aiosqlite>=0.22.1

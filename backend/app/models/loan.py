@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
@@ -21,6 +22,14 @@ from app.database.connection import Base
 
 class Loan(Base):
     __tablename__ = "loans"
+
+    __table_args__ = (
+        Index("idx_loans_created_at", "created_at"),
+        Index("idx_loans_is_deleted", "is_deleted"),
+        Index("idx_loans_customer_status", "customer_id", "status"),
+        Index("idx_loans_status_created_at", "status", "created_at"),
+        Index("idx_loans_customer_created_at", "customer_id", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False, index=True)

@@ -4,7 +4,7 @@ Notification model – stores user/customer notifications.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -12,6 +12,11 @@ from app.database.connection import Base
 
 class Notification(Base):
     __tablename__ = "notifications"
+
+    __table_args__ = (
+        Index("idx_notifications_sent_at", "sent_at"),
+        Index("idx_notifications_user_is_read_sent_at", "user_id", "is_read", "sent_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

@@ -6,7 +6,8 @@ from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 
 from app.database.session import get_db
 from app.middleware.auth import get_current_user, PermissionRequirement
@@ -21,6 +22,8 @@ from app.schemas.payment import PaymentResponse
 from app.services.audit import log_audit
 from app.services.loan_service import get_loan_status_details
 from app.exceptions.handlers import LoanNotFound, ConflictError
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.loans")
 
@@ -34,35 +37,70 @@ async def list_loans(
     customer_id: int = Query(None, description="Filter by customer ID"),
     status_filter: str = Query(None, alias="status", description="Filter by loan status"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
+    limit: int = Query(50, ge=1, le=1000),  # Default limit set to 50, ge=1, le=1000
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     List all loans with optional filtering by customer and status.
     """
+    # Enforce maximum allowed limit
+    if limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Maximum allowed limit is 1000 records per request"
+        )
+
+    # Redis Cache retrieval
+    cache_key = f"loans:list:{customer_id or 'all'}:{status_filter or 'all'}:{skip}:{limit}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message="Retrieved loans (cached)",
+                data=cached_data,
+            )
+
     from app.models.loan import Loan
 
-    query = db.query(Loan)
+    stmt = select(Loan)
+    count_stmt = select(func.count(Loan.id))
 
+    where_clauses = []
     if customer_id:
-        query = query.filter(Loan.customer_id == customer_id)
+        where_clauses.append(Loan.customer_id == customer_id)
     if status_filter:
-        query = query.filter(Loan.status == status_filter.upper())
+        where_clauses.append(Loan.status == status_filter.upper())
 
-    total = query.count()
-    loans = query.order_by(Loan.created_at.desc()).offset(skip).limit(limit).all()
+    if where_clauses:
+        stmt = stmt.filter(*where_clauses)
+        count_stmt = count_stmt.filter(*where_clauses)
+
+    import asyncio
+    res_task = db.execute(stmt.order_by(Loan.created_at.desc()).offset(skip).limit(limit))
+    count_task = db.execute(count_stmt)
+
+    res, count_res = await asyncio.gather(res_task, count_task)
+    loans = res.scalars().all()
+    total = count_res.scalar() or 0
+
     loans_data = [LoanResponse.model_validate(l).model_dump(mode="json") for l in loans]
+
+    response_data = {
+        "loans": loans_data,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, response_data, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
         message=f"Retrieved {len(loans_data)} loans",
-        data={
-            "loans": loans_data,
-            "total": total,
-            "skip": skip,
-            "limit": limit,
-        },
+        data=response_data,
     )
 
 
@@ -70,7 +108,7 @@ async def list_loans(
 async def create_loan(
     loan_data: LoanCreate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
@@ -78,13 +116,13 @@ async def create_loan(
     Requires ADMIN role.
     """
     # Verify customer exists
-    customer = CustomerRepository.get_by_id(db, loan_data.customer_id)
+    customer = await CustomerRepository.get_by_id(db, loan_data.customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    loan = LoanRepository.create(db, loan_data, current_user.id)
+    loan = await LoanRepository.create(db, loan_data, current_user.id)
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="CREATE_LOAN",
@@ -99,11 +137,13 @@ async def create_loan(
         },
         request=request,
     )
-    db.commit()
+    await db.commit()
 
-    # Invalidate dashboard metrics cache
-    from app.services.cache import cache
-    cache.delete("dashboard_metrics")
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("loans:*")
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -115,29 +155,34 @@ async def create_loan(
 @router.get("/{loan_id}", response_model=APIResponse)
 async def get_loan(
     loan_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get loan details with schedule, payments, and status summary.
     """
-    loan = LoanRepository.get_by_id(db, loan_id)
+    cache_key = f"loans:detail:{loan_id}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message="Loan details retrieved (cached)",
+                data=cached_data,
+            )
+
+    loan = await LoanRepository.get_by_id(db, loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
     loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
 
     # Get payments
-    payments = PaymentRepository.list_by_loan(db, loan_id)
+    payments = await PaymentRepository.list_by_loan(db, loan_id)
     payments_data = [PaymentResponse.model_validate(p).model_dump(mode="json") for p in payments]
 
-    # Get schedule
-    schedule = db.query(LoanSchedule).filter(
-        LoanSchedule.loan_id == loan_id
-    ).order_by(LoanSchedule.installment_number).all()
-
     from app.services.loan_service import get_loan_repayment_rows
-    repayment_rows = get_loan_repayment_rows(db, loan)
+    repayment_rows = await get_loan_repayment_rows(db, loan)
 
     schedule_data = [
         {
@@ -151,16 +196,17 @@ async def get_loan(
         for idx, r in enumerate(repayment_rows)
     ]
 
-
     # Get status details
     today = date.today()
     status_details = get_loan_status_details(loan, payments, today)
-    # Convert Decimals to strings for JSON serialization
     status_data = {k: str(v) if isinstance(v, Decimal) else v for k, v in status_details.items()}
 
     loan_dict["payments"] = payments_data
     loan_dict["schedule"] = schedule_data
     loan_dict["status_details"] = status_data
+
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, loan_dict, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,
@@ -174,14 +220,14 @@ async def update_loan(
     loan_id: int,
     update_data: LoanUpdate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
     Update loan data. Requires ADMIN role.
     Uses optimistic locking via version_id.
     """
-    loan = LoanRepository.get_by_id(db, loan_id)
+    loan = await LoanRepository.get_by_id(db, loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
@@ -193,7 +239,7 @@ async def update_loan(
     }
 
     try:
-        updated = LoanRepository.update(db, loan, update_data)
+        updated = await LoanRepository.update(db, loan, update_data)
     except ConflictError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
@@ -204,7 +250,7 @@ async def update_loan(
         "duration_days": updated.duration_days,
     }
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="UPDATE_LOAN",
@@ -214,7 +260,13 @@ async def update_loan(
         new_values=new_values,
         request=request,
     )
-    db.commit()
+    await db.commit()
+
+    # Invalidate caches
+    if settings.CACHE_ENABLED:
+        await cache.invalidate_pattern("loans:*")
+        await cache.invalidate_pattern("customers:*")
+        await cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -226,22 +278,28 @@ async def update_loan(
 @router.get("/{loan_id}/schedule", response_model=APIResponse)
 async def get_loan_schedule(
     loan_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get the installment schedule for a specific loan.
     """
-    loan = LoanRepository.get_by_id(db, loan_id)
+    cache_key = f"loans:schedule:{loan_id}"
+    if settings.CACHE_ENABLED:
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return APIResponse(
+                success=True,
+                message="Retrieved installments (cached)",
+                data=cached_data,
+            )
+
+    loan = await LoanRepository.get_by_id(db, loan_id)
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
-    schedule = db.query(LoanSchedule).filter(
-        LoanSchedule.loan_id == loan_id
-    ).order_by(LoanSchedule.installment_number).all()
-
     from app.services.loan_service import get_loan_repayment_rows
-    repayment_rows = get_loan_repayment_rows(db, loan)
+    repayment_rows = await get_loan_repayment_rows(db, loan)
 
     schedule_data = [
         {
@@ -257,6 +315,8 @@ async def get_loan_schedule(
         for idx, r in enumerate(repayment_rows)
     ]
 
+    if settings.CACHE_ENABLED:
+        await cache.set(cache_key, schedule_data, expire_seconds=settings.CACHE_TTL)
 
     return APIResponse(
         success=True,

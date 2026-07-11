@@ -2,11 +2,16 @@
 MailLog model – tracks all emails sent from the Sakra Finance subsystem.
 """
 from datetime import datetime
-from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy import Column, DateTime, Integer, String, Text, Index
 from app.database.connection import Base
 
 class MailLog(Base):
     __tablename__ = "mail_logs"
+
+    __table_args__ = (
+        Index("idx_mail_logs_created_at", "created_at"),
+        Index("idx_mail_logs_recipient_created_at", "recipient", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     recipient = Column(String(100), nullable=False, index=True)

@@ -3,6 +3,11 @@ Loan lifecycle service: end date calculation, schedule generation, and status tr
 """
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
+from collections import defaultdict
 
 from app.services.interest import calculate_interest, get_loan_balance_summary
 
@@ -98,62 +103,38 @@ def get_loan_status_details(
     Args:
         loan: Loan ORM object with principal_amount, interest_rate, interest_formula,
               loan_start_date, loan_end_date, duration_days
-        payments_list: List of payment ORM objects with amount_paid attribute
-        current_date: Date to calculate status as of
-
-    Returns:
-        Dictionary with:
-        - daily_due_amount: Expected daily payment
-        - days_elapsed: Days since loan start
-        - days_overdue: Days past loan end date (min 0)
-        - expected_paid_to_date: Amount that should have been paid by now
-        - status: Current loan status string
-        - All fields from get_loan_balance_summary
     """
-    principal = loan.principal_amount
-    rate = loan.interest_rate
-    formula = loan.interest_formula
-    duration = loan.duration_days
-
-    interest = calculate_interest(principal, rate, formula, duration)
-    total_due = principal + interest
-
-    # Daily expected payment
-    daily_due_amount = (total_due / Decimal(str(duration))).quantize(
-        QUANTIZE_PRECISION, rounding=ROUND_HALF_UP
+    total_paid = sum((p.amount_paid for p in payments_list), Decimal("0"))
+    
+    balance = get_loan_balance_summary(
+        loan.principal_amount,
+        loan.interest_rate,
+        loan.interest_formula,
+        total_paid,
+        loan.duration_days,
     )
 
-    # Calculate days elapsed from loan start
-    days_elapsed = max((current_date - loan.loan_start_date).days, 0)
+    days_elapsed = (current_date - loan.loan_start_date).days
+    days_elapsed = max(0, min(days_elapsed, loan.duration_days))
 
-    # Days overdue (past loan end date)
-    if loan.loan_end_date and current_date > loan.loan_end_date:
-        days_overdue = (current_date - loan.loan_end_date).days
-    else:
-        days_overdue = 0
-
-    # Expected paid amount by today
-    expected_days = min(days_elapsed, duration)
-    expected_paid_to_date = (daily_due_amount * Decimal(str(expected_days))).quantize(
+    # Expected paid to date is the daily due times elapsed days
+    daily_due_amount = balance["total_due"] / Decimal(str(loan.duration_days))
+    expected_paid_to_date = (daily_due_amount * Decimal(str(days_elapsed))).quantize(
         QUANTIZE_PRECISION, rounding=ROUND_HALF_UP
     )
-
-    # Total actually paid
-    total_paid = sum(
-        (p.amount_paid for p in payments_list),
-        Decimal("0"),
-    ).quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
-
-    # Get balance summary
-    balance = get_loan_balance_summary(principal, rate, formula, total_paid, duration)
 
     # Determine status
-    if total_paid >= total_due:
+    if balance["remaining_balance"] <= 0:
         status = "COMPLETED"
-    elif days_overdue > 0 and total_paid < total_due:
+    elif loan.loan_end_date and current_date > loan.loan_end_date and balance["remaining_balance"] > 0:
         status = "OVERDUE"
     else:
         status = "ACTIVE"
+
+    # Compute days overdue if applicable
+    days_overdue = 0
+    if status == "OVERDUE" and loan.loan_end_date:
+        days_overdue = (current_date - loan.loan_end_date).days
 
     return {
         "daily_due_amount": daily_due_amount,
@@ -165,39 +146,42 @@ def get_loan_status_details(
     }
 
 
-def get_loan_repayment_rows(db, loan) -> list[dict]:
+async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
     """
     Build repayment rows dynamically for a loan by merging its schedule and payments.
     """
-    from decimal import Decimal
-    from datetime import date
     from app.models.payment import Payment
     from app.models.loan_schedule import LoanSchedule
     from app.models.user import User
-    from app.services.interest import calculate_interest
 
     # Get payments for this loan (use preloaded if available)
     if "payments" in loan.__dict__:
         payments = sorted(loan.payments, key=lambda x: x.payment_date)
     else:
-        payments = db.query(Payment).filter(Payment.loan_id == loan.id).order_by(Payment.payment_date.asc()).all()
+        stmt = select(Payment).filter(Payment.loan_id == loan.id).order_by(Payment.payment_date.asc())
+        res = await db.execute(stmt)
+        payments = list(res.scalars().all())
     payments_dict = {p.payment_date: p for p in payments}
 
     # Get loan schedules (use preloaded if available)
     if "schedules" in loan.__dict__:
         schedules = sorted(loan.schedules, key=lambda x: x.installment_number)
     else:
-        schedules = db.query(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc()).all()
+        stmt = select(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc())
+        res = await db.execute(stmt)
+        schedules = list(res.scalars().all())
 
     # Pre-fetch all recorder users in a single query
     recorder_ids = {p.recorded_by for p in payments if p.recorded_by}
     recorders_dict = {}
     if recorder_ids:
-        recorders = db.query(User).filter(User.id.in_(list(recorder_ids))).all()
+        stmt = select(User).filter(User.id.in_(list(recorder_ids)))
+        res = await db.execute(stmt)
+        recorders = res.scalars().all()
         recorders_dict = {u.id: u.username for u in recorders}
 
     # Calculate overall loan totals
-    total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+    total_due = loan.total_repayable_amount if loan.total_repayable_amount is not None else (loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days))
     total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
     remaining_balance = max(total_due - total_paid, Decimal("0"))
 
@@ -256,27 +240,23 @@ def get_loan_repayment_rows(db, loan) -> list[dict]:
     return repayment_rows
 
 
-def get_customer_summary_details(db, customer_id: int) -> dict:
+async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> dict:
     """
     Compute customer summary details (Total Paid, Remaining Balance, Expected Till Today,
     Pending Amount, Credit Score, Risk Level, Completion %, Next Due Date).
     """
-    from decimal import Decimal
-    from datetime import date
     from app.models.loan import Loan
-    from app.models.payment import Payment
-    from app.services.interest import calculate_interest
     from app.services.credit_score import calculate_credit_score
 
-    from sqlalchemy.orm import selectinload
-    from app.models.loan_schedule import LoanSchedule
-    loans = db.query(Loan).filter(
+    stmt = select(Loan).filter(
         Loan.customer_id == customer_id, 
         Loan.is_deleted == False
     ).options(
         selectinload(Loan.payments),
         selectinload(Loan.schedules)
-    ).all()
+    )
+    res = await db.execute(stmt)
+    loans = res.scalars().all()
     today = date.today()
 
     total_principal_all = Decimal("0")
@@ -347,43 +327,70 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
     }
 
 
-def get_dashboard_metrics_details(db) -> dict:
+async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
     """
     Calculate comprehensive dashboard metrics dynamically from live DB.
-    Optimized to load all payments in a single query and perform loop calculations in memory.
+    Optimized to run counts and queries in parallel using asyncio.gather().
     """
-    from decimal import Decimal
-    from datetime import date
-    from collections import defaultdict
-    from sqlalchemy import func
     from app.models.customer import Customer
     from app.models.loan import Loan
     from app.models.payment import Payment
     from app.models.loan_schedule import LoanSchedule
-    from app.services.interest import calculate_interest, get_loan_balance_summary
 
     today = date.today()
 
-    total_customers = db.query(Customer).filter(Customer.is_deleted == False).count()
-    total_loans = db.query(Loan).filter(Loan.is_deleted == False).count()
+    # Define tasks for parallel execution
+    cust_count_task = db.execute(select(func.count(Customer.id)).filter(Customer.is_deleted == False))
+    loan_count_task = db.execute(select(func.count(Loan.id)).filter(Loan.is_deleted == False))
+    disbursed_task = db.execute(select(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False))
+    collected_task = db.execute(select(func.sum(Payment.amount_paid)))
+    today_collected_task = db.execute(select(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today))
+    all_loans_task = db.execute(select(Loan).filter(Loan.is_deleted == False))
+    pending_payments_task = db.execute(select(func.count(LoanSchedule.id)).filter(
+        LoanSchedule.due_date == today,
+        LoanSchedule.remaining_amount > 0
+    ))
 
-    disbursed_result = db.query(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False).scalar()
+    # Run DB calls concurrently!
+    (
+        cust_res,
+        loan_res,
+        disbursed_res,
+        collected_res,
+        today_collected_res,
+        all_loans_res,
+        pending_payments_res
+    ) = await asyncio.gather(
+        cust_count_task,
+        loan_count_task,
+        disbursed_task,
+        collected_task,
+        today_collected_task,
+        all_loans_task,
+        pending_payments_task
+    )
+
+    total_customers = cust_res.scalar() or 0
+    total_loans = loan_res.scalar() or 0
+
+    disbursed_result = disbursed_res.scalar()
     disbursed_principal = Decimal(str(disbursed_result)) if disbursed_result else Decimal("0")
 
-    collected_result = db.query(func.sum(Payment.amount_paid)).scalar()
+    collected_result = collected_res.scalar()
     total_collected = Decimal(str(collected_result)) if collected_result else Decimal("0")
 
-    today_collected_result = db.query(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today).scalar()
+    today_collected_result = today_collected_res.scalar()
     today_collection = Decimal(str(today_collected_result)) if today_collected_result else Decimal("0")
 
-    # Fetch all active loans
-    all_loans = db.query(Loan).filter(Loan.is_deleted == False).all()
+    all_loans = list(all_loans_res.scalars().all())
     loan_ids = [loan.id for loan in all_loans]
 
-    # Batch fetch all payments for these loans in a single query!
+    # Batch fetch all payments for these loans
     payments_by_loan = defaultdict(list)
     if loan_ids:
-        all_payments = db.query(Payment).filter(Payment.loan_id.in_(loan_ids)).all()
+        stmt = select(Payment).filter(Payment.loan_id.in_(loan_ids))
+        res = await db.execute(stmt)
+        all_payments = res.scalars().all()
         for p in all_payments:
             payments_by_loan[p.loan_id].append(p)
 
@@ -395,7 +402,7 @@ def get_dashboard_metrics_details(db) -> dict:
 
     for loan in all_loans:
         # Calculate due
-        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+        interest = loan.interest_amount if loan.interest_amount is not None else calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         loan_total_due = loan.principal_amount + interest
         total_due += loan_total_due
 
@@ -416,12 +423,7 @@ def get_dashboard_metrics_details(db) -> dict:
             overdue_customers_set.add(loan.customer_id)
 
     outstanding_balance = max(total_due - total_collected, Decimal("0"))
-
-    pending_payments_count = db.query(LoanSchedule).filter(
-        LoanSchedule.due_date == today,
-        LoanSchedule.remaining_amount > 0
-    ).count()
-
+    pending_payments_count = pending_payments_res.scalar() or 0
     collection_efficiency = float((total_collected / total_due) * 100) if total_due > 0 else 100.0
 
     return {
@@ -439,5 +441,3 @@ def get_dashboard_metrics_details(db) -> dict:
         "overdue_customers_count": len(overdue_customers_set),
         "collection_efficiency": round(collection_efficiency, 2),
     }
-
-

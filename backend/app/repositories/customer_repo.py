@@ -2,9 +2,10 @@
 Customer repository with Aadhaar encryption/hashing and optimistic locking.
 """
 from typing import Optional
-
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, func
+from sqlalchemy.orm import selectinload
+from sqlalchemy import or_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
 
 from app.models.customer import Customer
 from app.schemas.customer import CustomerCreate, CustomerUpdate
@@ -16,24 +17,32 @@ class CustomerRepository:
     """Repository for Customer model database operations."""
 
     @staticmethod
-    def get_by_id(db: Session, customer_id: int) -> Optional[Customer]:
+    async def get_by_id(db: AsyncSession, customer_id: int) -> Optional[Customer]:
         """Get a customer by ID, excluding soft-deleted customers."""
-        return db.query(Customer).filter(
+        from app.models.loan import Loan
+        stmt = select(Customer).filter(
             Customer.id == customer_id,
             Customer.is_deleted == False,
-        ).first()
+        ).options(
+            selectinload(Customer.documents),
+            selectinload(Customer.loans).selectinload(Loan.payments)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def get_by_aadhar_hash(db: Session, aadhar_hash: str) -> Optional[Customer]:
+    async def get_by_aadhar_hash(db: AsyncSession, aadhar_hash: str) -> Optional[Customer]:
         """Get a customer by their hashed Aadhaar number."""
-        return db.query(Customer).filter(
+        stmt = select(Customer).filter(
             Customer.aadhar_hash == aadhar_hash,
             Customer.is_deleted == False,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     @staticmethod
-    def list_customers(
-        db: Session,
+    async def list_customers(
+        db: AsyncSession,
         search: Optional[str] = None,
         skip: int = 0,
         limit: int = 20,
@@ -52,14 +61,10 @@ class CustomerRepository:
         Returns:
             Tuple of (list of customers, total count)
         """
-        from sqlalchemy.orm import selectinload
         from app.models.loan import Loan
-        from app.models.payment import Payment
-        query = db.query(Customer).filter(Customer.is_deleted == False).options(
-            selectinload(Customer.documents),
-            selectinload(Customer.loans).selectinload(Loan.payments)
-        )
-
+        
+        where_clauses = [Customer.is_deleted == False]
+        
         if search:
             search_term = f"%{search}%"
             try:
@@ -83,16 +88,26 @@ class CustomerRepository:
             elif len(search.strip()) == 64:
                 filters.append(Customer.aadhar_hash == search.strip())
 
-            query = query.filter(or_(*filters))
+            where_clauses.append(or_(*filters))
 
+        stmt = select(Customer).filter(*where_clauses).options(
+            selectinload(Customer.documents),
+            selectinload(Customer.loans).selectinload(Loan.payments)
+        ).order_by(Customer.created_at.desc()).offset(skip).limit(limit)
 
-        total = query.count()
-        customers = query.order_by(Customer.created_at.desc()).offset(skip).limit(limit).all()
+        count_stmt = select(func.count()).select_from(Customer).filter(*where_clauses)
+
+        res_task = db.execute(stmt)
+        count_task = db.execute(count_stmt)
+
+        res, count_res = await asyncio.gather(res_task, count_task)
+        customers = list(res.scalars().all())
+        total = count_res.scalar() or 0
 
         return customers, total
 
     @staticmethod
-    def create(db: Session, schema: CustomerCreate, creator_id: int) -> Customer:
+    async def create(db: AsyncSession, schema: CustomerCreate, creator_id: int) -> Customer:
         """
         Create a new customer with encrypted Aadhaar.
 
@@ -114,10 +129,12 @@ class CustomerRepository:
         aadhar_hash = hash_aadhaar(schema.aadhar_number)
 
         # Check for duplicate
-        existing = db.query(Customer).filter(
+        stmt = select(Customer).filter(
             Customer.aadhar_hash == aadhar_hash,
             Customer.is_deleted == False,
-        ).first()
+        )
+        result = await db.execute(stmt)
+        existing = result.scalars().first()
 
         if existing:
             raise DuplicateAadhaar()
@@ -144,13 +161,12 @@ class CustomerRepository:
             version_id=1,
         )
 
-
         db.add(customer)
-        db.flush()
+        await db.flush()
         return customer
 
     @staticmethod
-    def update(db: Session, customer: Customer, schema: CustomerUpdate) -> Customer:
+    async def update(db: AsyncSession, customer: Customer, schema: CustomerUpdate) -> Customer:
         """
         Update customer fields with optimistic locking.
 
@@ -180,12 +196,12 @@ class CustomerRepository:
                 setattr(customer, field, value)
 
         customer.version_id += 1
-        db.flush()
+        await db.flush()
         return customer
 
     @staticmethod
-    def soft_delete(db: Session, customer: Customer) -> Customer:
+    async def soft_delete(db: AsyncSession, customer: Customer) -> Customer:
         """Soft delete a customer by setting is_deleted flag."""
         customer.is_deleted = True
-        db.flush()
+        await db.flush()
         return customer

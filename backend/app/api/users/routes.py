@@ -6,7 +6,7 @@ import secrets
 import string
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.session import get_db
 from app.middleware.auth import PermissionRequirement
@@ -16,6 +16,8 @@ from app.schemas.common import APIResponse
 from app.schemas.user import UserInvite, UserUpdate, UserCreate, UserResponse
 from app.services.audit import log_audit
 from app.services.email_service import send_email
+from app.services.cache import cache
+from app.core.config import settings
 
 logger = logging.getLogger("sakra.users")
 
@@ -46,13 +48,13 @@ def generate_secure_password(length: int = 16) -> str:
 
 @router.get("/", response_model=APIResponse)
 async def list_users(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
     List all users. Requires ADMIN or SUPER_ADMIN role.
     """
-    users = UserRepository.list_all(db)
+    users = await UserRepository.list_all(db)
     users_data = [UserResponse.model_validate(u).model_dump(mode="json") for u in users]
 
     return APIResponse(
@@ -66,7 +68,7 @@ async def list_users(
 async def invite_user(
     invite: UserInvite,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
@@ -74,7 +76,7 @@ async def invite_user(
     an invitation email. Cannot invite SUPER_ADMIN users.
     """
     # Check if email already exists
-    existing = UserRepository.get_by_email(db, invite.email)
+    existing = await UserRepository.get_by_email(db, invite.email)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -87,7 +89,7 @@ async def invite_user(
     # Check for username collision and add suffix if needed
     base_username = username
     counter = 1
-    while UserRepository.get_by_username(db, username):
+    while await UserRepository.get_by_username(db, username):
         username = f"{base_username}_{counter}"
         counter += 1
 
@@ -102,7 +104,7 @@ async def invite_user(
         role=invite.role,
     )
 
-    user = UserRepository.create(db, user_schema, status="active")
+    user = await UserRepository.create(db, user_schema, status="active")
 
     # Send invitation email
     email_html = f"""
@@ -133,7 +135,7 @@ async def invite_user(
     )
 
     # Audit log
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="INVITE_USER",
@@ -142,7 +144,7 @@ async def invite_user(
         new_values={"email": invite.email, "role": invite.role, "username": username},
         request=request,
     )
-    db.commit()
+    await db.commit()
 
     user_data = UserResponse.model_validate(user)
 
@@ -158,13 +160,13 @@ async def update_user_status(
     user_id: int,
     update: UserUpdate,
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
 ):
     """
     Update a user's role or status. SUPER_ADMIN required for modifying admin users.
     """
-    target_user = UserRepository.get_by_id(db, user_id)
+    target_user = await UserRepository.get_by_id(db, user_id)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -187,11 +189,11 @@ async def update_user_status(
 
     old_values = {"role": target_user.role, "status": target_user.status}
 
-    updated_user = UserRepository.update(db, target_user, update)
+    updated_user = await UserRepository.update(db, target_user, update)
 
     new_values = {"role": updated_user.role, "status": updated_user.status}
 
-    log_audit(
+    await log_audit(
         db=db,
         actor_id=current_user.id,
         action="UPDATE_USER",
@@ -201,7 +203,12 @@ async def update_user_status(
         new_values=new_values,
         request=request,
     )
-    db.commit()
+    await db.commit()
+
+    # Clear user profiles and permissions cache
+    if settings.CACHE_ENABLED:
+        await cache.delete(f"auth:user:{user_id}")
+        await cache.invalidate_pattern(f"auth:permission:{user_id}:*")
 
     user_data = UserResponse.model_validate(updated_user)
 

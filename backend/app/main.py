@@ -61,6 +61,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
+    openapi_url="/openapi.json" if settings.DEBUG else None,
 )
 
 # Attach SlowAPI limiter state
@@ -68,9 +69,22 @@ app.state.limiter = limiter
 
 from fastapi.middleware.gzip import GZipMiddleware
 
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; object-src 'none';"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
 # Middleware
 app.add_middleware(RequestLoggingMiddleware)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+if settings.ENABLE_GZIP:
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
@@ -148,7 +162,7 @@ app.include_router(admin_router, prefix=settings.API_V1_STR)
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     logger.info("Verifying system configurations and security keys...")
     
     # 1. Check Security Keys
@@ -169,51 +183,39 @@ def on_startup():
 
     # 3. Check Database connection
     from sqlalchemy.sql import text
-    from app.database.session import SessionLocal
-    db_session = SessionLocal()
     try:
-        db_session.execute(text("SELECT 1"))
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
         logger.info("✓ Database connection verified successfully.")
     except Exception as e:
         raise RuntimeError(f"CONFIGURATION ERROR: Failed to connect to MySQL database: {str(e)}")
-    finally:
-        db_session.close()
 
     logger.info("Initializing database tables...")
-    Base.metadata.create_all(bind=engine)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    # Automatically check and add preferred_language column if it is missing
-    from sqlalchemy import inspect
-    from sqlalchemy.sql import text
-    try:
-        inspector = inspect(engine)
+    # Helper function to run sync migrations on connection
+    def check_and_run_migrations(connection):
+        from sqlalchemy import inspect
+        inspector = inspect(connection)
+        
+        # Automatically check and add preferred_language column if it is missing
         columns = [col["name"] for col in inspector.get_columns("users")]
         if "preferred_language" not in columns:
             logger.info("Column preferred_language not found in users table. Migrating schema...")
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE users ADD COLUMN preferred_language VARCHAR(5) NOT NULL DEFAULT 'en'"))
+            connection.execute(text("ALTER TABLE users ADD COLUMN preferred_language VARCHAR(5) NOT NULL DEFAULT 'en'"))
             logger.info("✓ Column preferred_language successfully added to users table.")
-    except Exception as migrate_err:
-        logger.error("Failed to automatically migrate users table for preferred_language: %s", str(migrate_err))
 
-    # Automatically alter interest_rate column in loans table to DECIMAL(8,4) if its precision/scale is different
-    try:
-        inspector = inspect(engine)
+        # Automatically alter interest_rate column in loans table to DECIMAL(8,4) if its precision/scale is different
         loans_columns = {col["name"]: col for col in inspector.get_columns("loans")}
         if "interest_rate" in loans_columns:
             col_type = loans_columns["interest_rate"]["type"]
             if getattr(col_type, "scale", None) != 4 or getattr(col_type, "precision", None) != 8:
                 logger.info("Column interest_rate in loans table does not have DECIMAL(8,4) precision. Migrating schema...")
-                with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE loans MODIFY COLUMN interest_rate DECIMAL(8,4) NOT NULL"))
+                connection.execute(text("ALTER TABLE loans MODIFY COLUMN interest_rate DECIMAL(8,4) NOT NULL"))
                 logger.info("✓ Column interest_rate successfully migrated to DECIMAL(8,4).")
-    except Exception as migrate_err:
-        logger.error("Failed to automatically migrate loans table for interest_rate precision: %s", str(migrate_err))
-    
-    # Automatically add new columns to loans table if they are missing
-    try:
-        inspector = inspect(engine)
-        loans_columns = {col["name"]: col for col in inspector.get_columns("loans")}
+
+        # Automatically add new columns to loans table if they are missing
         new_cols = {
             "interest_amount": "DECIMAL(15,2) NULL",
             "total_repayable_amount": "DECIMAL(15,2) NULL",
@@ -223,66 +225,104 @@ def on_startup():
         for col_name, col_type in new_cols.items():
             if col_name not in loans_columns:
                 logger.info(f"Column {col_name} not found in loans table. Migrating schema...")
-                with engine.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE loans ADD COLUMN {col_name} {col_type}"))
+                connection.execute(text(f"ALTER TABLE loans ADD COLUMN {col_name} {col_type}"))
                 logger.info(f"✓ Column {col_name} successfully added to loans table.")
-    except Exception as migrate_err:
-        logger.error("Failed to automatically migrate loans table for new calculated fields: %s", str(migrate_err))
-    
 
-    
+        # Create new indexes if they do not exist
+        indexes_to_create = [
+            ("users", "idx_users_email_status", "(email, status)"),
+            ("users", "idx_users_role_status", "(role, status)"),
+            ("users", "idx_users_created_at", "(created_at)"),
+            ("users", "idx_users_updated_at", "(updated_at)"),
+            ("customers", "idx_customers_created_at", "(created_at)"),
+            ("customers", "idx_customers_updated_at", "(updated_at)"),
+            ("customers", "idx_customers_is_deleted_created_at", "(is_deleted, created_at)"),
+            ("loans", "idx_loans_created_at", "(created_at)"),
+            ("loans", "idx_loans_is_deleted", "(is_deleted)"),
+            ("loans", "idx_loans_customer_status", "(customer_id, status)"),
+            ("loans", "idx_loans_status_created_at", "(status, created_at)"),
+            ("loans", "idx_loans_customer_created_at", "(customer_id, created_at)"),
+            ("payments", "idx_payments_created_at", "(created_at)"),
+            ("payments", "idx_payments_customer_payment_date", "(customer_id, payment_date)"),
+            ("payments", "idx_payments_loan_created_at", "(loan_id, created_at)"),
+            ("payments", "idx_payments_customer_created_at", "(customer_id, created_at)"),
+            ("user_sessions", "idx_sessions_created_at", "(created_at)"),
+            ("user_sessions", "idx_sessions_is_active", "(is_active)"),
+            ("user_sessions", "idx_sessions_user_created_at", "(user_id, created_at)"),
+            ("notifications", "idx_notifications_sent_at", "(sent_at)"),
+            ("notifications", "idx_notifications_user_is_read_sent_at", "(user_id, is_read, sent_at)"),
+            ("audit_logs", "idx_audit_logs_created_at", "(created_at)"),
+            ("audit_logs", "idx_audit_logs_actor_id", "(actor_id)"),
+            ("audit_logs", "idx_audit_logs_actor_created_at", "(actor_id, created_at)"),
+            ("mail_logs", "idx_mail_logs_created_at", "(created_at)"),
+            ("mail_logs", "idx_mail_logs_recipient_created_at", "(recipient, created_at)")
+        ]
+        
+        for table, index_name, cols in indexes_to_create:
+            existing_indexes = [idx["name"] for idx in inspector.get_indexes(table)]
+            if index_name not in existing_indexes:
+                logger.info(f"Creating index {index_name} on table {table}...")
+                connection.execute(text(f"CREATE INDEX {index_name} ON {table} {cols}"))
+                logger.info(f"✓ Index {index_name} created successfully.")
+
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(check_and_run_migrations)
+    except Exception as migrate_err:
+        logger.error("Failed to run dynamic schema migrations: %s", str(migrate_err))
+
     # Seed default SUPER_ADMIN if none exists
-    from sqlalchemy.orm import Session
+    from sqlalchemy import select
     from app.database.session import SessionLocal
     from app.core.security import hash_password
     from app.ai.rag.vector_store import vector_store
     
-    db: Session = SessionLocal()
-    try:
-        super_admin_exists = db.query(User).filter(User.role == "SUPER_ADMIN").first()
-        if not super_admin_exists:
-            logger.info("No SUPER_ADMIN found. Seeding default admin user...")
-            admin_user = User(
-                username="admin",
-                email="admin@sakra.finance",
-                password_hash=hash_password("SuperAdmin@2026"),
-                role="SUPER_ADMIN",
-                status="active",
-                is_deleted=False,
-                version_id=1,
+    async with SessionLocal() as db:
+        try:
+            stmt = select(User).filter(User.role == "SUPER_ADMIN")
+            result = await db.execute(stmt)
+            super_admin_exists = result.scalars().first()
+            if not super_admin_exists:
+                logger.info("No SUPER_ADMIN found. Seeding default admin user...")
+                admin_user = User(
+                    username="admin",
+                    email="admin@sakra.finance",
+                    password_hash=hash_password("SuperAdmin@2026"),
+                    role="SUPER_ADMIN",
+                    status="active",
+                    is_deleted=False,
+                    version_id=1,
+                )
+                db.add(admin_user)
+                await db.commit()
+                logger.info("Default administrator seeded (admin / SuperAdmin@2026).")
+                
+            # Seed local RAG vector database with domain rules
+            logger.info("Seeding local RAG vector store database...")
+            vector_store.add_document(
+                doc_id="rule_1",
+                text="Sakra Finance loans default to a duration of 100 days. Daily repayments are expected every single day from day 1 to day 100.",
+                metadata={"category": "loan_terms"}
             )
-            db.add(admin_user)
-            db.commit()
-            logger.info("Default administrator seeded (admin / SuperAdmin@2026).")
-            
-        # Seed local RAG vector database with domain rules
-        logger.info("Seeding local RAG vector store database...")
-        vector_store.add_document(
-            doc_id="rule_1",
-            text="Sakra Finance loans default to a duration of 100 days. Daily repayments are expected every single day from day 1 to day 100.",
-            metadata={"category": "loan_terms"}
-        )
-        vector_store.add_document(
-            doc_id="rule_2",
-            text="Interest formulas: Simple Interest (Included) increases the core principal immediately. Simple Interest (Excluded) tracks interest separately in a secondary ledger. Fixed percentage applies a flat % over the total loan amount.",
-            metadata={"category": "interest_formulas"}
-        )
-        vector_store.add_document(
-            doc_id="rule_3",
-            text="Overdue tracking: A loan is marked OVERDUE if the current date is past the loan end date and the outstanding balance is greater than zero.",
-            metadata={"category": "overdue_policy"}
-        )
-        vector_store.add_document(
-            doc_id="rule_4",
-            text="Credit scoring rules: Calculated from 300 to 850. Weights: 40% payment regularity (unique days of payment), 40% compliance (ratio of paid to expected amount), and 20% timeliness (deductions for overdue days).",
-            metadata={"category": "credit_score"}
-        )
-        logger.info("RAG vector database seeding completed.")
-    except Exception as e:
-        logger.error("Error during startup seed: %s", str(e))
-        db.rollback()
-    finally:
-        db.close()
+            vector_store.add_document(
+                doc_id="rule_2",
+                text="Interest formulas: Simple Interest (Included) increases the core principal immediately. Simple Interest (Excluded) tracks interest separately in a secondary ledger. Fixed percentage applies a flat % over the total loan amount.",
+                metadata={"category": "interest_formulas"}
+            )
+            vector_store.add_document(
+                doc_id="rule_3",
+                text="Overdue tracking: A loan is marked OVERDUE if the current date is past the loan end date and the outstanding balance is greater than zero.",
+                metadata={"category": "overdue_policy"}
+            )
+            vector_store.add_document(
+                doc_id="rule_4",
+                text="Credit scoring rules: Calculated from 300 to 850. Weights: 40% payment regularity (unique days of payment), 40% compliance (ratio of paid to expected amount), and 20% timeliness (deductions for overdue days).",
+                metadata={"category": "credit_score"}
+            )
+            logger.info("RAG vector database seeding completed.")
+        except Exception as e:
+            logger.error("Error during startup seed: %s", str(e))
+            await db.rollback()
 
 @app.get("/health", tags=["Health"])
 def health_check():
