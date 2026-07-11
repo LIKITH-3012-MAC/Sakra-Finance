@@ -135,7 +135,7 @@ function renderStats(stats) {
 
   const overdueHoverEl = document.getElementById("metric-overdue-hover");
   if (overdueHoverEl) {
-    overdueHoverEl.innerText = `${targetOverdue} ${window.t ? window.t("nav_daily_repayments") : "accounts require action"}`;
+    overdueHoverEl.innerText = `${targetOverdue} ${window.t ? window.t("dashboard_overdue_desc") : "accounts require action"}`;
   }
 }
 

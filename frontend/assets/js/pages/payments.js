@@ -109,8 +109,25 @@ async function init() {
 }
 
 function renderCustomerList() {
+  if (customers.length === 0) {
+    listContainer.innerHTML = `<p class="text-center text-xs text-text-muted py-8 font-semibold">${window.t("payments_no_customer_available")}</p>`;
+    
+    // Set unselected placeholder texts to empty state dynamically
+    const titleEl = document.querySelector("#unselected-placeholder h3");
+    const descEl = document.querySelector("#unselected-placeholder p");
+    if (titleEl) {
+      titleEl.setAttribute("data-i18n", "payments_no_customer_available_title");
+      titleEl.innerText = window.t("payments_no_customer_available_title");
+    }
+    if (descEl) {
+      descEl.setAttribute("data-i18n", "payments_no_customer_available");
+      descEl.innerText = window.t("payments_no_customer_available");
+    }
+    return;
+  }
+
   if (filteredCustomers.length === 0) {
-    listContainer.innerHTML = `<p class="text-center text-xs text-text-muted py-8 font-semibold">No customers found.</p>`;
+    listContainer.innerHTML = `<p class="text-center text-xs text-text-muted py-8 font-semibold">${window.t("customers_no_records")}</p>`;
     return;
   }
 

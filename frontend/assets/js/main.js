@@ -81,7 +81,7 @@ async function initLayout(user) {
 
           <!-- User Identity widget -->
           <div class="p-6 bg-slate-950/20 border-b border-white/5">
-            <p class="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Secured Profile</p>
+            <p class="text-[9px] text-slate-500 uppercase tracking-widest font-bold">${window.t ? window.t("secured_profile") : "Secured Profile"}</p>
             <p class="font-bold text-sm text-slate-200 mt-1 truncate">${user.username}</p>
             <span class="inline-block mt-2 px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-blue-950/50 text-blue-400 border border-blue-500/20">
               ${user.role}
@@ -98,7 +98,7 @@ async function initLayout(user) {
         <div class="p-4 border-t border-white/5 flex flex-col gap-4">
           <button id="sidebar-logout" class="w-full flex items-center gap-3.5 px-4 py-3 rounded-lg text-xs font-semibold uppercase tracking-wider text-rose-400/80 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all duration-150 cursor-pointer">
             <i data-lucide="log-out" class="w-4 h-4 shrink-0"></i>
-            <span data-i18n="sign_out">Sign Out</span>
+            <span data-i18n="sign_out">${window.t ? window.t("sign_out") : "Sign Out"}</span>
           </button>
         </div>
       </div>
@@ -117,10 +117,10 @@ async function initLayout(user) {
         <div class="flex items-center gap-2 md:gap-3">
           <span class="text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-blue-950/50 text-blue-400 px-2.5 py-1 rounded border border-blue-500/25 flex items-center gap-1.5 select-none font-sans">
             <span class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-ping"></span>
-            <span data-i18n="secure_session">SECURE SESSION</span>
+            <span data-i18n="secure_session">${window.t ? window.t("secure_session") : "SECURE SESSION"}</span>
           </span>
           <span class="hidden sm:inline-flex text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-900/50 text-slate-400 px-2.5 py-1 rounded border border-white/5 select-none font-sans">
-            <span data-i18n="verified_ip">VERIFIED IP</span>
+            <span data-i18n="verified_ip">${window.t ? window.t("verified_ip") : "VERIFIED IP"}</span>
           </span>
         </div>
         
@@ -146,7 +146,7 @@ async function initLayout(user) {
           <span class="text-white/5">|</span>
           <div class="flex items-center gap-1.5 select-none text-[9px] font-bold text-emerald-400">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-            <span class="hidden md:inline-block uppercase tracking-widest" data-i18n="audit_active">AUDIT ACTIVE</span>
+            <span class="hidden md:inline-block uppercase tracking-widest" data-i18n="audit_active">${window.t ? window.t("audit_active") : "AUDIT ACTIVE"}</span>
           </div>
           <span class="text-white/5">|</span>
           <div class="flex items-center gap-1.5 text-slate-200">
@@ -196,11 +196,11 @@ async function initLayout(user) {
     }
     const activePath = getPageFilename();
     const links = [
-      { name: "Dashboard", file: "dashboard.html", icon: "layout-dashboard", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-      { name: "Customers", file: "customers.html", icon: "users", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-      { name: "Daily Repayments", file: "payments.html", icon: "check-square", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN"] },
-      { name: "Notifications", file: "notifications.html", icon: "bell", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-      { name: "Sakra AI Copilot", file: "copilot.html", icon: "cpu", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] }
+      { name: "Dashboard", key: "nav_dashboard", file: "dashboard.html", icon: "layout-dashboard", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+      { name: "Customers", key: "nav_customers", file: "customers.html", icon: "users", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+      { name: "Daily Repayments", key: "nav_daily_repayments", file: "payments.html", icon: "check-square", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN"] },
+      { name: "Notifications", key: "nav_notifications", file: "notifications.html", icon: "bell", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+      { name: "Sakra AI Copilot", key: "nav_copilot", file: "copilot.html", icon: "cpu", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] }
     ];
     const allowedLinks = links.filter(l => l.roles.includes(user.role));
     const mobileLinksHtml = allowedLinks.map(link => {
@@ -210,7 +210,7 @@ async function initLayout(user) {
           isActive ? "text-blue-400 font-bold" : "text-slate-500 hover:text-slate-300"
         }">
           <i data-lucide="${link.icon}" class="w-5 h-5"></i>
-          <span class="text-[8px] uppercase tracking-wider font-semibold">${link.name.split(" ").pop()}</span>
+          <span class="text-[8px] uppercase tracking-wider font-semibold" data-i18n="${link.key}">${window.t ? window.t(link.key) : link.name}</span>
         </a>
       `;
     }).join("");
@@ -228,7 +228,8 @@ async function initLayout(user) {
             <input
               id="spotlight-search"
               type="text"
-              placeholder="Type a command or search action..."
+              data-i18n-placeholder="cmd_search_placeholder"
+              placeholder="${window.t ? window.t("cmd_search_placeholder") : "Type a command or search action..."}"
               class="w-full bg-transparent outline-none border-none text-white text-sm"
             />
           </div>
@@ -238,8 +239,8 @@ async function initLayout(user) {
           </div>
           
           <div class="px-4 py-2.5 border-t border-slate-800 bg-slate-950/20 text-[10px] text-slate-500 flex items-center justify-between">
-            <span>Search using command palette</span>
-            <span>ESC to close</span>
+            <span data-i18n="cmd_search_help">${window.t ? window.t("cmd_search_help") : "Search using command palette"}</span>
+            <span data-i18n="cmd_search_esc">${window.t ? window.t("cmd_search_esc") : "ESC to close"}</span>
           </div>
         </div>
       </div>
@@ -263,14 +264,15 @@ function setupCommandPalette(user) {
   if (!overlay || !input || !itemsContainer) return;
 
   const items = [
-    { name: "Navigate to Dashboard", action: () => window.location.href = "/dashboard.html", icon: "settings", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-    { name: "Navigate to Customers Directory", action: () => window.location.href = "/customers.html", icon: "users", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-    { name: "Record Daily Repayments", action: () => window.location.href = "/payments.html", icon: "settings", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN"] },
-    { name: "Ask SAKRA AI Copilot", action: () => window.location.href = "/copilot.html", icon: "bot", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-    { name: "Open System Alerts", action: () => window.location.href = "/notifications.html", icon: "bell", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
-    { name: "Security Audit Logs", action: () => window.location.href = "/reports.html", icon: "shield-alert", roles: ["SUPER_ADMIN"] },
+    { name: "Navigate to Dashboard", key: "cmd_nav_dashboard", action: () => window.location.href = "/dashboard.html", icon: "settings", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+    { name: "Navigate to Customers Directory", key: "cmd_nav_customers", action: () => window.location.href = "/customers.html", icon: "users", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+    { name: "Record Daily Repayments", key: "cmd_record_repayments", action: () => window.location.href = "/payments.html", icon: "settings", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN"] },
+    { name: "Ask SAKRA AI Copilot", key: "cmd_ask_copilot", action: () => window.location.href = "/copilot.html", icon: "bot", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+    { name: "Open System Alerts", key: "cmd_open_alerts", action: () => window.location.href = "/notifications.html", icon: "bell", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
+    { name: "Security Audit Logs", key: "cmd_security_logs", action: () => window.location.href = "/reports.html", icon: "shield-alert", roles: ["SUPER_ADMIN"] },
     {
       name: "Switch Theme: Dark Luxury",
+      key: "cmd_theme_dark",
       action: () => {
         setTheme("dark");
         overlay.classList.add("hidden");
@@ -280,6 +282,7 @@ function setupCommandPalette(user) {
     },
     {
       name: "Switch Theme: Light Professional",
+      key: "cmd_theme_light",
       action: () => {
         setTheme("light");
         overlay.classList.add("hidden");
@@ -289,6 +292,7 @@ function setupCommandPalette(user) {
     },
     {
       name: "Switch Theme: OLED Pitch Black",
+      key: "cmd_theme_oled",
       action: () => {
         setTheme("oled");
         overlay.classList.add("hidden");
@@ -302,17 +306,20 @@ function setupCommandPalette(user) {
 
   function renderItems(filterText = "") {
     const query = filterText.toLowerCase().trim();
-    const filtered = allowedItems.filter(item => item.name.toLowerCase().includes(query));
+    const filtered = allowedItems.filter(item => {
+      const translatedName = (window.t ? window.t(item.key) : item.name).toLowerCase();
+      return translatedName.includes(query) || item.name.toLowerCase().includes(query);
+    });
 
     if (filtered.length === 0) {
-      itemsContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">No matching actions found.</p>`;
+      itemsContainer.innerHTML = `<p class="text-xs text-slate-500 text-center py-6">${window.t ? window.t("cmd_no_results") : "No matching actions found."}</p>`;
       return;
     }
 
     itemsContainer.innerHTML = filtered.map((item, idx) => `
       <button data-idx="${idx}" class="spotlight-btn w-full text-left px-4 py-3 rounded-xl hover:bg-slate-800/60 transition-all text-xs text-slate-300 flex items-center gap-3 hover:text-white cursor-pointer bg-transparent border-none">
         <i data-lucide="${item.icon}" class="w-4 h-4 text-indigo-400 shrink-0"></i>
-        <span>${item.name}</span>
+        <span>${window.t ? window.t(item.key) : item.name}</span>
       </button>
     `).join("");
 
@@ -576,8 +583,16 @@ async function executeMain() {
   }
 
   // Setup layouts
+  window.currentUserSession = user;
   await initLayout(user);
 }
+
+// Global Language Changed Redraw Listener
+window.addEventListener("language-changed", () => {
+  if (window.currentUserSession) {
+    initLayout(window.currentUserSession);
+  }
+});
 
 // Global Auth Expired Event redirection handler
 window.addEventListener("auth-expired", () => {
