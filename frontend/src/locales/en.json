@@ -356,5 +356,7 @@
   "payments_col_expected": "Expected Amount",
   "payments_col_recorded_by": "Recorded By",
   "payments_col_recorded_time": "Recorded Time",
-  "payments_col_notes": "Notes"
+  "payments_col_notes": "Notes",
+  "payments_col_date": "Payment Date",
+  "payments_col_mode": "Payment Mode"
 }

@@ -356,5 +356,7 @@
   "payments_col_expected": "ఆశించిన మొత్తం",
   "payments_col_recorded_by": "నమోదు చేసినది",
   "payments_col_recorded_time": "నమోదైన సమయం",
-  "payments_col_notes": "నోట్స్"
+  "payments_col_notes": "నోట్స్",
+  "payments_col_date": "చెల్లింపు తేదీ",
+  "payments_col_mode": "చెల్లింపు విధానం"
 }

@@ -1469,6 +1469,60 @@ label, .text-\[10px\] {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL ACCESSIBILITY & CONTRAST STATUS BADGES OVERRIDES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Target all tags matching typical light background badge Tailwind utility classes */
+.bg-emerald-50,
+.bg-blue-50,
+.bg-rose-50,
+.bg-amber-50,
+.bg-slate-50,
+.bg-orange-50,
+.bg-green-50,
+.bg-red-50,
+.bg-yellow-50,
+span[class*="bg-emerald-50"],
+span[class*="bg-blue-50"],
+span[class*="bg-rose-50"],
+span[class*="bg-amber-50"],
+span[class*="bg-slate-50"],
+span[class*="bg-orange-50"] {
+  color: #000000 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.06em !important;
+  opacity: 1 !important;
+  text-transform: uppercase !important;
+}
+
+/* Specific background contrast adjustments for accessibility (light pastel cards to prevent blending with navy theme) */
+.bg-emerald-50 {
+  background-color: #d1fae5 !important; /* light mint green */
+  border: 1px solid #34d399 !important;
+}
+.bg-blue-50 {
+  background-color: #dbeafe !important; /* light blue */
+  border: 1px solid #60a5fa !important;
+}
+.bg-rose-50 {
+  background-color: #ffe4e6 !important; /* light red */
+  border: 1px solid #f87171 !important;
+}
+.bg-amber-50 {
+  background-color: #fef3c7 !important; /* light yellow/cream */
+  border: 1px solid #fbbf24 !important;
+}
+.bg-slate-50 {
+  background-color: #f1f5f9 !important; /* light slate */
+  border: 1px solid #94a3b8 !important;
+}
+.bg-orange-50 {
+  background-color: #ffedd5 !important; /* light orange */
+  border: 1px solid #fb923c !important;
+}
+
+
 
 
 
