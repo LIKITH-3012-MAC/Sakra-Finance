@@ -43,7 +43,20 @@ class LoanRepository:
         Returns:
             The created Loan object (with schedule records committed)
         """
+        from decimal import Decimal, ROUND_HALF_UP
+        from app.services.interest import calculate_interest
+
         end_date = calculate_loan_end_date(schema.loan_start_date, schema.duration_days)
+        interest = calculate_interest(
+            schema.principal_amount,
+            schema.interest_rate,
+            schema.interest_formula,
+            schema.duration_days,
+        )
+        total_repayable = schema.principal_amount + interest
+        daily_inst = (total_repayable / Decimal(str(schema.duration_days))).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
 
         loan = Loan(
             customer_id=schema.customer_id,
@@ -56,6 +69,10 @@ class LoanRepository:
             status="ACTIVE",
             created_by=creator_id,
             version_id=1,
+            interest_amount=interest,
+            total_repayable_amount=total_repayable,
+            daily_installment=daily_inst,
+            remaining_balance=total_repayable,
         )
 
         db.add(loan)
@@ -119,6 +136,31 @@ class LoanRepository:
             start = loan.loan_start_date
             duration = loan.duration_days
             loan.loan_end_date = calculate_loan_end_date(start, duration)
+
+        # Recalculate calculated fields if any configuration changed
+        if any(f in update_data for f in ["principal_amount", "interest_rate", "interest_formula", "duration_days"]):
+            from decimal import Decimal, ROUND_HALF_UP
+            from app.services.interest import calculate_interest
+            from app.models.payment import Payment
+            
+            principal = loan.principal_amount
+            rate = loan.interest_rate
+            formula = loan.interest_formula
+            duration = loan.duration_days
+            
+            interest = calculate_interest(principal, rate, formula, duration)
+            total_repayable = principal + interest
+            daily_inst = (total_repayable / Decimal(str(duration))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            
+            # Fetch all payments to subtract from total repayable
+            all_payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
+            total_paid = sum(p.amount_paid for p in all_payments)
+            remaining = max(total_repayable - total_paid, Decimal("0"))
+            
+            loan.interest_amount = interest
+            loan.total_repayable_amount = total_repayable
+            loan.daily_installment = daily_inst
+            loan.remaining_balance = remaining
 
         loan.version_id += 1
         db.flush()

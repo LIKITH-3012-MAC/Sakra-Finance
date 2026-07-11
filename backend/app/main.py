@@ -210,6 +210,25 @@ def on_startup():
     except Exception as migrate_err:
         logger.error("Failed to automatically migrate loans table for interest_rate precision: %s", str(migrate_err))
     
+    # Automatically add new columns to loans table if they are missing
+    try:
+        inspector = inspect(engine)
+        loans_columns = {col["name"]: col for col in inspector.get_columns("loans")}
+        new_cols = {
+            "interest_amount": "DECIMAL(15,2) NULL",
+            "total_repayable_amount": "DECIMAL(15,2) NULL",
+            "daily_installment": "DECIMAL(15,2) NULL",
+            "remaining_balance": "DECIMAL(15,2) NULL"
+        }
+        for col_name, col_type in new_cols.items():
+            if col_name not in loans_columns:
+                logger.info(f"Column {col_name} not found in loans table. Migrating schema...")
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE loans ADD COLUMN {col_name} {col_type}"))
+                logger.info(f"✓ Column {col_name} successfully added to loans table.")
+    except Exception as migrate_err:
+        logger.error("Failed to automatically migrate loans table for new calculated fields: %s", str(migrate_err))
+    
 
     
     # Seed default SUPER_ADMIN if none exists

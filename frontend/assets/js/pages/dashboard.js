@@ -106,8 +106,7 @@ function renderStats(stats) {
   const targetCollected = parseFloat(stats.total_collected ?? 0);
   const targetOverdue = stats.overdue_count ?? 0;
 
-  const disbursed = parseFloat(stats.disbursed_principal || 0);
-  const targetRealization = disbursed > 0 ? Math.min(Math.round((targetCollected / disbursed) * 100), 100) : 0;
+  const targetRealization = parseFloat(stats.collection_efficiency ?? 100.0);
 
   // Run rollups
   animateValue("metric-customers", 0, targetCustomers, 700);
@@ -130,7 +129,8 @@ function renderStats(stats) {
 
   const realizationHoverEl = document.getElementById("metric-realization-hover");
   if (realizationHoverEl) {
-    realizationHoverEl.innerText = `${window.t ? window.t("customers_col_principal") : "Principal"}: ${formatVal(disbursed)}`;
+    const totalRepayable = parseFloat(stats.total_repayable || 0);
+    realizationHoverEl.innerText = `Total Repayable: ${formatVal(totalRepayable)}`;
   }
 
   const overdueHoverEl = document.getElementById("metric-overdue-hover");

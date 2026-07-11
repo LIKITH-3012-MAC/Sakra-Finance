@@ -78,6 +78,7 @@ def get_dashboard_analytics(db: Session) -> Dict[str, Any]:
         from app.models.loan import Loan
         from app.models.payment import Payment
         from decimal import Decimal
+        from app.services.interest import calculate_interest
 
         total_customers = db.query(Customer).filter(Customer.is_deleted == False).count()
         loans = db.query(Loan).filter(Loan.is_deleted == False).all()
@@ -85,7 +86,17 @@ def get_dashboard_analytics(db: Session) -> Dict[str, Any]:
 
         total_disbursed = sum((l.principal_amount for l in loans), Decimal("0"))
         total_collected = sum((p.amount_paid for p in payments), Decimal("0"))
-        outstanding = max(Decimal("0"), total_disbursed - total_collected)
+        
+        # Calculate total due (repayable) across all loans
+        total_due = Decimal("0")
+        for l in loans:
+            if l.total_repayable_amount is not None:
+                total_due += l.total_repayable_amount
+            else:
+                interest = calculate_interest(l.principal_amount, l.interest_rate, l.interest_formula, l.duration_days)
+                total_due += l.principal_amount + interest
+
+        outstanding = max(Decimal("0"), total_due - total_collected)
         overdue_count = sum((1 for l in loans if l.status == "OVERDUE"), 0)
 
         return {

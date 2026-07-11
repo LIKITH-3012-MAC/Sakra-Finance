@@ -318,7 +318,12 @@ async function selectLoan(loan) {
   const outstanding = parseFloat(bs.remaining_balance || loan.remaining_balance || 0);
   document.getElementById("cc-outstanding-bal").innerText = formatVal(outstanding);
   
+  const interestVal = parseFloat(bs.interest || loan.interest_amount || 0);
+  const totalRepayableVal = parseFloat(bs.total_due || loan.total_repayable_amount || 0);
+
   document.getElementById("kpi-principal").innerText = formatVal(loan.principal_amount);
+  document.getElementById("kpi-interest").innerText = formatVal(interestVal);
+  document.getElementById("kpi-total-repayable").innerText = formatVal(totalRepayableVal);
   document.getElementById("kpi-paid").innerText = formatVal(bs.total_paid || 0);
   document.getElementById("kpi-remaining").innerText = formatVal(outstanding);
   

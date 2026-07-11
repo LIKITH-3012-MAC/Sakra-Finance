@@ -279,6 +279,8 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
     ).all()
     today = date.today()
 
+    total_principal_all = Decimal("0")
+    total_interest_all = Decimal("0")
     total_paid_all = Decimal("0")
     total_due_all = Decimal("0")
     expected_till_today_all = Decimal("0")
@@ -290,8 +292,13 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
         loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
         total_paid_all += loan_total_paid
 
-        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
-        loan_total_due = loan.principal_amount + interest
+        principal = loan.principal_amount
+        total_principal_all += principal
+
+        interest = loan.interest_amount if loan.interest_amount is not None else calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+        total_interest_all += interest
+
+        loan_total_due = loan.total_repayable_amount if loan.total_repayable_amount is not None else (principal + interest)
         total_due_all += loan_total_due
 
         duration = loan.duration_days
@@ -326,6 +333,9 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
     completion_percent = float((total_paid_all / total_due_all) * 100) if total_due_all > 0 else 100.0
 
     return {
+        "total_principal": float(total_principal_all),
+        "total_interest": float(total_interest_all),
+        "total_repayable": float(total_due_all),
         "total_paid": float(total_paid_all),
         "remaining_balance": float(remaining_balance_all),
         "expected_till_today": float(expected_till_today_all),
@@ -419,6 +429,7 @@ def get_dashboard_metrics_details(db) -> dict:
         "total_loans": total_loans,
         "disbursed_principal": float(disbursed_principal),
         "total_collected": float(total_collected),
+        "total_repayable": float(total_due),
         "outstanding_balance": float(outstanding_balance),
         "active_principal": float(active_principal),
         "overdue_count": overdue_count,

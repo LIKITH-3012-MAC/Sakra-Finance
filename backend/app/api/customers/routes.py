@@ -417,11 +417,16 @@ async def get_customer(
     # Sort payments by date descending
     aggregate_payments.sort(key=lambda x: x["payment_date"], reverse=True)
 
+    # Fetch backend summary details to prevent frontend JavaScript calculations
+    from app.services.loan_service import get_customer_summary_details
+    summary_details = get_customer_summary_details(db, customer_id)
+
     response_payload = {
         "customer": customer_dict,
         "loans": loans_data,
         "aggregate_payments": aggregate_payments,
-        "credit_score": avg_credit_score
+        "credit_score": avg_credit_score,
+        "summary": summary_details
     }
 
     return APIResponse(

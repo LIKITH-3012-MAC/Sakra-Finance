@@ -47,7 +47,7 @@ async function init() {
 }
 
 function renderProfile(data) {
-  const { customer, loans = [], aggregate_payments = [], credit_score } = data;
+  const { customer, loans = [], aggregate_payments = [], credit_score, summary = {} } = data;
 
   // 1. Identity Header
   document.getElementById("profile-name").innerText = customer.name;
@@ -56,15 +56,14 @@ function renderProfile(data) {
   document.getElementById("profile-id").innerText = `#${customer.id}`;
   document.getElementById("profile-version").innerText = customer.version_id ?? "1";
 
-  // 2. Financial Stats calculations
-  const totalPrincipal = loans.reduce((s, l) => s + (l.principal_amount || 0), 0);
-  const totalPaid = aggregate_payments.reduce((s, p) => s + (p.amount_paid || 0), 0);
-  const totalOutstanding = Math.max(0, totalPrincipal - totalPaid);
+  // 2. Financial Stats (Derived 100% from backend source of truth summary object)
   const activeLoansCount = loans.filter(l => l.status === "ACTIVE" || l.status === "OVERDUE").length;
 
-  document.getElementById("stat-principal").innerText = formatCurrency(totalPrincipal);
-  document.getElementById("stat-paid").innerText = formatCurrency(totalPaid);
-  document.getElementById("stat-outstanding").innerText = formatCurrency(totalOutstanding);
+  document.getElementById("stat-principal").innerText = formatCurrency(summary.total_principal || 0);
+  document.getElementById("stat-interest").innerText = formatCurrency(summary.total_interest || 0);
+  document.getElementById("stat-repayable").innerText = formatCurrency(summary.total_repayable || 0);
+  document.getElementById("stat-paid").innerText = formatCurrency(summary.total_paid || 0);
+  document.getElementById("stat-outstanding").innerText = formatCurrency(summary.remaining_balance || 0);
   document.getElementById("stat-loans-count").innerText = activeLoansCount;
 
   // 3. Customer Details block

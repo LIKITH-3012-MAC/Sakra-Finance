@@ -80,13 +80,12 @@ def get_loan_balance_summary(
     interest = calculate_interest(principal, rate, formula, duration_days)
     total_due = (principal + interest).quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
 
-    # Payments applied to principal first
-    remaining_balance = max(principal - total_paid, Decimal("0")).quantize(
+    # Remaining balance must always be calculated from total due (repayable), not principal
+    remaining_balance = max(total_due - total_paid, Decimal("0")).quantize(
         QUANTIZE_PRECISION, rounding=ROUND_HALF_UP
     )
 
-    # Interest outstanding: if total_paid < principal, full interest remains;
-    # if total_paid >= principal, reduce interest by overage
+    # Interest outstanding calculation (for compatibility/analytics)
     if total_paid >= principal:
         interest_paid = total_paid - principal
         interest_outstanding = max(interest - interest_paid, Decimal("0"))
@@ -95,9 +94,10 @@ def get_loan_balance_summary(
 
     interest_outstanding = interest_outstanding.quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
 
-    total_outstanding_with_interest = (remaining_balance + interest_outstanding).quantize(
-        QUANTIZE_PRECISION, rounding=ROUND_HALF_UP
-    )
+    # Total outstanding with interest is exactly the remaining balance
+    total_outstanding_with_interest = remaining_balance
+
+    completion_percent = float((total_paid / total_due) * 100) if total_due > 0 else 100.0
 
     return {
         "principal": principal.quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP),
@@ -107,4 +107,5 @@ def get_loan_balance_summary(
         "remaining_balance": remaining_balance,
         "interest_outstanding": interest_outstanding,
         "total_outstanding_with_interest": total_outstanding_with_interest,
+        "completion_percent": round(completion_percent, 2),
     }

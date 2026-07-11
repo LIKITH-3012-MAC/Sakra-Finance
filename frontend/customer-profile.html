@@ -78,11 +78,23 @@
           </div>
 
           <!-- Financial Stats Grid (3D tilt cards) -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div class="sakra-3d-card-wrapper">
               <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
                 <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="customers_label_principal">Total Principal</p>
                 <p id="stat-principal" class="text-xl font-bold mt-2 font-mono text-financial-number text-text-primary">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Total Interest</p>
+                <p id="stat-interest" class="text-xl font-bold mt-2 font-mono text-financial-number text-text-primary">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Total Repayable</p>
+                <p id="stat-repayable" class="text-xl font-bold mt-2 font-mono text-financial-number text-text-primary">₹0</p>
               </div>
             </div>
             <div class="sakra-3d-card-wrapper">
@@ -93,7 +105,7 @@
             </div>
             <div class="sakra-3d-card-wrapper">
               <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
-                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="dashboard_total_unpaid">Outstanding Balance</p>
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Remaining Balance</p>
                 <p id="stat-outstanding" class="text-xl font-bold mt-2 font-mono text-financial-number text-danger">₹0</p>
               </div>
             </div>

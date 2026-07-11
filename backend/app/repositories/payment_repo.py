@@ -87,8 +87,11 @@ class PaymentRepository:
             raise PaymentError(f"Loan #{schema.loan_id} not found.")
 
         # Compute outstanding amounts
-        from app.services.interest import calculate_interest
-        total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+        if loan.total_repayable_amount is not None:
+            total_due = loan.total_repayable_amount
+        else:
+            from app.services.interest import calculate_interest
+            total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         
         # Calculate sum of other payments
         other_payments_sum = db.query(Payment).filter(
@@ -102,8 +105,11 @@ class PaymentRepository:
         remaining = max(Decimal(str(total_due)) - new_paid, Decimal("0"))
         
         payment_status = "PAID"
+        loan.remaining_balance = remaining
         if remaining <= 0:
             loan.status = "COMPLETED"
+        else:
+            loan.status = "ACTIVE"
 
         payment = Payment(
             loan_id=schema.loan_id,
@@ -162,6 +168,29 @@ class PaymentRepository:
         payment.amount_paid = schema.amount_paid
         payment.version_id += 1
         db.flush()
+
+        # Update loan remaining balance and status
+        from app.models.loan import Loan
+        loan = db.query(Loan).filter(Loan.id == payment.loan_id).first()
+        if loan:
+            # sum all payments
+            all_payments_sum = db.query(Payment).filter(
+                Payment.loan_id == loan.id
+            ).with_entities(Payment.amount_paid).all()
+            total_paid = sum(p[0] for p in all_payments_sum)
+
+            if loan.total_repayable_amount is not None:
+                total_due = loan.total_repayable_amount
+            else:
+                from app.services.interest import calculate_interest
+                total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+
+            remaining = max(total_due - total_paid, Decimal("0"))
+            loan.remaining_balance = remaining
+            if remaining <= 0:
+                loan.status = "COMPLETED"
+            else:
+                loan.status = "ACTIVE"
 
         return payment
 
