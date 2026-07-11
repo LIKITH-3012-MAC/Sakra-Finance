@@ -169,11 +169,32 @@ body {
   color: var(--text-primary);
 }
 
+/* CONTAINER DEF TO PERMIT ELEMENT SCALING WITHIN CARD BOUNDARIES */
+.glass-card,
+.sakra-3d-card-wrapper,
+.sakra-3d-card {
+  container-type: inline-size;
+}
+
 .text-financial-number {
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: -0.01em;
+  
+  /* RESPONSIVE TYPOGRAPHY & AUTO FIT */
+  font-size: clamp(13px, 10.5cqw, 32px) !important;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  display: inline-block;
+  max-width: 100%;
+  
+  /* Left/Right safe padding boundaries */
+  padding-left: 2px;
+  padding-right: 2px;
+  box-sizing: border-box;
 }
 
 /* GLASSMORPHISM ENGINE */

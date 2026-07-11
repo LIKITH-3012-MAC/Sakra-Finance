@@ -599,5 +599,68 @@ window.addEventListener("auth-expired", () => {
   window.location.href = "/login.html";
 });
 
+// ── Responsive Typography & Auto-Fit for Financial Numbers ───
+window.autoFitFinancialNumbers = function() {
+  const elements = document.querySelectorAll('.text-financial-number');
+  elements.forEach(el => {
+    // Reset inline font size so clamp/container-query styles can compute baseline
+    el.style.fontSize = '';
+    
+    const parent = el.parentElement;
+    if (!parent) return;
+
+    const parentStyle = window.getComputedStyle(parent);
+    const paddingLeft = parseFloat(parentStyle.paddingLeft || 0);
+    const paddingRight = parseFloat(parentStyle.paddingRight || 0);
+    
+    // Safety boundary margins (8px)
+    const availableWidth = parent.clientWidth - (paddingLeft + paddingRight) - 8;
+    if (availableWidth <= 0) return;
+
+    let currentSize = parseFloat(window.getComputedStyle(el).fontSize);
+    const minSize = 9; // Minimum readable size
+
+    while (el.scrollWidth > availableWidth && currentSize > minSize) {
+      currentSize -= 0.5;
+      el.style.fontSize = `${currentSize}px`;
+    }
+  });
+};
+
+// Handle resize event
+window.addEventListener("resize", () => {
+  window.autoFitFinancialNumbers();
+});
+
+// Setup mutation observer to fit text automatically when numbers load dynamically
+const autoFitObserver = new MutationObserver(() => {
+  autoFitObserver.disconnect();
+  window.autoFitFinancialNumbers();
+  autoFitObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+});
+
+// Start observing on load
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    window.autoFitFinancialNumbers();
+    autoFitObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  });
+} else {
+  window.autoFitFinancialNumbers();
+  autoFitObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true
+  });
+}
+
 // Run bootstrap
 executeMain();
