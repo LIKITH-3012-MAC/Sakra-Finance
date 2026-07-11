@@ -1,0 +1,742 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+/* SAKRA PREMIUM V6.0 FINTECH DESIGN CORE VARIABLES */
+:root {
+  /* Dark Luxury (Primary Theme) colors */
+  --sakra-bg: #040815;
+  --sakra-bg-secondary: #070d1e;
+  --sakra-surface: rgba(10, 18, 36, 0.45);
+  --sakra-surface-elevated: rgba(16, 28, 54, 0.65);
+  --sakra-border: rgba(255, 255, 255, 0.06);
+  --sakra-border-hover: rgba(59, 130, 246, 0.25);
+  
+  /* Accent energy lines */
+  --accent-primary: #1d4ed8;     /* Financial Royal Blue */
+  --accent-primary-hover: #3b82f6;
+  --accent-ai: #00f0ff;          /* Electric Cyan */
+  --accent-ai-glow: rgba(0, 240, 255, 0.2);
+  --accent-success: #10b981;     /* Emerald Green */
+  --accent-warning: #f59e0b;     /* Amber */
+  --accent-danger: #ef4444;      /* Premium Red */
+
+  /* Text assets - High contrast adjustments */
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+
+  /* Tailwind v4 text sizing variables overrides (approx 15-20% increase) */
+  --text-xs: 0.85rem;      /* ~13.6px instead of 12px */
+  --text-sm: 0.95rem;      /* ~15.2px instead of 14px */
+  --text-base: 1.15rem;    /* ~18.4px instead of 16px */
+  --text-lg: 1.3rem;       /* ~20.8px instead of 18px */
+  --text-xl: 1.45rem;      /* ~23.2px instead of 20px */
+  --text-2xl: 1.75rem;     /* ~28px instead of 24px */
+  --text-3xl: 2.15rem;     /* ~34.4px instead of 30px */
+  --text-4xl: 2.6rem;      /* ~41.6px instead of 36px */
+
+  /* Glassmorphism Presets */
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(59, 130, 246, 0.2);
+
+  /* Spacing Grid (8px) */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  /* Timings */
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-smooth: cubic-bezier(.4, 0, .2, 1);
+  --time-fast: 150ms;
+  --time-normal: 240ms;
+  --time-premium: 400ms;
+
+  /* Layered Shadows */
+  --neu-shadow-raised: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --neu-shadow-inset: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 25px rgba(37, 99, 235, 0.25);
+  --shadow-glow-ai: 0 0 25px rgba(0, 240, 255, 0.3);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.3);
+  --shadow-deep: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* Force light theme to look identical to dark luxury theme to satisfy global brand identity */
+[data-theme="light"] {
+  --sakra-bg: #040815;
+  --sakra-bg-secondary: #070d1e;
+  --sakra-surface: rgba(10, 18, 36, 0.45);
+  --sakra-surface-elevated: rgba(16, 28, 54, 0.65);
+  --sakra-border: rgba(255, 255, 255, 0.06);
+  --sakra-border-hover: rgba(59, 130, 246, 0.25);
+
+  --accent-primary: #1d4ed8;
+  --accent-primary-hover: #3b82f6;
+  --accent-ai-glow: rgba(0, 240, 255, 0.2);
+
+  --text-primary: #ffffff;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+
+
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(59, 130, 246, 0.2);
+
+  --neu-shadow-raised: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --neu-shadow-inset: inset 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 25px rgba(37, 99, 235, 0.25);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.3);
+  --shadow-deep: 0 30px 80px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="oled"] {
+  --sakra-bg: #000000;
+  --sakra-bg-secondary: #000000;
+  --sakra-surface: rgba(0, 0, 0, 0.65);
+  --sakra-surface-elevated: #080808;
+  --sakra-border: rgba(255, 255, 255, 0.07);
+  --sakra-border-hover: rgba(59, 130, 246, 0.2);
+
+  --glass-bg: rgba(255, 255, 255, 0.01);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-border-hover: rgba(59, 130, 246, 0.15);
+}
+
+body, input, button, select, textarea {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #040815 !important;
+  background-image: 
+    radial-gradient(circle at 50% 15%, rgba(29, 78, 216, 0.09) 0%, transparent 60%),
+    radial-gradient(circle at 10% 85%, rgba(0, 240, 255, 0.04) 0%, transparent 40%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  transition: color var(--time-normal) var(--ease-smooth);
+}
+
+/* SAKRA AMBIENT ENVIRONMENT */
+.sakra-financial-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 80px 80px;
+  background-position: center;
+  opacity: 0.2;
+  z-index: 0;
+}
+
+.sakra-ambient-glow {
+  position: fixed;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(29, 78, 216, 0.08) 0%, rgba(0, 240, 255, 0.02) 45%, transparent 70%);
+  top: -180px;
+  right: -180px;
+  pointer-events: none;
+  z-index: 0;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  animation: float-ambient 28s ease-in-out infinite;
+}
+
+@keyframes float-ambient {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-70px, 50px, 0) scale(1.05); }
+}
+
+/* TYPOGRAPHY hierarchy */
+.text-display {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.75rem, 3vw + 0.8rem, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+
+.text-financial-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* GLASSMORPHISM ENGINE */
+.glass-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  transition: all var(--time-normal) var(--ease-smooth);
+}
+
+.glass-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-deep);
+}
+
+.glass-panel {
+  background: rgba(11, 18, 32, 0.7);
+  border: 1px solid var(--sakra-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* 3D DEPTH ROTATION SYSTEM */
+.sakra-3d-card-wrapper {
+  perspective: 1000px;
+}
+
+.sakra-3d-card {
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease;
+  transform-style: preserve-3d;
+}
+
+.sakra-3d-card:hover {
+  transform: translateY(-6px) rotateX(2deg) rotateY(-2deg);
+  box-shadow: var(--shadow-deep), 0 10px 30px rgba(37, 99, 235, 0.08);
+}
+
+/* NEUMORPHISM SYSTEM */
+.sakra-input-tactile {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--sakra-surface-elevated);
+  border: 1px solid var(--sakra-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-shadow: var(--neu-shadow-raised);
+  transition: all var(--time-fast) var(--ease-smooth);
+}
+
+.sakra-input-tactile:focus {
+  border-color: var(--accent-primary);
+  box-shadow: var(--neu-shadow-inset), 0 0 0 1px rgba(37, 99, 235, 0.25);
+  background: var(--sakra-surface);
+}
+
+.sakra-btn-tactile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  box-shadow: var(--neu-shadow-raised);
+  transition: all var(--time-fast) var(--ease-spring);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+.sakra-btn-tactile:hover {
+  transform: translate3d(0, -2px, 0);
+}
+
+.sakra-btn-tactile:active {
+  transform: translate3d(0, 1px, 0);
+  box-shadow: var(--neu-shadow-inset);
+}
+
+.sakra-btn-primary {
+  background: var(--accent-primary);
+  color: #FFFFFF;
+}
+.sakra-btn-primary:hover {
+  background: var(--accent-primary-hover);
+  box-shadow: var(--shadow-glow);
+}
+
+.sakra-btn-secondary {
+  background: var(--sakra-surface-elevated);
+  border: 1px solid var(--sakra-border);
+  color: var(--text-primary);
+}
+
+.sakra-btn-ai {
+  background: linear-gradient(135deg, rgba(0, 245, 255, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  color: var(--accent-ai);
+  text-shadow: 0 0 8px rgba(0, 245, 255, 0.4);
+}
+.sakra-btn-ai:hover {
+  border-color: var(--accent-ai);
+  box-shadow: var(--shadow-glow-ai);
+}
+
+.sakra-btn-danger {
+  background: var(--accent-danger);
+  color: #FFFFFF;
+}
+
+/* SAKRA AI FLOATING ORB WIDGET */
+.sakra-ai-orb {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #00F5FF 0%, rgba(0, 245, 255, 0.1) 70%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--time-normal) var(--ease-spring);
+  animation: float-orb 5s ease-in-out infinite;
+  border: 2px solid rgba(0, 245, 255, 0.4);
+  box-shadow: var(--shadow-glow-ai);
+}
+
+.sakra-ai-orb:hover {
+  transform: scale(1.15);
+  border-color: #00F5FF;
+  box-shadow: 0 0 35px rgba(0, 245, 255, 0.5);
+}
+
+@keyframes float-orb {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.03); }
+}
+
+/* ADVANCED DATA TABLES */
+.sakra-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sakra-border);
+  box-shadow: var(--shadow-soft);
+}
+
+.sakra-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sakra-table th {
+  padding: 16px 20px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--sakra-border);
+  background: var(--sakra-surface-elevated);
+}
+
+.sakra-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sakra-border);
+  color: var(--text-primary);
+  background: var(--sakra-surface);
+  transition: background var(--time-fast) ease;
+}
+
+.sakra-table tr:hover td {
+  background: var(--sakra-surface-elevated);
+}
+
+/* LIVE ALERTS NEON BLINKER */
+.sa-live-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-danger);
+  box-shadow: 0 0 10px var(--accent-danger);
+  animation: blink-live 1.2s infinite;
+}
+
+@keyframes blink-live {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* LAYOUT STRUCTURE */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--sakra-bg);
+  position: relative;
+  z-index: 10;
+}
+
+.main-content {
+  flex: 1;
+  padding: 32px 40px;
+  overflow-y: auto;
+  height: 100vh;
+  position: relative;
+  z-index: 10;
+}
+
+/* CUSTOM TERMINAL SCROLLBAR */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sakra-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ERROR VALIDATION SHAKE */
+.sa-shake {
+  animation: sa-shake-kf 0.4s ease;
+}
+
+@keyframes sa-shake-kf {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* SKELETON PREVIEWS */
+.sa-shimmer {
+  background: linear-gradient(90deg, var(--sakra-surface-elevated) 25%, var(--sakra-border) 37%, var(--sakra-surface-elevated) 63%);
+  background-size: 400% 100%;
+  animation: sa-shimmer-kf 1.4s ease infinite;
+}
+
+@keyframes sa-shimmer-kf {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+.sa-reveal {
+  animation: sa-reveal-kf 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sa-reveal-kf {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* PREMIUM MODAL SYSTEM */
+.sakra-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(5, 8, 22, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sakra-modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sakra-modal-container {
+  background: var(--sakra-surface);
+  border: 1px solid var(--sakra-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-deep);
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.96) translateY(20px);
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+.sakra-modal-overlay.active .sakra-modal-container {
+  transform: scale(1) translateY(0);
+}
+
+.sakra-modal-header {
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--sakra-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.sakra-modal-body {
+  padding: 32px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sakra-modal-footer {
+  padding: 20px 32px;
+  border-top: 1px solid var(--sakra-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: var(--sakra-surface-elevated);
+}
+
+@media (max-width: 767px) {
+  .sakra-modal-container {
+    max-height: 95vh;
+  }
+  .sakra-modal-header {
+    padding: 16px 20px;
+  }
+  .sakra-modal-body {
+    padding: 20px;
+  }
+  .sakra-modal-footer {
+    padding: 16px 20px;
+  }
+}
+
+/* Dynamic slide-open detailing panels for metric cards */
+.metric-slide-panel {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, margin-top 0.4s ease, padding-top 0.4s ease;
+}
+
+.sakra-3d-card-wrapper:hover .metric-slide-panel {
+  max-height: 120px;
+  opacity: 1;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(37, 99, 235, 0.2);
+}
+
+/* SAKRA BRAND CONSISTENCY WORKSPACE COMPATIBILITY LAYER */
+.bg-white,
+.bg-white\/50,
+.bg-white\/60,
+.bg-white\/70,
+.bg-white\/95,
+.bg-white\/90,
+.bg-white\/80 {
+  background-color: var(--sakra-surface) !important;
+}
+
+.bg-slate-50,
+.bg-slate-50\/50,
+.bg-slate-100,
+.bg-slate-100\/50,
+.bg-slate-200\/60,
+.bg-slate-900\/50 {
+  background-color: var(--sakra-surface-elevated) !important;
+}
+
+.border-slate-200,
+.border-slate-100,
+.border-slate-100\/60,
+.border-border-default,
+.border-border-default\/30,
+.border-border-default\/45,
+.border-border-default\/60,
+.border-border-default\/80 {
+  border-color: var(--sakra-border) !important;
+}
+
+.text-slate-900,
+.text-slate-800,
+.text-slate-700,
+.text-slate-200 {
+  color: #ffffff !important;
+}
+
+.text-slate-600,
+.text-slate-500,
+.text-slate-400,
+.text-slate-300 {
+  color: #d1d5db !important;
+}
+
+.text-text-primary {
+  color: #ffffff !important;
+}
+
+.text-text-secondary {
+  color: #d1d5db !important;
+}
+
+.text-text-muted {
+  color: #9ca3af !important;
+}
+
+/* Base elements typography hierarchy overrides */
+h1, h2, .text-display {
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.25 !important;
+  color: #ffffff !important;
+}
+
+h3, h4, .text-lg, .text-xl {
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  line-height: 1.35 !important;
+  color: #ffffff !important;
+}
+
+p, span, td, li, a {
+  font-weight: 500 !important;
+  line-height: 1.6 !important;
+}
+
+/* Table Headers scaling and weight */
+.sakra-table th {
+  font-weight: 600 !important;
+  font-size: 11px !important;
+  color: #ffffff !important;
+  letter-spacing: 0.08em !important;
+  background-color: var(--sakra-bg-secondary) !important;
+}
+
+/* Buttons weight and readability */
+.sakra-btn-tactile {
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* Inputs, Placeholders and Labels visibility */
+.sakra-input-tactile {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  background-color: var(--sakra-bg-secondary) !important;
+}
+.sakra-input-tactile::placeholder {
+  color: #9ca3af !important;
+  opacity: 1 !important;
+  font-weight: 500 !important;
+}
+label, .text-\[10px\] {
+  font-weight: 600 !important;
+  color: #d1d5db !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* Financial emphasis numbers */
+.text-financial-number,
+.font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+}
+.text-success,
+.text-emerald-600,
+.text-emerald-500 {
+  color: #34d399 !important; /* bright emerald green for dark luxury */
+}
+.text-danger,
+.text-rose-600,
+.text-rose-500 {
+  color: #f87171 !important; /* bright light red for readability */
+}
+
+/* Arbitrary pixel scaling compiler overrides (~15-20% increase) */
+.text-\[8px\],
+.text-\[9px\] {
+  font-size: 11px !important;
+}
+.text-\[10px\] {
+  font-size: 12px !important;
+}
+.text-\[11px\],
+.text-\[12px\] {
+  font-size: 14px !important;
+}
+
+/* Ensure glassmorphism cards look completely unified */
+.glass-card {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  backdrop-filter: blur(16px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(140%) !important;
+}
+
+.glass-card:hover {
+  background: var(--glass-bg-hover) !important;
+  border-color: var(--glass-border-hover) !important;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Scrollbars styling to match dark premium theme */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Unified premium focus borders */
+.sakra-input-tactile:focus {
+  border-color: var(--accent-primary-hover) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15), inset 0 2px 8px rgba(0,0,0,0.5) !important;
+}
+
+/* SAKRA UNIFIED INPUT & PREFIX ICON ARCHITECTURE OVERRIDES */
+.relative > div.absolute:first-child {
+  width: 48px !important;
+  height: 100% !important;
+  left: 0 !important;
+  right: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  transform: none !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+}
+
+.relative > div.absolute:first-child + input,
+.relative > div.absolute:first-child + select,
+.relative > div.absolute:first-child + textarea {
+  padding-left: 48px !important;
+}
+
+/* Specific adjustment for password visibility togglers (always preserve right spacing) */
+.relative > button.absolute {
+  z-index: 12 !important;
+}
+
+
+
+

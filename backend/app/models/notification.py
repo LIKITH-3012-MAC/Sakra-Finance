@@ -1,0 +1,29 @@
+"""
+Notification model – stores user/customer notifications.
+"""
+
+from datetime import datetime
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.database.connection import Base
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    notification_type = Column(String(50), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # ── Relationships ────────────────────────────────────────────
+    user = relationship("User", back_populates="notifications", foreign_keys=[user_id])
+    customer = relationship("Customer", back_populates="notifications")
+
+    def __repr__(self) -> str:
+        return f"<Notification(id={self.id}, type='{self.notification_type}', is_read={self.is_read})>"

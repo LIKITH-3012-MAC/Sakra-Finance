@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="forgot_title">SAKRA FINANCE | Forgot Credentials</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative min-h-screen w-full overflow-hidden select-none">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="min-h-screen w-full flex items-center justify-center sa-reveal relative z-10 p-4 md:p-8">
+    
+    <!-- Interactive Particles Background Canvas -->
+    <canvas id="particlesCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></canvas>
+
+    <div class="w-full max-w-lg relative z-10 sakra-3d-card-wrapper">
+      
+      <!-- Card Wrapper -->
+      <div id="forgot-card" class="sakra-3d-card glass-card p-8 md:p-12 bg-slate-950/45 border border-white/5 rounded-xl shadow-deep backdrop-blur-md flex flex-col gap-6">
+        
+        <!-- Brand Identity / Logo -->
+        <div class="flex flex-col items-center gap-3 select-none mb-4">
+          <img src="/logo.png" alt="SAKRA FINANCE" class="h-16 w-auto object-contain" />
+          <h1 class="text-xs font-bold uppercase tracking-[0.2em] text-blue-400 mt-2" data-i18n="forgot_subtitle">Recover secure workspace credentials</h1>
+        </div>
+
+        <div id="status-message" class="hidden mb-4 p-4 rounded-md text-xs font-semibold">
+          <!-- Dynamic success or error message -->
+        </div>
+
+        <!-- STAGE 1: Request OTP -->
+        <form id="forgot-form-email" class="flex flex-col gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label for="email" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="forgot_label_email">
+              Enter registered email address
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="mail" class="w-4 h-4"></i>
+              </div>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="e.g. employee@sakra.finance"
+                class="sakra-input-tactile pl-10"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            id="send-otp-btn"
+            class="sakra-btn-tactile sakra-btn-primary w-full h-12 mt-4 text-[11px] select-none"
+          >
+            <span data-i18n="forgot_btn_send_otp">Request Verification Code</span>
+          </button>
+        </form>
+
+        <!-- STAGE 2: Verify OTP (Hidden initially) -->
+        <form id="forgot-form-otp" class="hidden flex flex-col gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label for="otp" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="forgot_label_otp">
+              Enter 6-digit OTP code
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="key" class="w-4 h-4"></i>
+              </div>
+              <input
+                id="otp"
+                name="otp"
+                type="text"
+                maxlength="6"
+                placeholder="e.g. 123456"
+                class="sakra-input-tactile pl-10 tracking-[0.3em] font-mono text-center text-sm"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            id="verify-otp-btn"
+            class="sakra-btn-tactile sakra-btn-primary w-full h-12 mt-4 text-[11px] select-none"
+          >
+            <span data-i18n="forgot_btn_verify_otp">Verify OTP Code</span>
+          </button>
+        </form>
+
+        <!-- STAGE 3: Reset Password (Hidden initially) -->
+        <form id="forgot-form-reset" class="hidden flex flex-col gap-5">
+          <div class="flex flex-col gap-1.5">
+            <label for="new-password" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="forgot_label_new_pass">
+              New Secure Password
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="lock" class="w-4 h-4"></i>
+              </div>
+              <input
+                id="new-password"
+                name="new-password"
+                type="password"
+                placeholder="Min 12 chars, uppercase, number, special"
+                class="sakra-input-tactile pl-10 pr-10"
+                required
+              />
+            </div>
+            <!-- Password Strength Meter -->
+            <div class="mt-1.5 w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="strength-bar" class="h-full rounded-full bg-slate-700 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="strength-label" class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5"></p>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <label for="confirm-password" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="forgot_label_confirm_pass">
+              Confirm New Password
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </div>
+              <input
+                id="confirm-password"
+                name="confirm-password"
+                type="password"
+                placeholder="Re-enter new password"
+                class="sakra-input-tactile pl-10"
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            id="reset-password-btn"
+            class="sakra-btn-tactile sakra-btn-primary w-full h-12 mt-4 text-[11px] select-none"
+          >
+            <span data-i18n="forgot_btn_reset">Reset Account Password</span>
+          </button>
+        </form>
+
+        <!-- Back to Login Navigation link -->
+        <div class="flex items-center justify-center text-[11px] text-slate-400 mt-2 select-none">
+          <a href="/login.html" class="text-blue-400 hover:underline font-bold bg-transparent border-none outline-none cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+            <span data-i18n="activate_btn_login">Return to Login</span>
+          </a>
+        </div>
+
+        <!-- Security Badges under form -->
+        <div class="flex justify-between items-center pt-6 border-t border-white/5 text-[9px] text-slate-500 uppercase tracking-wider font-semibold font-mono select-none">
+          <span class="flex items-center gap-1.5"><i data-lucide="server" class="w-3.5 h-3.5"></i> Server: main-gateway-mumbai</span>
+          <span class="flex items-center gap-1.5 text-emerald-400"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Secured SSL Active</span>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/forgot.js"></script>
+</body>
+</html>

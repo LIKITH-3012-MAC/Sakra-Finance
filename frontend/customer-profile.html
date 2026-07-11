@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="profile_title">SAKRA FINANCE | Customer Profile</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js for payments scatter plot -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="profile-content" class="flex flex-col gap-8 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Breadcrumb -->
+          <div>
+            <a href="/customers.html" class="inline-flex items-center gap-2 text-xs text-text-secondary hover:text-primary transition-colors font-bold uppercase tracking-wider w-fit">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> <span data-i18n="profile_back">Back to Customer Registry</span>
+            </a>
+          </div>
+
+          <!-- Identity Header -->
+          <div class="glass-card flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-6">
+            <div class="flex items-center gap-5">
+              <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-white shadow-md shrink-0 bg-slate-100 flex items-center justify-center select-none cursor-pointer group/photo relative" id="profile-photo-container">
+                <img id="profile-photo-img" src="" class="w-full h-full object-cover" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23cbd5e1\' style=\'background:%23f1f5f9;\'><path fill-rule=\'evenodd\' d=\'M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z\' clip-rule=\'evenodd\' /></svg>'" />
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover/photo:opacity-100 transition-opacity flex items-center justify-center">
+                  <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+                </div>
+              </div>
+              <input type="file" id="replace-photo-input" class="hidden" accept="image/jpeg,image/png,image/webp" />
+              <div>
+                <h2 id="profile-name" class="text-2xl font-bold text-text-primary tracking-tight">—</h2>
+                <p class="text-xs text-text-secondary mt-1 flex items-center gap-3 flex-wrap font-mono font-bold select-none">
+                  <span class="inline-flex items-center gap-1.5"><i data-lucide="phone" class="w-3.5 h-3.5 text-text-muted"></i><span id="profile-phone">—</span></span>
+                  <span class="inline-flex items-center gap-1.5"><i data-lucide="credit-card" class="w-3.5 h-3.5 text-text-muted"></i><span id="profile-aadhar">—</span></span>
+                </p>
+              </div>
+            </div>
+            <div class="text-xs text-text-muted font-mono font-bold select-none uppercase tracking-wider">
+              <span data-i18n="profile_id">Customer ID</span>: <span id="profile-id">—</span> · <span data-i18n="settings_gateway_url">Version</span> <span id="profile-version">—</span>
+            </div>
+          </div>
+
+          <!-- Financial Stats Grid (3D tilt cards) -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="customers_label_principal">Total Principal</p>
+                <p id="stat-principal" class="text-xl font-bold mt-2 font-mono text-financial-number text-text-primary">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="dashboard_total_collected">Total Paid</p>
+                <p id="stat-paid" class="text-xl font-bold mt-2 font-mono text-financial-number text-success">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="dashboard_total_unpaid">Outstanding Balance</p>
+                <p id="stat-outstanding" class="text-xl font-bold mt-2 font-mono text-financial-number text-danger">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted" data-i18n="profile_sec_loan">Active Loans</p>
+                <p id="stat-loans-count" class="text-xl font-bold mt-2 font-mono text-financial-number text-primary">0</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Credit Score & Scatter charts split (3D Cards + Glass Cards) -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Customer details -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card flex flex-col gap-4 bg-white/60 p-6 h-full justify-between">
+                <div>
+                  <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="profile_title_details">Customer Details</h3>
+                  <div class="flex flex-col gap-2.5 mt-4">
+                    <div id="details-dob-row" class="flex items-center gap-2.5 text-xs font-semibold">
+                      <i data-lucide="cake" class="w-4 h-4 text-text-muted shrink-0"></i>
+                      <span class="text-text-muted" data-i18n="profile_dob">DOB:</span>
+                      <span id="details-dob" class="text-text-secondary">—</span>
+                    </div>
+                    <div id="details-gender-row" class="flex items-center gap-2.5 text-xs font-semibold">
+                      <i data-lucide="smile" class="w-4 h-4 text-text-muted shrink-0"></i>
+                      <span class="text-text-muted" data-i18n="profile_gender">Gender:</span>
+                      <span id="details-gender" class="text-text-secondary">—</span>
+                    </div>
+                    <div id="details-occupation-row" class="flex items-center gap-2.5 text-xs font-semibold">
+                      <i data-lucide="briefcase" class="w-4 h-4 text-text-muted shrink-0"></i>
+                      <span class="text-text-muted" data-i18n="profile_occupation">Occupation:</span>
+                      <span id="details-occupation" class="text-text-secondary">—</span>
+                    </div>
+                    <div id="details-address-row" class="flex items-start gap-2.5 text-xs font-semibold">
+                      <i data-lucide="map-pin" class="w-4 h-4 text-text-muted shrink-0 mt-0.5"></i>
+                      <span class="text-text-muted" data-i18n="profile_address">Address:</span>
+                      <span id="details-address" class="text-text-secondary">—</span>
+                    </div>
+                    <div id="details-promissory-row" class="flex items-start gap-2.5 text-xs font-semibold">
+                      <i data-lucide="file-text" class="w-4 h-4 text-text-muted shrink-0 mt-0.5"></i>
+                      <span class="text-text-muted" data-i18n="profile_memos">Note Memos:</span>
+                      <span id="details-promissory" class="text-text-secondary">—</span>
+                    </div>
+                    <div id="details-remarks-row" class="flex items-start gap-2.5 text-xs font-semibold">
+                      <i data-lucide="align-left" class="w-4 h-4 text-text-muted shrink-0 mt-0.5"></i>
+                      <span class="text-text-muted" data-i18n="profile_remarks">Remarks:</span>
+                      <span id="details-remarks" class="text-text-secondary">—</span>
+                    </div>
+                  </div>
+                </div>
+                <div id="details-registered" class="text-[9px] text-text-muted mt-4 border-t border-slate-100/60 pt-3 font-mono font-bold select-none uppercase tracking-wider">
+                  <span data-i18n="profile_registered">Registered</span>: —
+                </div>
+              </div>
+            </div>
+
+            <!-- Credit Score Gauge -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card flex flex-col items-center justify-center bg-white/60 p-6 h-full">
+                <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-4 select-none" data-i18n="profile_credit_title">Credit Score Registry</h3>
+                <div class="relative w-36 h-36">
+                  <!-- SVG circle gauge with glows -->
+                  <svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="#f1f5f9" stroke-width="8" />
+                    <circle id="score-gauge-circle" cx="60" cy="60" r="54" fill="none" stroke="#2563EB" stroke-width="8" stroke-linecap="round" stroke-dasharray="339.292" stroke-dashoffset="339.292" style="transition: stroke-dashoffset 1s ease-in-out;" />
+                  </svg>
+                  <div class="absolute inset-0 flex flex-col items-center justify-center font-mono select-none">
+                    <span id="score-val-text" class="text-3xl font-bold text-primary">700</span>
+                    <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider">/ 850</span>
+                  </div>
+                </div>
+                <p class="text-xs font-semibold text-text-secondary mt-4 text-center select-none uppercase tracking-wider">
+                  Rating: <span id="score-badge-container"></span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Payment Scatter Chart -->
+            <div class="glass-card flex flex-col bg-white/60 p-6 h-full">
+              <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary mb-4 select-none" data-i18n="profile_dist_title">Payment Distribution</h3>
+              <div id="scatter-chart-wrapper" class="flex-1 min-h-[200px] flex items-center justify-center relative">
+                <canvas id="scatterChartCanvas" style="max-height: 200px; width: 100%;"></canvas>
+                <p id="scatter-chart-empty" class="text-text-muted text-xs font-semibold hidden select-none" data-i18n="payments_empty_notes">No payment logs recorded.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- KYC Verification Documents -->
+          <div class="glass-card bg-white/60 p-6 flex flex-col gap-4">
+            <div class="flex items-center justify-between pb-2 border-b border-border-default/30 mb-2 select-none">
+              <div class="flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>
+                <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="profile_sec_documents">KYC Verification Documents</h3>
+              </div>
+              <span class="text-[9px] uppercase font-bold tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Secured in DB</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <!-- Aadhaar Card Status -->
+              <div class="border border-slate-100 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between min-h-[140px] hover:shadow-enterprise-sm transition-all group/doc">
+                <div>
+                  <div class="flex justify-between items-start">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                        <i data-lucide="fingerprint" class="w-5 h-5"></i>
+                      </div>
+                      <div>
+                        <h4 class="text-xs font-bold text-text-primary" data-i18n="profile_doc_aadhar">Aadhaar Card UID</h4>
+                        <p class="text-[9px] text-text-muted mt-0.5" id="aadhaar-meta-filename">Loading...</p>
+                      </div>
+                    </div>
+                    <span id="aadhaar-status-badge" class="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border">Loading...</span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 text-[9px] font-mono text-text-secondary select-none">
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_size">File Size</span>
+                      <span id="aadhaar-meta-size" class="font-bold">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_uploaded">Uploaded At</span>
+                      <span id="aadhaar-meta-date" class="font-bold">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_by">Actor / Admin</span>
+                      <span id="aadhaar-meta-by" class="font-bold">—</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mt-4 border-t border-slate-100/60 pt-3">
+                  <button type="button" id="view-aadhaar-btn" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-primary hover:bg-slate-50 px-3 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold">
+                    <i data-lucide="eye" class="w-3.5 h-3.5"></i> <span data-i18n="profile_btn_preview">Preview</span>
+                  </button>
+                  <button type="button" id="replace-aadhaar-btn" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-secondary hover:bg-slate-50 px-3 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="profile_btn_replace">Replace</span>
+                  </button>
+                  <button type="button" id="delete-aadhaar-btn" class="sakra-btn-tactile text-rose-600 hover:text-rose-800 bg-transparent border-0 px-2 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold ml-auto cursor-pointer">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Promissory Note Status -->
+              <div class="border border-slate-100 rounded-lg p-4 bg-slate-50/50 flex flex-col justify-between min-h-[140px] hover:shadow-enterprise-sm transition-all group/doc">
+                <div>
+                  <div class="flex justify-between items-start">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-9 h-9 rounded bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                        <i data-lucide="file-signature" class="w-5 h-5"></i>
+                      </div>
+                      <div>
+                        <h4 class="text-xs font-bold text-text-primary" data-i18n="profile_doc_promissory">Promissory Note Document</h4>
+                        <p class="text-[9px] text-text-muted mt-0.5" id="promissory-meta-filename">Loading...</p>
+                      </div>
+                    </div>
+                    <span id="promissory-status-badge" class="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border">Loading...</span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4 text-[9px] font-mono text-text-secondary select-none">
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_size">File Size</span>
+                      <span id="promissory-meta-size" class="font-bold">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_uploaded">Uploaded At</span>
+                      <span id="promissory-meta-date" class="font-bold">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block uppercase text-[7px] tracking-wider" data-i18n="profile_meta_by">Actor / Admin</span>
+                      <span id="promissory-meta-by" class="font-bold">—</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 mt-4 border-t border-slate-100/60 pt-3">
+                  <button type="button" id="view-promissory-btn" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-primary hover:bg-slate-50 px-3 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold">
+                    <i data-lucide="eye" class="w-3.5 h-3.5"></i> <span data-i18n="profile_btn_preview">Preview</span>
+                  </button>
+                  <button type="button" id="replace-promissory-btn" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-secondary hover:bg-slate-50 px-3 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="profile_btn_replace">Replace</span>
+                  </button>
+                  <button type="button" id="delete-promissory-btn" class="sakra-btn-tactile text-rose-600 hover:text-rose-800 bg-transparent border-0 px-2 py-1.5 text-[9px] uppercase tracking-wider flex items-center gap-1 font-bold ml-auto cursor-pointer">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <input type="file" id="replace-aadhaar-input" class="hidden" accept="application/pdf,image/png,image/jpeg,image/jpg" />
+          <input type="file" id="replace-promissory-input" class="hidden" accept="application/pdf,image/png,image/jpeg,image/jpg" />
+
+          <!-- Loans Table -->
+          <div class="sakra-table-wrapper bg-white/60 backdrop-blur-md">
+            <div class="px-6 py-4 border-b border-border-default bg-surface/50 select-none">
+              <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="profile_sec_loan">Loan Accounts</h3>
+            </div>
+            <div id="loans-empty" class="p-12 text-center text-text-muted text-xs font-semibold hidden select-none" data-i18n="profile_loans_empty">No loans registered for this customer.</div>
+            <div id="loans-table-container" class="overflow-x-auto">
+              <table class="sakra-table">
+                <thead>
+                  <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
+                    <th data-i18n="profile_col_loan_id">Loan ID</th>
+                    <th class="text-right" data-i18n="customers_label_principal">Principal</th>
+                    <th data-i18n="customers_label_interest_formula">Formula</th>
+                    <th data-i18n="profile_col_period">Period</th>
+                    <th class="text-center" data-i18n="admin_col_status">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="loans-table-body">
+                  <!-- Dynamic rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Payment History -->
+          <div class="sakra-table-wrapper bg-white/60 backdrop-blur-md">
+            <div class="px-6 py-4 border-b border-border-default bg-surface/50 select-none">
+              <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="profile_sec_payments">All Payment Transactions</h3>
+            </div>
+            <div id="payments-empty" class="p-12 text-center text-text-muted text-xs font-semibold hidden select-none" data-i18n="payments_empty_notes">No payments recorded.</div>
+            <div id="payments-table-container" class="overflow-x-auto">
+              <table class="sakra-table">
+                <thead>
+                  <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
+                    <th>#</th>
+                    <th data-i18n="payments_col_date">Date</th>
+                    <th class="text-right" data-i18n="payments_col_expected">Expected Amount</th>
+                    <th class="text-right" data-i18n="payments_col_paid">Paid Amount</th>
+                    <th data-i18n="payments_col_mode">Mode</th>
+                    <th data-i18n="admin_col_status">Status</th>
+                    <th data-i18n="payments_col_recorded_by">Recorded By</th>
+                    <th data-i18n="payments_col_recorded_time">Recorded Time</th>
+                    <th data-i18n="payments_col_notes">Notes</th>
+                  </tr>
+                </thead>
+                <tbody id="payments-table-body">
+                  <!-- Dynamic rows -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- DOCUMENT VIEWER MODAL -->
+  <div id="document-viewer-modal" class="sakra-modal-overlay hidden">
+    <div class="sakra-modal-container bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-slate-100 overflow-hidden">
+      
+      <!-- Viewer Header -->
+      <div class="border-b border-slate-800 p-4 flex justify-between items-center bg-slate-950/80">
+        <div>
+          <h3 id="viewer-title" class="text-sm font-bold uppercase tracking-wider text-slate-200" data-i18n="profile_btn_preview">KYC Document Viewer</h3>
+          <p id="viewer-subtitle" class="text-[9px] text-slate-400 mt-0.5" data-i18n="admin_sec_sessions_desc">Secure live database preview</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Zoom Controls -->
+          <button type="button" id="viewer-zoom-out" class="w-7 h-7 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center border-0 cursor-pointer">
+            <i data-lucide="zoom-out" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" id="viewer-zoom-in" class="w-7 h-7 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center border-0 cursor-pointer">
+            <i data-lucide="zoom-in" class="w-3.5 h-3.5"></i>
+          </button>
+          <!-- Print Button -->
+          <button type="button" id="viewer-print" class="w-7 h-7 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 flex items-center justify-center border-0 cursor-pointer">
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+          </button>
+          <!-- Close Button -->
+          <button type="button" id="close-viewer-btn" class="w-7 h-7 rounded-full bg-slate-800 hover:bg-slate-700 hover:text-white flex items-center justify-center text-slate-400 cursor-pointer border-0">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Viewer Body -->
+      <div class="flex-1 p-6 overflow-auto bg-slate-950 flex items-center justify-center min-h-[400px] max-h-[calc(90vh-120px)] relative">
+        <div id="viewer-content-container" class="w-full h-full flex items-center justify-center origin-center transition-transform duration-200">
+          <!-- Loaded dynamically: iframe for PDF, img for images -->
+        </div>
+        <div id="viewer-loader" class="absolute inset-0 flex items-center justify-center bg-slate-950/80 hidden">
+          <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-blue-500"></i>
+        </div>
+      </div>
+
+      <!-- Viewer Footer -->
+      <div class="p-4 border-t border-slate-800 flex justify-between items-center bg-slate-950/80 text-[10px] text-slate-400 font-mono">
+        <span id="viewer-file-meta">—</span>
+        <button type="button" id="viewer-download-btn" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 text-[9px] uppercase tracking-wider font-bold border-0 flex items-center gap-1">
+          <i data-lucide="download" class="w-3 h-3"></i> <span data-i18n="download">Download Document</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/customer-profile.js"></script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="admin_title">SAKRA FINANCE | IAM Console</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div class="flex flex-col gap-6 w-full sa-reveal p-4 md:p-8">
+
+          <!-- Page Title -->
+          <div class="flex items-center justify-between pb-4 border-b border-border-default">
+            <div class="flex items-center gap-3">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+              <div>
+                <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="admin_title">Enterprise IAM Control</h2>
+                <p class="text-[9px] text-text-secondary mt-1 tracking-widest font-bold flex items-center gap-1.5 select-none uppercase">
+                  <i data-lucide="shield" class="w-3.5 h-3.5 text-primary"></i> IDENTITY & ACCESS MANAGEMENT PLATFORM
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Security Stats Dashboard (Grouped Cards) -->
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_card_total_emp">Total Employees</span>
+              <p id="stat-total-users" class="text-xl font-extrabold text-text-primary mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-400" data-i18n="admin_card_online">Online Users</span>
+              <p id="stat-online-users" class="text-xl font-extrabold text-emerald-400 mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_card_offline">Offline Users</span>
+              <p id="stat-offline-users" class="text-xl font-extrabold text-text-secondary mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-blue-400" data-i18n="admin_card_sessions">Active Sessions</span>
+              <p id="stat-active-sessions" class="text-xl font-extrabold text-blue-400 mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-amber-500" data-i18n="admin_card_locked">Locked Accounts</span>
+              <p id="stat-locked-accounts" class="text-xl font-extrabold text-amber-500 mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-rose-500" data-i18n="admin_card_failed">Failed Logins</span>
+              <p id="stat-failed-logins" class="text-xl font-extrabold text-rose-500 mt-1">0</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_card_pending">Pending Invites</span>
+              <p id="stat-pending-invitations" class="text-xl font-extrabold text-text-primary mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-emerald-500" data-i18n="admin_card_accepted">Accepted Invites</span>
+              <p id="stat-accepted-invitations" class="text-xl font-extrabold text-emerald-400 mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-rose-400" data-i18n="admin_card_expired">Expired Invites</span>
+              <p id="stat-expired-invitations" class="text-xl font-extrabold text-rose-400 mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500" data-i18n="admin_card_revoked">Revoked Invites</span>
+              <p id="stat-revoked-invitations" class="text-xl font-extrabold text-text-muted mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_card_today_logins">Today's Logins</span>
+              <p id="stat-today-logins" class="text-xl font-extrabold text-text-secondary mt-1">0</p>
+            </div>
+            <div class="card-enterprise p-4 rounded-xl flex flex-col justify-between">
+              <span class="text-[9px] font-bold uppercase tracking-wider text-rose-500" data-i18n="admin_card_email_fail">Email Failures</span>
+              <p id="stat-email-failures" class="text-xl font-extrabold text-rose-500 mt-1">0</p>
+            </div>
+          </div>
+
+          <!-- Section 2: Tabbed Console Registry (Employees vs Invitations) -->
+          <div class="card-enterprise rounded-xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-border-default flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="flex items-center gap-2 border-b border-white/5 sm:border-0 pb-2 sm:pb-0">
+                <button id="tab-employees" class="px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 border-blue-500 text-blue-400 bg-transparent cursor-pointer outline-none font-sans" data-i18n="admin_sec_directory">
+                  Employees Directory
+                </button>
+                <button id="tab-invitations" class="px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 border-transparent text-text-muted bg-transparent cursor-pointer outline-none hover:text-text-primary font-sans" data-i18n="admin_sec_invitations">
+                  Pending Invitations
+                </button>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="relative">
+                  <i data-lucide="search" class="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input type="text" id="search-directory" data-i18n-placeholder="customers_search_placeholder" placeholder="Search directory..." class="sakra-input-tactile pl-9 py-1.5 text-xs w-48 bg-slate-900 border border-white/5 text-white rounded" />
+                </div>
+                <button id="btn-open-invite" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded text-[9px] uppercase tracking-widest font-bold border-0 cursor-pointer flex items-center gap-1.5 shadow-md">
+                  <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> <span data-i18n="admin_btn_invite">Invite Employee</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Employee Directory Content Table -->
+            <div id="employees-table-container" class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-border-default text-[9px] font-bold uppercase tracking-widest text-text-muted bg-slate-950/20">
+                    <th class="py-3 px-6" data-i18n="admin_col_emp">Employee</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_code_branch">Code / Branch</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_dept_title">Department / Title</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_role">Role</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_status">Status</th>
+                    <th class="py-3 px-6 text-right" data-i18n="admin_col_actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="employees-table-body" class="text-xs divide-y divide-border-default text-text-secondary font-medium">
+                  <tr>
+                    <td colspan="6" class="py-8 text-center text-text-muted font-bold uppercase tracking-wider text-[10px]" data-i18n="loading">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Invitations Content Table (Hidden by default) -->
+            <div id="invitations-table-container" class="overflow-x-auto hidden">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-border-default text-[9px] font-bold uppercase tracking-widest text-text-muted bg-slate-950/20">
+                    <th class="py-3 px-6" data-i18n="customers_label_fullname">Candidate Name</th>
+                    <th class="py-3 px-6" data-i18n="customers_label_email">Email / Code</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_dept_branch">Dept / Branch</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_role">Role</th>
+                    <th class="py-3 px-6" data-i18n="admin_col_status">Status</th>
+                    <th class="py-3 px-6 text-right" data-i18n="admin_col_actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="invite-table-body" class="text-xs divide-y divide-border-default text-text-secondary font-medium">
+                  <tr>
+                    <td colspan="6" class="py-8 text-center text-text-muted font-bold uppercase tracking-wider text-[10px]" data-i18n="loading">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Section 3: Active Device Logins & Resend Audit Log -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Active Sessions Card -->
+            <div class="card-enterprise rounded-xl overflow-hidden lg:col-span-2 flex flex-col">
+              <div class="px-6 py-4 border-b border-border-default flex justify-between items-center bg-slate-950/10">
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary" data-i18n="admin_sec_sessions">Active Device Sessions</h3>
+                  <p class="text-[10px] text-text-muted mt-0.5 font-medium" data-i18n="admin_sec_sessions_desc">Authenticated browsers, IP addresses, and geolocation tags</p>
+                </div>
+                <button id="btn-terminate-all" class="px-3 py-1.5 border border-rose-500/20 hover:bg-rose-500/10 text-rose-400 bg-transparent rounded font-bold uppercase tracking-widest text-[9px] cursor-pointer shadow-sm" data-i18n="admin_btn_terminate_all">
+                  Terminate All Sessions
+                </button>
+              </div>
+              <div class="overflow-x-auto flex-1">
+                <table class="w-full text-left border-collapse">
+                  <thead>
+                    <tr class="border-b border-border-default text-[9px] font-bold uppercase tracking-widest text-text-muted">
+                      <th class="py-3 px-6" data-i18n="admin_col_emp">User</th>
+                      <th class="py-3 px-6" data-i18n="admin_col_device">Device / Browser</th>
+                      <th class="py-3 px-6" data-i18n="admin_col_ip">IP Address</th>
+                      <th class="py-3 px-6" data-i18n="admin_col_last_active">Last Active</th>
+                      <th class="py-3 px-6 text-right" data-i18n="admin_col_terminate">Terminate</th>
+                    </tr>
+                  </thead>
+                  <tbody id="session-table-body" class="text-xs divide-y divide-border-default text-text-secondary font-medium">
+                    <tr>
+                      <td colspan="5" class="py-8 text-center text-text-muted font-bold uppercase tracking-wider text-[10px]" data-i18n="loading">Loading...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Mail Logs Outbox Card -->
+            <div class="card-enterprise rounded-xl overflow-hidden flex flex-col">
+              <div class="px-6 py-4 border-b border-border-default flex-shrink-0 bg-slate-950/10">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary" data-i18n="admin_sec_audit">Resend Outbox Audit</h3>
+                <p class="text-[10px] text-text-muted mt-0.5 font-medium" data-i18n="admin_sec_audit_desc">Outbound email dispatch statuses and Resend API tracking IDs</p>
+              </div>
+              <div class="flex-1 overflow-y-auto p-4 space-y-3 max-h-[360px]" id="mail-logs-container">
+                <p class="text-center text-text-muted font-bold uppercase tracking-wider text-[9px] py-10" data-i18n="loading">Loading...</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Form: Invite Employee -->
+  <div id="invite-modal" class="sakra-modal-overlay hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-300">
+    <div class="sakra-modal-container bg-surface-card border border-border-default rounded-xl max-w-lg w-full flex flex-col overflow-hidden shadow-2xl">
+      <div class="sakra-modal-header px-6 py-4 border-b border-border-default flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-4 h-4 text-blue-500"></i> <span data-i18n="admin_modal_invite_title">Invite Employee</span>
+        </h3>
+        <button type="button" id="btn-close-invite" class="text-text-muted hover:text-text-primary bg-transparent border-0 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="invite-form" class="flex flex-col flex-1 overflow-hidden font-sans">
+        <div class="sakra-modal-body p-6 space-y-4 overflow-y-auto flex-1">
+          <div id="invite-error-msg" class="hidden px-4 py-2.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-bold uppercase tracking-wide"></div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="customers_label_fullname">Employee Name</label>
+              <input type="text" id="invite-name" required class="sakra-input-tactile" placeholder="e.g. Likith Naidu" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="customers_label_email">Official Email</label>
+              <input type="email" id="invite-email" required class="sakra-input-tactile" placeholder="e.g. likith@sakra.finance" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="customers_col_code">Employee Code</label>
+              <input type="text" id="invite-code" required class="sakra-input-tactile" placeholder="e.g. SK-1002" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_branch">Branch</label>
+              <input type="text" id="invite-branch" required class="sakra-input-tactile" placeholder="e.g. Bangalore Central" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_dept">Department</label>
+              <input type="text" id="invite-dept" required class="sakra-input-tactile" placeholder="e.g. Credit Operations" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_designation">Designation</label>
+              <input type="text" id="invite-designation" required class="sakra-input-tactile" placeholder="e.g. Operations Head" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_phone">Phone Number</label>
+              <input type="text" id="invite-phone" required class="sakra-input-tactile" placeholder="e.g. +91 9900998877" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_role">Role</label>
+              <select id="invite-role" required class="sakra-input-tactile">
+                <option value="ADMIN">ADMIN</option>
+                <option value="FINANCE_MANAGER">FINANCE MANAGER</option>
+                <option value="COLLECTION_OFFICER">COLLECTION OFFICER</option>
+                <option value="AUDITOR">AUDITOR</option>
+                <option value="DATA_ENTRY">DATA ENTRY</option>
+                <option value="VIEWER">VIEWER</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="sakra-modal-footer px-6 py-4 border-t border-border-default flex items-center justify-between flex-shrink-0 bg-slate-950/20">
+          <button type="button" id="btn-cancel-invite" class="px-4 py-2 border border-border-default hover:bg-white/5 rounded text-[9px] uppercase tracking-widest font-bold text-text-secondary bg-transparent cursor-pointer" data-i18n="cancel">Cancel</button>
+          <button type="submit" id="btn-submit-invite" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded text-[9px] uppercase tracking-widest font-bold border-0 cursor-pointer flex items-center gap-1.5 shadow-md">
+            <span data-i18n="admin_btn_send_invite">Send Invitation Email</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Copy Onboarding Invitation Links & Password -->
+  <div id="copy-links-modal" class="sakra-modal-overlay hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-300">
+    <div class="sakra-modal-container bg-surface-card border border-border-default rounded-xl max-w-md w-full flex flex-col overflow-hidden shadow-2xl">
+      <div class="sakra-modal-header px-6 py-4 border-b border-border-default flex items-center justify-between bg-slate-950/10">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-emerald-400 flex items-center gap-2">
+          <i data-lucide="check-circle" class="w-4 h-4"></i> <span data-i18n="success">Invitation Generated</span>
+        </h3>
+        <button type="button" id="btn-close-copy-modal" class="text-text-muted hover:text-text-primary bg-transparent border-0 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="sakra-modal-body p-6 space-y-4">
+        <p class="text-xs text-text-secondary leading-relaxed">
+          Employee onboarding credentials generated. A secure email was dispatched, but you can also copy the details directly:
+        </p>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Onboarding Link</label>
+          <div class="flex gap-2">
+            <input type="text" id="copy-invite-link" readonly class="sakra-input-tactile flex-1 text-xs" />
+            <button id="btn-copy-link" class="px-3 bg-slate-900 border border-white/5 rounded text-white text-[10px] font-bold hover:bg-slate-800 cursor-pointer">Copy</button>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Temporary Password</label>
+          <div class="flex gap-2">
+            <input type="text" id="copy-temp-password" readonly class="sakra-input-tactile flex-1 text-xs font-mono text-rose-400" />
+            <button id="btn-copy-password" class="px-3 bg-slate-900 border border-white/5 rounded text-white text-[10px] font-bold hover:bg-slate-800 cursor-pointer">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sakra-modal-footer px-6 py-4 border-t border-border-default flex justify-end bg-slate-950/20">
+        <button id="btn-close-copy-done" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded text-[9px] uppercase tracking-widest font-bold cursor-pointer">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Form: Edit Employee Profile -->
+  <div id="edit-employee-modal" class="sakra-modal-overlay hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-300">
+    <div class="sakra-modal-container bg-surface-card border border-border-default rounded-xl max-w-lg w-full flex flex-col overflow-hidden shadow-2xl">
+      <div class="sakra-modal-header px-6 py-4 border-b border-border-default flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary flex items-center gap-2">
+          <i data-lucide="edit" class="w-4 h-4 text-blue-500"></i> <span data-i18n="customers_modal_edit_title">Edit Employee Profile</span>
+        </h3>
+        <button type="button" id="btn-close-edit" class="text-text-muted hover:text-text-primary bg-transparent border-0 cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="edit-employee-form" class="flex flex-col flex-1 overflow-hidden font-sans">
+        <input type="hidden" id="edit-emp-id" />
+        <div class="sakra-modal-body p-6 space-y-4 overflow-y-auto flex-1">
+          <div id="edit-error-msg" class="hidden px-4 py-2.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500 text-[10px] font-bold uppercase tracking-wide"></div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="customers_label_fullname">Full Name</label>
+              <input type="text" id="edit-full-name" required class="sakra-input-tactile" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_phone">Phone Number</label>
+              <input type="text" id="edit-phone-number" required class="sakra-input-tactile" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_branch">Branch</label>
+              <input type="text" id="edit-branch" required class="sakra-input-tactile" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_dept">Department</label>
+              <input type="text" id="edit-department" required class="sakra-input-tactile" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_designation">Designation</label>
+              <input type="text" id="edit-designation" required class="sakra-input-tactile" />
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="admin_label_role">Role</label>
+              <select id="edit-role" required class="sakra-input-tactile">
+                <option value="SUPER_ADMIN">SUPER ADMIN</option>
+                <option value="ADMIN">ADMIN</option>
+                <option value="FINANCE_MANAGER">FINANCE MANAGER</option>
+                <option value="COLLECTION_OFFICER">COLLECTION OFFICER</option>
+                <option value="AUDITOR">AUDITOR</option>
+                <option value="DATA_ENTRY">DATA ENTRY</option>
+                <option value="VIEWER">VIEWER</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="status">Account Status</label>
+              <select id="edit-status" required class="sakra-input-tactile">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="suspended">Suspended</option>
+                <option value="locked">Locked</option>
+                <option value="INVITED">Invited</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="sakra-modal-footer px-6 py-4 border-t border-border-default flex items-center justify-between flex-shrink-0 bg-slate-950/20">
+          <button type="button" id="btn-cancel-edit" class="px-4 py-2 border border-border-default hover:bg-white/5 rounded text-[9px] uppercase tracking-widest font-bold text-text-secondary bg-transparent cursor-pointer" data-i18n="cancel">Cancel</button>
+          <button type="submit" id="btn-submit-edit" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded text-[9px] uppercase tracking-widest font-bold border-0 cursor-pointer flex items-center gap-1.5 shadow-md">
+            <span data-i18n="save_changes">Save Changes</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Script loading -->
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/admin.js"></script>
+</body>
+</html>

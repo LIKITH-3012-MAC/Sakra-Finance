@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="nav_daily_repayments">SAKRA FINANCE | Payments</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="payments-content" class="flex flex-col gap-6 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Page Header -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-default">
+            <div>
+              <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="nav_daily_repayments">Daily Repayments</h2>
+              <p class="text-xs text-text-secondary mt-1 font-semibold select-none" data-i18n="payments_subtitle">Record and review daily loan payment entries.</p>
+            </div>
+            <div class="flex items-center gap-2 select-none">
+              <a href="/customer-daily.html" class="sakra-btn-tactile sakra-btn-secondary h-11 px-4 text-xs flex items-center gap-1">
+                <i data-lucide="inbox" class="w-4 h-4"></i> <span data-i18n="payments_todays_ledger">Today's Ledger</span>
+              </a>
+              <button id="export-csv-btn" class="sakra-btn-tactile sakra-btn-secondary h-11 px-4 text-xs flex items-center gap-1 font-sans">
+                <i data-lucide="download" class="w-4 h-4"></i> <span data-i18n="payments_export_csv">Export CSV</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- LEFT PANEL: Customer + Loan Selector -->
+            <div class="lg:col-span-1 flex flex-col gap-4">
+              
+              <!-- Search box -->
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
+                  <i data-lucide="search" class="w-4 h-4"></i>
+                </div>
+                <input
+                  id="customer-search-input"
+                  type="text"
+                  data-i18n-placeholder="payments_filter_customers"
+                  placeholder="Filter customers..."
+                  class="sakra-input-tactile pl-9 text-xs"
+                />
+              </div>
+
+              <!-- Customer Buttons List container -->
+              <div id="customer-list-card" class="glass-card flex flex-col gap-1 max-h-[35vh] overflow-y-auto bg-white/60 p-2">
+                <!-- Loaded dynamically -->
+              </div>
+
+              <!-- Loan Selector Card -->
+              <div id="loan-selector-card" class="glass-card flex flex-col gap-3 bg-white/60 p-6 hidden">
+                <h4 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="profile_sec_loan">Select Loan Account</h4>
+                <div id="loan-list-buttons" class="flex flex-col gap-2 font-sans">
+                  <!-- Loaded dynamically -->
+                </div>
+              </div>
+
+            </div>
+
+            <!-- RIGHT PANEL: Record Form + History -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+              
+              <!-- Unselected Placeholder -->
+              <div id="unselected-placeholder" class="glass-card text-center py-20 bg-white/60 p-6">
+                <i data-lucide="check-square" class="w-12 h-12 text-text-muted mx-auto mb-3"></i>
+                <h3 class="text-sm font-bold text-text-secondary" data-i18n="payments_select_customer">Select customer to start</h3>
+                <p class="text-xs text-text-muted mt-1" data-i18n="payments_select_customer_desc">Select an account profile from the registry left column to manage repayments.</p>
+              </div>
+
+              <!-- Active Workdesk -->
+              <div id="active-workdesk" class="flex flex-col gap-6 hidden">
+                
+                <!-- Loan Summary Details Card -->
+                <div class="glass-card bg-slate-50/50 border border-slate-100/60 flex items-center justify-between p-6 rounded-lg select-none">
+                  <div>
+                    <h4 class="font-bold text-sm text-text-primary" data-i18n="payments_loan_details">Loan Account Details</h4>
+                    <p class="text-xs text-text-secondary mt-1 font-semibold">
+                      <span data-i18n="customers_label_interest_rate">Rate</span>: <span id="summary-rate" class="font-mono font-bold text-primary">—</span> · <span data-i18n="customers_label_interest_formula">Formula</span>: <span id="summary-formula" class="font-bold">—</span>
+                    </p>
+                    <p class="text-[10px] text-text-muted mt-1.5 font-mono font-bold uppercase">
+                      <span data-i18n="profile_col_period">Period</span>: <span id="summary-dates">—</span>
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <span id="summary-status-badge"></span>
+                  </div>
+                </div>
+
+                <!-- Record Form Card -->
+                <div id="payment-entry-card" class="glass-card bg-white/60 p-8">
+                  <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider mb-4 select-none" data-i18n="payments_record_installment">Record New Installment</h3>
+
+                  <div id="form-error-msg" class="mb-4 p-3 rounded bg-rose-50 border border-rose-200 text-xs text-rose-700 font-semibold hidden animate-pulse"></div>
+                  <div id="form-success-msg" class="mb-4 p-3 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 font-semibold hidden"></div>
+
+                  <form id="record-payment-form" class="flex flex-col gap-4">
+                    <div class="grid grid-cols-2 gap-4">
+                      <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="payments_col_date">Payment Date</label>
+                        <input type="date" name="payment_date" class="sakra-input-tactile text-xs font-mono" required />
+                      </div>
+                      <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="payments_col_paid">Amount Paid (₹)</label>
+                        <input type="number" name="amount_paid" class="sakra-input-tactile text-xs font-mono" required />
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                      <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="payments_col_mode">Payment Mode</label>
+                        <select name="payment_mode" class="sakra-input-tactile h-10 text-xs">
+                          <option value="CASH">Cash payment</option>
+                          <option value="BANK_TRANSFER">Bank transfer</option>
+                          <option value="UPI">UPI gateway</option>
+                          <option value="CHEQUE">Cheque clearing</option>
+                        </select>
+                      </div>
+                      <div class="flex flex-col gap-1.5">
+                        <label class="text-[10px] font-bold uppercase tracking-wider text-text-secondary select-none" data-i18n="payments_col_notes">Remarks memo</label>
+                        <input type="text" name="remarks" class="sakra-input-tactile text-xs" />
+                      </div>
+                    </div>
+
+                    <button type="submit" id="form-submit-btn" class="sakra-btn-tactile sakra-btn-primary w-full h-11 mt-2 text-xs">
+                      <span data-i18n="payments_btn_record">Record Payment</span>
+                    </button>
+                  </form>
+                </div>
+
+                <!-- Recent Payments History for this Loan -->
+                <div class="sakra-table-wrapper bg-white/60 backdrop-blur-md">
+                  <div class="px-6 py-4 border-b border-border-default bg-surface/50 select-none">
+                    <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="payments_recent_title">Recent Loan Payments</h3>
+                  </div>
+                  <div id="loan-payments-empty" class="p-12 text-center text-text-muted text-xs font-semibold hidden select-none" data-i18n="payments_empty_notes">No payments recorded for this account.</div>
+                  <div id="loan-payments-table-container" class="overflow-x-auto">
+                    <table class="sakra-table">
+                      <thead>
+                        <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
+                          <th data-i18n="payments_col_date">Date</th>
+                          <th class="text-right" data-i18n="payments_col_expected">Expected Amount</th>
+                          <th class="text-right" data-i18n="payments_col_paid">Paid Amount</th>
+                          <th data-i18n="payments_col_mode">Method</th>
+                          <th data-i18n="admin_col_status">Status</th>
+                          <th data-i18n="payments_col_recorded_by">Recorded By</th>
+                          <th data-i18n="payments_col_recorded_time">Recorded Time</th>
+                          <th data-i18n="payments_col_notes">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody id="loan-payments-table-body">
+                        <!-- Loaded dynamically -->
+                      </tbody>
+                    </table>
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/payments.js"></script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="activate_title">SAKRA FINANCE | Account Activation</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative min-h-screen w-full overflow-hidden select-none">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="min-h-screen w-full flex items-center justify-center sa-reveal relative z-10 p-4 md:p-8">
+    
+    <canvas id="particlesCanvas" class="absolute inset-0 w-full h-full z-0 pointer-events-none"></canvas>
+
+    <div class="w-full max-w-lg relative z-10 sakra-3d-card-wrapper">
+      
+      <!-- Token Validation State -->
+      <div id="loading-state" class="sakra-3d-card glass-card p-8 md:p-12 bg-slate-950/45 border border-white/5 rounded-xl shadow-deep backdrop-blur-md flex flex-col items-center gap-6">
+        <div class="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs text-slate-400 uppercase tracking-widest font-bold" data-i18n="activate_loading">Verifying invitation token...</p>
+      </div>
+
+      <!-- Invalid / Expired State -->
+      <div id="error-state" class="hidden sakra-3d-card glass-card p-8 md:p-12 bg-slate-950/45 border border-white/5 rounded-xl shadow-deep backdrop-blur-md flex flex-col items-center gap-6">
+        <i data-lucide="shield-x" class="w-12 h-12 text-rose-500"></i>
+        <h2 class="text-sm font-bold uppercase tracking-widest text-rose-400" data-i18n="activate_failed">Activation Failed</h2>
+        <p id="error-detail" class="text-xs text-slate-400 text-center max-w-xs leading-relaxed"></p>
+        <a href="/login.html" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded text-[9px] uppercase tracking-widest font-bold border-0 cursor-pointer mt-4" data-i18n="activate_btn_login">
+          Return to Login
+        </a>
+      </div>
+
+      <!-- Activation Form State -->
+      <div id="activate-card" class="hidden sakra-3d-card glass-card p-8 md:p-12 bg-slate-950/45 border border-white/5 rounded-xl shadow-deep backdrop-blur-md flex flex-col gap-6">
+        
+        <!-- Brand Identity -->
+        <div class="flex flex-col items-center gap-3 select-none mb-2">
+          <img src="/logo.png" alt="SAKRA FINANCE" class="h-14 w-auto object-contain" />
+          <h1 class="text-xs font-bold uppercase tracking-[0.2em] text-blue-400 mt-1" data-i18n="activate_title">Enterprise Account Activation</h1>
+        </div>
+
+        <!-- Welcome Banner -->
+        <div class="bg-blue-950/30 border border-blue-500/15 rounded-lg p-4 text-center">
+          <p class="text-[10px] text-slate-500 uppercase tracking-wider font-bold" data-i18n="activate_welcome">Welcome</p>
+          <p id="invite-name" class="text-sm font-bold text-slate-100 mt-1"></p>
+          <div class="flex items-center justify-center gap-3 mt-2">
+            <span id="invite-role" class="px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-blue-950/50 text-blue-400 border border-blue-500/20 font-mono"></span>
+            <span id="invite-dept" class="px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-slate-800 text-slate-300 border border-white/5 font-mono"></span>
+          </div>
+        </div>
+
+        <div id="activate-error" class="hidden p-4 rounded-md text-xs font-semibold bg-rose-950/30 border border-rose-900/50 text-rose-300 leading-relaxed"></div>
+
+        <form id="activate-form" class="flex flex-col gap-5">
+          
+          <!-- Temporary Password -->
+          <div class="flex flex-col gap-1.5">
+            <label for="temp-password" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="activate_label_temp">
+              Temporary Password (from email)
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="key" class="w-4 h-4"></i>
+              </div>
+              <input id="temp-password" type="password" data-i18n-placeholder="activate_placeholder_temp" placeholder="Enter temporary password" class="sakra-input-tactile pl-10" required />
+            </div>
+          </div>
+
+          <!-- New Password -->
+          <div class="flex flex-col gap-1.5">
+            <label for="new-password" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="activate_label_new">
+              Create New Password
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="lock" class="w-4 h-4"></i>
+              </div>
+              <input id="new-password" type="password" data-i18n-placeholder="activate_placeholder_new" placeholder="Min 12 chars, uppercase, number, special" class="sakra-input-tactile pl-10" required minlength="12" />
+            </div>
+            <!-- Password Strength Meter -->
+            <div class="mt-1.5 w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="strength-bar" class="h-full rounded-full bg-slate-700 transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="strength-label" class="text-[9px] text-slate-500 font-bold uppercase tracking-wider mt-0.5"></p>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="flex flex-col gap-1.5">
+            <label for="confirm-password" class="text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none" data-i18n="activate_label_confirm">
+              Confirm New Password
+            </label>
+            <div class="relative">
+              <div class="absolute top-1/2 -translate-y-1/2 left-3.5 flex items-center pointer-events-none text-slate-500">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </div>
+              <input id="confirm-password" type="password" data-i18n-placeholder="activate_placeholder_confirm" placeholder="Re-enter new password" class="sakra-input-tactile pl-10" required minlength="12" />
+            </div>
+          </div>
+
+          <button type="submit" id="activate-btn" class="sakra-btn-tactile bg-blue-600 hover:bg-blue-500 text-white w-full py-3.5 rounded-lg text-xs font-bold uppercase tracking-widest border-0 cursor-pointer flex items-center justify-center gap-2 shadow-lg mt-2 transition-all">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span data-i18n="activate_btn_submit">Activate Account</span>
+          </button>
+        </form>
+
+        <p class="text-[9px] text-slate-600 text-center mt-2 leading-relaxed" data-i18n="activate_policies_note">
+          By activating, you agree to the SAKRA FINANCE security policies. Your temporary password will become permanently invalid.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/activate.js"></script>
+</body>
+</html>

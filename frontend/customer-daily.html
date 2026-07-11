@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="nav_daily_repayments">SAKRA FINANCE | Daily Collections</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="daily-ledger-content" class="flex flex-col gap-6 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Header -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-default">
+            <div>
+              <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="payments_todays_ledger">Daily Collections Ledger</h2>
+              <p class="text-xs text-text-secondary mt-1 font-semibold select-none" data-i18n="payments_daily_ledger_desc">Review ledger transactions recorded across all active accounts today.</p>
+            </div>
+            <div class="flex items-center gap-2 select-none">
+              <a href="/payments.html" class="sakra-btn-tactile sakra-btn-primary h-11 px-5 text-xs flex items-center gap-1.5 font-sans">
+                <i data-lucide="check-square" class="w-4 h-4"></i> <span data-i18n="payments_btn_record">Record New Payment</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Today's Metrics Grid (3D cards) -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted select-none" data-i18n="payments_ledger_date">Ledger Date</p>
+                <p id="today-date-text" class="text-lg font-bold text-text-primary mt-3 font-mono">—</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted select-none" data-i18n="payments_todays_collections">Today's Collections</p>
+                <p id="today-collections-amount" class="text-2xl font-bold text-success mt-3 font-mono text-financial-number">₹0</p>
+              </div>
+            </div>
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted select-none" data-i18n="payments_trans_count">Transactions Count</p>
+                <p id="today-collections-count" class="text-2xl font-bold text-primary mt-3 font-mono text-financial-number">0</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ledger Table -->
+          <div class="sakra-table-wrapper bg-white/60 backdrop-blur-md">
+            <div class="px-6 py-4 border-b border-border-default bg-surface/50 select-none">
+              <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="payments_todays_trans">Today's Transactions</h3>
+            </div>
+            <div id="ledger-empty" class="p-16 text-center text-text-muted text-xs font-semibold hidden select-none">
+              <i data-lucide="inbox" class="w-12 h-12 text-text-muted mx-auto mb-3"></i>
+              <span data-i18n="payments_no_today">No payments recorded today yet.</span>
+            </div>
+            <div id="ledger-table-container" class="overflow-x-auto">
+              <table class="sakra-table">
+                <thead>
+                  <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
+                    <th data-i18n="profile_col_loan_id">Payment ID</th>
+                    <th data-i18n="profile_sec_loan">Loan Account</th>
+                    <th data-i18n="payments_col_recorded_time">Recorded Time</th>
+                    <th class="text-right" data-i18n="payments_col_paid">Amount Paid</th>
+                    <th data-i18n="payments_col_mode">Method</th>
+                    <th data-i18n="payments_col_notes">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody id="ledger-table-body">
+                  <!-- Dynamic rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/customer-daily.js"></script>
+</body>
+</html>

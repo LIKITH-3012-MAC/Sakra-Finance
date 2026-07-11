@@ -1,0 +1,28 @@
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Sensitive configuration files (contains keys/credentials)
+.env
+.env.local
+.env.*.local
+
+# IDEs and OS
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

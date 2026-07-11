@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="settings_title">SAKRA FINANCE | Settings</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="settings-content" class="flex flex-col gap-6 w-full max-w-3xl mx-auto sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Header -->
+          <div class="flex items-center justify-between pb-6 border-b border-border-default">
+            <div>
+              <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="settings_title">System Settings</h2>
+              <p class="text-xs text-text-secondary mt-1 font-semibold" data-i18n="settings_subtitle">Configure secure user interface preferences and view system parameters.</p>
+            </div>
+          </div>
+
+          <!-- Section 1: Themes (Tactile Buttons) -->
+          <div class="glass-card p-6 bg-white/60 flex flex-col gap-4">
+            <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 select-none">
+              <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i> <span data-i18n="settings_sec_theme">Theme Preference</span>
+            </h3>
+            <p class="text-xs text-text-secondary leading-relaxed select-none font-semibold" data-i18n="settings_theme_desc">
+              Configure the visual appearance of the secure terminal workspace. Preference is saved in browser local storage.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <button id="theme-dark-btn" class="sakra-btn-tactile sakra-btn-secondary py-4 text-xs font-bold w-full select-none cursor-pointer flex flex-col items-center gap-2">
+                <i data-lucide="moon" class="w-5 h-5 text-indigo-500"></i>
+                <span data-i18n="settings_theme_dark">Dark Luxury (Default)</span>
+              </button>
+              <button id="theme-light-btn" class="sakra-btn-tactile sakra-btn-secondary py-4 text-xs font-bold w-full select-none cursor-pointer flex flex-col items-center gap-2">
+                <i data-lucide="sun" class="w-5 h-5 text-amber-500"></i>
+                <span data-i18n="settings_theme_light">Light Professional</span>
+              </button>
+              <button id="theme-oled-btn" class="sakra-btn-tactile sakra-btn-secondary py-4 text-xs font-bold w-full select-none cursor-pointer flex flex-col items-center gap-2">
+                <i data-lucide="zap" class="w-5 h-5 text-emerald-400"></i>
+                <span data-i18n="settings_theme_oled">OLED Pitch Black</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Language Preference (Tactile Buttons) -->
+          <div class="glass-card p-6 bg-white/60 flex flex-col gap-4">
+            <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 select-none">
+              <i data-lucide="languages" class="w-4 h-4 text-primary"></i> <span data-i18n="settings_sec_lang">Language Preference</span>
+            </h3>
+            <p class="text-xs text-text-secondary leading-relaxed select-none font-semibold" data-i18n="settings_lang_desc">
+              Select the default workspace display language. This updates your persistent employee profile.
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <button id="lang-en-btn" class="sakra-btn-tactile sakra-btn-secondary py-4 text-xs font-bold w-full select-none cursor-pointer flex flex-col items-center gap-2">
+                <span data-i18n="settings_lang_en">🇬🇧 English</span>
+              </button>
+              <button id="lang-te-btn" class="sakra-btn-tactile sakra-btn-secondary py-4 text-xs font-bold w-full select-none cursor-pointer flex flex-col items-center gap-2">
+                <span data-i18n="settings_lang_te">🇮🇳 తెలుగు</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 3: Security & Profile -->
+          <div class="glass-card p-6 bg-white/60 flex flex-col gap-4">
+            <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 select-none">
+              <i data-lucide="lock" class="w-4 h-4 text-primary"></i> <span data-i18n="settings_sec_security">Security Session Parameters</span>
+            </h3>
+            <div class="flex flex-col gap-3 font-mono text-xs text-text-secondary">
+              <div class="flex justify-between border-b border-slate-100/60 pb-2">
+                <span class="font-semibold text-text-muted" data-i18n="settings_security_username">Username Reference:</span>
+                <span id="settings-username" class="font-bold text-text-primary">—</span>
+              </div>
+              <div class="flex justify-between border-b border-slate-100/60 pb-2">
+                <span class="font-semibold text-text-muted" data-i18n="settings_security_role">Assigned Security Role:</span>
+                <span id="settings-role" class="font-bold text-primary">—</span>
+              </div>
+              <div class="flex justify-between border-b border-slate-100/60 pb-2">
+                <span class="font-semibold text-text-muted" data-i18n="settings_security_status">Session Token Status:</span>
+                <span class="font-bold text-success flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-success"></i> <span data-i18n="settings_security_verified">Verified</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4: Gateway configuration -->
+          <div class="glass-card p-6 bg-white/60 flex flex-col gap-4">
+            <h3 class="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-2 select-none">
+              <i data-lucide="cpu" class="w-4 h-4 text-primary"></i> <span data-i18n="settings_sec_gateway">System Gateway Status</span>
+            </h3>
+            <div class="flex flex-col gap-3 font-mono text-xs text-text-secondary">
+              <div class="flex justify-between border-b border-slate-100/60 pb-2">
+                <span class="font-semibold text-text-muted" data-i18n="settings_gateway_url">API Base URL:</span>
+                <span id="settings-api-url" class="font-bold text-text-primary truncate max-w-sm">—</span>
+              </div>
+              <div class="flex justify-between border-b border-slate-100/60 pb-2">
+                <span class="font-semibold text-text-muted" data-i18n="settings_gateway_timeout">Socket Timeout threshold:</span>
+                <span id="settings-timeout" class="font-bold text-text-primary">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/settings.js"></script>
+</body>
+</html>

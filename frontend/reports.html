@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="nav_security_audit">SAKRA FINANCE | Reports</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="reports-content" class="flex flex-col gap-6 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Header -->
+          <div class="flex items-center justify-between pb-6 border-b border-border-default">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-50 border border-amber-100 text-warning flex items-center justify-center shadow-enterprise-sm shrink-0">
+                <i data-lucide="shield-alert" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="nav_security_audit">Security Audit Trail</h2>
+                <p class="text-xs text-text-secondary mt-1 font-semibold select-none" data-i18n="reports_subtitle">Super Admin exclusive — tracks all state-changing operations.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter Form (Tactile design) -->
+          <div class="glass-card p-4 bg-white/50">
+            <form id="filter-form" class="flex gap-3">
+              <div class="flex-1 relative font-sans">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-muted">
+                  <i data-lucide="filter" class="w-4 h-4"></i>
+                </div>
+                <input
+                  id="action-filter-input"
+                  type="text"
+                  data-i18n-placeholder="reports_filter_placeholder"
+                  placeholder="Filter by action name (e.g. USER_LOGIN)..."
+                  class="sakra-input-tactile pl-9 text-xs"
+                />
+              </div>
+              <button type="submit" class="sakra-btn-tactile sakra-btn-secondary h-10 px-5 text-xs select-none font-sans">
+                <span data-i18n="reports_filter_btn">Filter Logs</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Table Spinner -->
+          <div id="reports-spinner" class="flex items-center justify-center py-20 bg-white/60 border border-border-default rounded-md hidden">
+            <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary"></i>
+          </div>
+
+          <!-- Empty State -->
+          <div id="reports-empty" class="glass-card text-center py-16 flex flex-col items-center justify-center hidden bg-white/60 select-none font-sans">
+            <i data-lucide="shield-alert" class="w-12 h-12 text-text-muted mb-3"></i>
+            <h3 class="text-sm font-bold text-text-secondary" data-i18n="reports_no_logs">No audit logs found</h3>
+            <p class="text-xs text-text-muted mt-1 max-w-xs" data-i18n="reports_no_logs_desc">There are no operational event traces matching your current filter in the transaction log.</p>
+          </div>
+
+          <!-- Reports Table log -->
+          <div id="reports-table-container" class="flex flex-col gap-4 hidden">
+            <div class="sakra-table-wrapper bg-white/60 backdrop-blur-md">
+              <table class="sakra-table">
+                <thead>
+                  <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
+                    <th data-i18n="payments_col_recorded_time">Timestamp</th>
+                    <th data-i18n="payments_col_recorded_by">Actor</th>
+                    <th data-i18n="admin_col_actions">Action</th>
+                    <th data-i18n="reports_col_target">Target</th>
+                    <th data-i18n="admin_col_ip">IP Address</th>
+                    <th data-i18n="reports_col_changes">Changes</th>
+                  </tr>
+                </thead>
+                <tbody id="reports-table-body">
+                  <!-- Loaded dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Footer -->
+            <div class="px-6 py-4 border-t border-border-default flex items-center justify-between bg-slate-950/10 text-xs">
+              <span id="page-info-text" class="text-text-muted font-semibold">Page 1 of 1 (0 total)</span>
+              <div class="flex items-center gap-2">
+                <button id="prev-page-btn" class="px-3 py-1.5 border border-border-default hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-50 disabled:pointer-events-none">Prev</button>
+                <button id="next-page-btn" class="px-3 py-1.5 border border-border-default hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-50 disabled:pointer-events-none">Next</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/reports.js"></script>
+</body>
+</html>

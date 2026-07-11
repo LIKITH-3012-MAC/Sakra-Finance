@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="nav_notifications">SAKRA FINANCE | Notifications</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="notifications-content" class="flex flex-col gap-6 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Header -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-default">
+            <div>
+              <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="nav_notifications">Notifications</h2>
+              <p id="unread-count-text" class="text-xs text-text-secondary mt-1 font-semibold select-none">
+                0 unread alerts pending
+              </p>
+            </div>
+            <div class="flex items-center gap-3 select-none">
+              <button id="toggle-filter-btn" class="sakra-btn-tactile sakra-btn-secondary h-10 px-4 text-xs font-sans">
+                <span data-i18n="notifications_filter_all">Show All</span>
+              </button>
+              <button id="mark-all-btn" class="sakra-btn-tactile sakra-btn-primary h-10 px-4 text-xs hidden font-sans">
+                <i data-lucide="check-check" class="w-4 h-4 mr-1 inline animate-pulse"></i> <span data-i18n="notifications_btn_mark_all">Mark All Read</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="notifications-empty" class="glass-card text-center py-16 flex flex-col items-center justify-center hidden bg-white/60 font-sans">
+            <i data-lucide="inbox" class="w-12 h-12 text-text-muted mb-3"></i>
+            <h3 class="text-sm font-bold text-text-secondary select-none" data-i18n="notifications_no_alerts_title">No notifications to display</h3>
+            <p class="text-xs text-text-muted mt-1 max-w-xs select-none" data-i18n="notifications_no_alerts_desc">All customer accounts are in good standing and no alerts are pending.</p>
+          </div>
+
+          <!-- Notifications List List -->
+          <div id="notifications-list" class="flex flex-col gap-3 font-sans">
+            <!-- Loaded dynamically -->
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/notifications.js"></script>
+</body>
+</html>

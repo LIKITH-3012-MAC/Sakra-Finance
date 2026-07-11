@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title data-i18n="nav_copilot">SAKRA FINANCE | AI Copilot</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Hide default header on Copilot page for clean 3-section layout */
+    #header-container {
+      display: none !important;
+    }
+    /* Let main take the full height since site header is hidden */
+    .main-content {
+      height: 100vh !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      background-color: transparent !important;
+    }
+    /* Smooth typing shimmer or dot animation */
+    @keyframes typing-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .typing-dot {
+      animation: typing-bounce 1s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="relative overflow-hidden">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 flex flex-col h-screen overflow-hidden">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="copilot-content" class="flex-1 flex flex-col h-full w-full sa-reveal hidden">
+          
+          <!-- AI HEADER (Enterprise Hero Section) -->
+          <div id="ai-header" class="w-full shrink-0 select-none bg-slate-900/10 border-b border-slate-200/40 z-20">
+            <div class="hidden md:grid grid-cols-12 items-center gap-4 p-5 glass-card bg-white/60 rounded-none border-0">
+              <div class="col-span-2.5 flex items-center gap-3.5">
+                <div class="w-10 h-10 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-center shrink-0 p-2 shadow-enterprise-sm">
+                  <img src="/logo.png" alt="SAKRA Logo" class="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <h2 class="text-sm font-bold text-text-primary tracking-tight font-sans" data-i18n="nav_copilot">Sakra AI Copilot</h2>
+                  <p class="text-[9px] text-text-muted font-mono uppercase tracking-wider font-bold" data-i18n="copilot_subtitle">Financial AI</p>
+                </div>
+              </div>
+              <div class="col-span-1.5 font-mono">
+                <span class="text-text-muted block text-[8px] uppercase tracking-widest font-bold mb-0.5">Current User</span>
+                <span id="copilot-username" class="font-bold text-text-primary text-[10px] truncate max-w-full block">—</span>
+              </div>
+              <div class="col-span-1 font-mono">
+                <span class="text-text-muted block text-[8px] uppercase tracking-widest font-bold mb-0.5" data-i18n="admin_col_role">Role</span>
+                <span id="copilot-role" class="font-bold text-primary text-[10px] truncate max-w-full block">—</span>
+              </div>
+              <div class="col-span-1 font-mono">
+                <span class="text-text-muted block text-[8px] uppercase tracking-widest font-bold mb-0.5" data-i18n="admin_col_status">Status</span>
+                <span class="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> <span data-i18n="settings_security_verified">Active</span>
+                </span>
+              </div>
+              
+              <!-- Custom Premium Language Selector -->
+              <div class="col-span-1 relative font-sans" id="lang-switcher-container">
+                <span class="text-text-muted block text-[8px] uppercase tracking-widest font-bold mb-0.5">Language</span>
+                <button id="lang-switcher-btn" class="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 border border-slate-200/60 text-[9px] uppercase font-bold tracking-wider text-text-primary transition-colors select-none cursor-pointer">
+                  <span id="current-lang-text">🇬🇧 EN</span>
+                  <i data-lucide="chevron-down" class="w-2.5 h-2.5 text-text-muted"></i>
+                </button>
+                <div id="lang-switcher-dropdown" class="absolute right-0 mt-1 w-28 bg-white border border-slate-200 rounded-lg shadow-enterprise-md py-1 hidden z-50 flex flex-col">
+                  <button data-lang="en" class="flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-slate-50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer w-full text-[9px] font-bold uppercase tracking-wider border-0">
+                    🇬🇧 English
+                  </button>
+                  <button data-lang="te" class="flex items-center gap-1.5 px-3 py-1.5 text-left hover:bg-slate-50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer w-full text-[9px] font-bold uppercase tracking-wider border-0">
+                    🇮🇳 తెలుగు
+                  </button>
+                </div>
+              </div>
+
+              <!-- Live Clock Widget -->
+              <div class="col-span-3 font-mono">
+                <span class="text-text-muted block text-[8px] uppercase tracking-widest font-bold mb-0.5">Live Gateway Clock</span>
+                <span id="copilot-datetime" class="font-bold text-text-primary text-[10px] block truncate">—</span>
+              </div>
+
+              <div class="col-span-2 flex justify-end">
+                <button id="clear-history-btn" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-primary hover:bg-slate-50 px-3.5 h-9 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span data-i18n="admin_sec_sessions">Clear History</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Mobile Layout -->
+            <div class="md:hidden flex flex-col items-center text-center p-4 glass-card bg-white/60 rounded-none border-0 gap-2">
+              <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-2 text-left">
+                  <div class="w-8 h-8 bg-primary/10 border border-primary/20 rounded-lg flex items-center justify-center p-1.5 shrink-0 select-none">
+                    <img src="/logo.png" alt="SAKRA Logo" class="w-full h-full object-contain" />
+                  </div>
+                  <div>
+                    <h2 class="text-xs font-bold text-text-primary" data-i18n="nav_copilot">Sakra AI Copilot</h2>
+                    <p class="text-[8px] text-text-muted uppercase tracking-wider font-semibold">Intelligence Platform</p>
+                  </div>
+                </div>
+                
+                <!-- Language drop mobile -->
+                <div class="relative" id="lang-switcher-container-mobile">
+                  <button id="lang-switcher-btn-mobile" class="flex items-center gap-1 px-2 py-1 rounded bg-slate-100 border border-slate-200 text-[8px] uppercase font-bold tracking-wider text-text-primary cursor-pointer select-none">
+                    <span id="current-lang-text-mobile">EN</span>
+                    <i data-lucide="chevron-down" class="w-2 h-2 text-text-muted"></i>
+                  </button>
+                  <div id="lang-switcher-dropdown-mobile" class="absolute right-0 mt-1 w-24 bg-white border border-slate-200 rounded shadow-lg py-1 hidden z-50 flex flex-col">
+                    <button data-lang="en" class="px-2 py-1 text-left hover:bg-slate-50 text-text-secondary text-[8px] font-bold uppercase tracking-wider border-0">EN</button>
+                    <button data-lang="te" class="px-2 py-1 text-left hover:bg-slate-50 text-text-secondary text-[8px] font-bold uppercase tracking-wider border-0">TE</button>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex items-center justify-between w-full mt-1 border-t border-slate-100/60 pt-2 text-[9px] font-mono text-text-secondary font-bold uppercase tracking-wider">
+                <span id="copilot-role-mobile" class="text-primary">—</span>
+                <button id="clear-history-btn-mobile" class="sakra-btn-tactile bg-white border border-border-default/50 text-text-primary px-3 py-1 text-[8px] font-bold uppercase tracking-wider flex items-center gap-1 transition-all">
+                  <i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i> <span data-i18n="admin_sec_sessions">Clear</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CHAT VIEWPORT (The ONE scrollable area) -->
+          <div class="flex-1 overflow-y-auto w-full flex flex-col items-center px-4 py-6 md:py-8 min-h-0 select-text" id="chat-viewport">
+            <div class="w-full max-w-[900px] flex flex-col gap-6" id="chat-messages-container">
+              <!-- Dynamically Populated Messaging Cards -->
+            </div>
+            
+            <div id="chat-history-loader" class="flex-1 flex flex-col items-center justify-center py-20 z-10 w-full">
+              <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary"></i>
+            </div>
+          </div>
+
+          <!-- MESSAGE COMPOSER (Always Fixed/Visible) -->
+          <div class="w-full bg-slate-900/5 border-t border-slate-200/40 px-4 py-4 md:py-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6 shrink-0 z-20 select-none">
+            <div class="w-full max-w-[900px] mx-auto relative font-sans">
+              <form id="chat-input-form" class="relative flex items-center bg-white/90 border border-slate-200 rounded-2xl p-1.5 shadow-enterprise-md focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
+                
+                <!-- Attach Button -->
+                <button type="button" id="chat-attach-btn" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-text-muted flex items-center justify-center shrink-0 border-0 cursor-pointer transition-colors" title="Attach Document">
+                  <i data-lucide="paperclip" class="w-4 h-4 text-slate-500"></i>
+                </button>
+
+                <!-- Input Field -->
+                <input
+                  id="chat-input"
+                  type="text"
+                  placeholder="Ask Sakra AI anything about customers, repayments, analytics or reports..."
+                  class="flex-1 bg-transparent border-0 ring-0 focus:ring-0 focus:outline-none px-3 text-xs md:text-sm text-text-primary placeholder:text-text-muted/60 font-sans"
+                  autocomplete="off"
+                />
+
+                <!-- Microphone Button -->
+                <button type="button" id="chat-mic-btn" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-text-muted flex items-center justify-center shrink-0 border-0 cursor-pointer transition-colors mr-1" title="Voice Input">
+                  <i data-lucide="mic" class="w-4 h-4 text-slate-500"></i>
+                </button>
+
+                <!-- Send Button -->
+                <button type="submit" id="chat-send-btn" class="w-10 h-10 rounded-xl bg-primary hover:bg-primary/95 text-white flex items-center justify-center shrink-0 border-0 cursor-pointer transition-all active:scale-95 shadow-md">
+                  <i data-lucide="send" class="w-4 h-4 text-white"></i>
+                </button>
+
+              </form>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/copilot.js"></script>
+</body>
+</html>

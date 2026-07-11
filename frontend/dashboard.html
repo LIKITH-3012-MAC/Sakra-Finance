@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="nav_dashboard">SAKRA FINANCE | Dashboard</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/logo.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- Command Palette Placeholder -->
+      <div id="command-palette-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="dashboard-content" class="flex flex-col gap-8 w-full sa-reveal hidden p-4 md:p-8">
+          
+          <!-- Executive Welcome & Clock -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border-default">
+            <div>
+              <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="dashboard_title">Executive Summary</h2>
+              <p class="text-[9px] text-text-secondary mt-1 tracking-widest font-bold flex items-center gap-1.5 select-none uppercase" data-i18n="dashboard_subtitle">
+                <i data-lucide="cpu" class="w-3.5 h-3.5 text-primary"></i> SAKRA SECURE FINANCIAL COMMAND DESK
+              </p>
+            </div>
+            
+            <div class="flex items-center gap-3 px-4 py-2 bg-white/70 backdrop-blur-md border border-border-default rounded-lg shadow-enterprise-sm select-none">
+              <i data-lucide="clock" class="w-4 h-4 text-primary"></i>
+              <div class="text-right font-mono">
+                <p id="dashboard-date" class="text-[9px] font-bold text-text-muted uppercase tracking-wider">—</p>
+                <p id="dashboard-time" class="text-sm font-bold text-text-primary mt-0.5">—</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metric Cards Grid (Sakra 3D Cards + Glass Cards) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            
+            <!-- Card 1 -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <div class="flex items-center justify-between text-text-secondary select-none">
+                  <span class="text-caption" data-i18n="dashboard_total_customers">Total Customers</span>
+                  <i data-lucide="users" class="w-4 h-4 text-text-muted"></i>
+                </div>
+                <p id="metric-customers" class="text-xl lg:text-2xl xl:text-3xl font-extrabold text-text-primary mt-3 text-financial-number truncate font-sans">0</p>
+                <div class="metric-slide-panel">
+                  <p class="text-[9px] uppercase tracking-wider text-text-muted select-none" data-i18n="dashboard_db_count">Exact Database Count</p>
+                  <p id="metric-customers-hover" class="text-xs font-bold text-primary font-mono mt-0.5">0 profiles</p>
+                </div>
+                <p class="text-[10px] text-text-muted mt-1 select-none font-semibold" data-i18n="dashboard_registered_profiles">Active registered profiles</p>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <div class="flex items-center justify-between text-text-secondary select-none">
+                  <span class="text-caption" data-i18n="dashboard_active_principal">Active Principal</span>
+                  <i data-lucide="indian-rupee" class="w-4 h-4 text-text-muted"></i>
+                </div>
+                <p id="metric-principal" class="text-xl lg:text-2xl xl:text-3xl font-extrabold text-text-primary mt-3 text-financial-number truncate font-sans">₹0</p>
+                <div class="metric-slide-panel">
+                  <p class="text-[9px] uppercase tracking-wider text-text-muted select-none" data-i18n="dashboard_outstanding_principal">Exact Outstanding Principal</p>
+                  <p id="metric-principal-hover" class="text-xs font-bold text-primary font-mono mt-0.5">₹0.00</p>
+                </div>
+                <p class="text-[10px] text-text-muted mt-1 select-none font-semibold" data-i18n="dashboard_principal_outstanding">Principal outstanding</p>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <div class="flex items-center justify-between text-text-secondary select-none">
+                  <span class="text-caption" data-i18n="dashboard_total_collected">Total Collected</span>
+                  <i data-lucide="calendar-check" class="w-4 h-4 text-text-muted"></i>
+                </div>
+                <p id="metric-collected" class="text-xl lg:text-2xl xl:text-3xl font-extrabold text-text-primary mt-3 text-financial-number truncate font-sans">₹0</p>
+                <div class="metric-slide-panel">
+                  <p class="text-[9px] uppercase tracking-wider text-text-muted select-none" data-i18n="dashboard_collected_returns">Exact Collected Returns</p>
+                  <p id="metric-collected-hover" class="text-xs font-bold text-success font-mono mt-0.5">₹0.00</p>
+                </div>
+                <p class="text-[10px] text-text-muted mt-1 select-none font-semibold" data-i18n="dashboard_collected_returns_sub">Collected returns</p>
+              </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60">
+                <div class="flex items-center justify-between text-text-secondary select-none">
+                  <span class="text-caption" data-i18n="dashboard_collection_efficiency">Collection Efficiency</span>
+                  <i data-lucide="trending-up" class="w-4 h-4 text-text-muted"></i>
+                </div>
+                <p id="metric-realization" class="text-xl lg:text-2xl xl:text-3xl font-extrabold text-text-primary mt-3 text-financial-number truncate font-sans">0%</p>
+                <div class="metric-slide-panel">
+                  <p class="text-[9px] uppercase tracking-wider text-text-muted select-none" data-i18n="dashboard_efficiency_calc">Dynamic Efficiency Ratio</p>
+                  <p id="metric-realization-hover" class="text-xs font-bold text-primary font-mono mt-0.5">Disbursed: ₹0.00</p>
+                </div>
+                <p class="text-[10px] text-text-muted mt-1 select-none font-semibold" data-i18n="dashboard_repayment_ratio">Repayments tracking</p>
+              </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="sakra-3d-card-wrapper">
+              <div class="sakra-3d-card glass-card p-6 bg-white/60 border-l-2 border-l-rose-500">
+                <div class="flex items-center justify-between text-text-secondary select-none">
+                  <span class="text-caption" data-i18n="admin_card_locked">Locked Accounts</span>
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-500 animate-pulse"></i>
+                </div>
+                <p id="metric-overdue" class="text-xl lg:text-2xl xl:text-3xl font-extrabold text-rose-600 mt-3 text-financial-number truncate font-sans">0</p>
+                <div class="metric-slide-panel">
+                  <p class="text-[9px] uppercase tracking-wider text-text-muted select-none" data-i18n="dashboard_db_count">Count</p>
+                  <p id="metric-overdue-hover" class="text-xs font-bold text-rose-600 font-mono mt-0.5">0 accounts</p>
+                </div>
+                <p class="text-[10px] text-text-muted mt-1 select-none font-semibold" data-i18n="dashboard_total_unpaid">Total unpaid principal</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Split Workspace Section -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 font-sans">
+            
+            <!-- Left Actions column -->
+            <div class="lg:col-span-2 flex flex-col gap-6">
+              
+              <h3 class="text-caption font-bold text-text-secondary tracking-wider select-none" data-i18n="dashboard_operational_performance">Dashboard Actions Index</h3>
+              
+              <!-- Action 1: Repayments -->
+              <a href="/payments.html" class="glass-card p-6 group flex items-center justify-between hover:border-success bg-white/50">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-lg bg-emerald-50/70 flex items-center justify-center border border-emerald-100 group-hover:bg-success group-hover:text-white transition-all shadow-enterprise-sm text-success shrink-0">
+                    <i data-lucide="check-circle" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-base text-text-primary group-hover:text-success transition-colors" data-i18n="nav_daily_repayments">Daily Repayments</h4>
+                    <p class="text-xs text-text-secondary mt-1 select-none">Record installment collections, inspect payment receipts, and download transaction sheets.</p>
+                  </div>
+                </div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-text-muted group-hover:text-success transition-colors group-hover:translate-x-1 duration-200"></i>
+              </a>
+
+              <!-- Action 2: Copilot -->
+              <a href="/copilot.html" class="glass-card p-6 group flex items-center justify-between hover:border-primary bg-white/50">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-lg bg-blue-50/70 flex items-center justify-center border border-blue-100 group-hover:bg-primary group-hover:text-white transition-all shadow-enterprise-sm text-primary shrink-0">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-base text-text-primary group-hover:text-primary transition-colors" data-i18n="nav_copilot">Sakra AI Copilot</h4>
+                    <p class="text-xs text-text-secondary mt-1 select-none">Audit security profiles, formulate portfolio evaluations, and review financial stats with secure AI.</p>
+                  </div>
+                </div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-text-muted group-hover:text-primary transition-colors group-hover:translate-x-1 duration-200"></i>
+              </a>
+
+              <!-- Action 3: Audit Trail -->
+              <a href="/reports.html" id="action-audit-trail" class="glass-card p-6 group flex items-center justify-between hover:border-warning bg-white/50 hidden">
+                <div class="flex items-start gap-4">
+                  <div class="w-12 h-12 rounded-lg bg-amber-50/70 flex items-center justify-center border border-amber-100 group-hover:bg-warning group-hover:text-white transition-all shadow-enterprise-sm text-warning shrink-0">
+                    <i data-lucide="shield-alert" class="w-5 h-5"></i>
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-base text-text-primary group-hover:text-warning transition-colors" data-i18n="nav_security_audit">Security Logs Trail</h4>
+                    <p class="text-xs text-text-secondary mt-1 select-none">Super Admin Exclusive — trace state-altering commands, IP entries, and user authentication logs.</p>
+                  </div>
+                </div>
+                <i data-lucide="arrow-right" class="w-4 h-4 text-text-muted group-hover:text-warning transition-colors group-hover:translate-x-1 duration-200"></i>
+              </a>
+
+            </div>
+
+            <!-- Right Alert Stream column -->
+            <div class="lg:col-span-1 flex flex-col gap-6">
+              
+              <div class="select-none flex items-center justify-between">
+                <div>
+                  <h3 class="text-caption font-bold text-text-secondary tracking-wider" data-i18n="dashboard_security_audit_feeds">Live Security Alert Stream</h3>
+                  <p class="text-[10px] text-text-muted mt-1 uppercase tracking-wider font-semibold" data-i18n="dashboard_audit_desc">Unresolved compliance flags</p>
+                </div>
+                <div class="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-100 rounded text-[9px] font-bold text-danger">
+                  <span class="sa-live-indicator"></span> LIVE FEED
+                </div>
+              </div>
+
+              <div id="alerts-stream-list" class="flex flex-col gap-4">
+                <!-- Notifications loaded dynamically -->
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/dashboard.js"></script>
+</body>
+</html>
