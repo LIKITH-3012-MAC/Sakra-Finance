@@ -358,7 +358,7 @@ function setupCommandPalette(user) {
 //  CINEMATIC INTRO EXPERIENCE V3.0
 // ═══════════════════════════════════════════════════════════════
 
-const CI_LOGO_PATH = "M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z";
+const CI_LOGO_PATH = "M 24 5 L 42 32 L 24 38 L 6 32 Z M 24 15 L 13 29 L 24 33 L 35 29 Z";
 
 function buildCinematicHTML() {
   return `
@@ -379,7 +379,33 @@ function buildCinematicHTML() {
           <!-- Stroke outline (draws progressively) -->
           <path class="ci-stroke" d="${CI_LOGO_PATH}"/>
           <!-- Branded fill (revealed after stroke) -->
-          <path class="ci-fill" d="${CI_LOGO_PATH}" fill="#863bff" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/>
+          <g class="ci-fill">
+            <!-- Outer metallic/gradient frame -->
+            <path d="${CI_LOGO_PATH}" fill="url(#ci-metal-grad)" fill-rule="evenodd"/>
+            <!-- Central glowing blue orb -->
+            <circle cx="24" cy="24" r="3.2" fill="url(#ci-orb-grad)" filter="url(#ci-orb-glow)"/>
+          </g>
+          <defs>
+            <!-- Metallic frame gradient -->
+            <linearGradient id="ci-metal-grad" x1="6" y1="5" x2="42" y2="38" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#00f0ff"/>
+              <stop offset="25%" stop-color="#e2e8f0"/>
+              <stop offset="50%" stop-color="#1d4ed8"/>
+              <stop offset="75%" stop-color="#ffffff"/>
+              <stop offset="100%" stop-color="#00f0ff"/>
+            </linearGradient>
+            <!-- Orb gradient -->
+            <radialGradient id="ci-orb-grad" cx="24" cy="24" r="3.2" fx="23" fy="23" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#ffffff"/>
+              <stop offset="40%" stop-color="#00f0ff"/>
+              <stop offset="70%" stop-color="#1d4ed8"/>
+              <stop offset="100%" stop-color="#040815"/>
+            </radialGradient>
+            <!-- Orb blur/glow -->
+            <filter id="ci-orb-glow" x="15" y="15" width="18" height="18" filterUnits="userSpaceOnUse">
+              <feGaussianBlur stdDeviation="0.75" result="blur"/>
+            </filter>
+          </defs>
         </svg>
         <div class="ci-pulse"></div>
         <div class="ci-sweep"></div>
