@@ -338,7 +338,7 @@ class SakraCopilotAgent:
             total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
             
             # Dynamic calculations
-            interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+            interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
             total_due = loan.principal_amount + interest
             remaining_balance = max(total_due - total_paid, Decimal("0"))
             
@@ -431,7 +431,7 @@ class SakraCopilotAgent:
                 # Calculate remaining balance
                 payments = db.query(Payment).filter(Payment.loan_id == o_loan.id).all()
                 total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
-                interest = calculate_interest(o_loan.principal_amount, o_loan.interest_rate, o_loan.interest_formula)
+                interest = calculate_interest(o_loan.principal_amount, o_loan.interest_rate, o_loan.interest_formula, o_loan.duration_days)
                 total_due = o_loan.principal_amount + interest
                 remaining = max(total_due - total_paid, Decimal("0"))
 
@@ -454,7 +454,7 @@ class SakraCopilotAgent:
             for idx, c_loan in enumerate(completed_loans, 1):
                 payments = db.query(Payment).filter(Payment.loan_id == c_loan.id).all()
                 total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
-                interest = calculate_interest(c_loan.principal_amount, c_loan.interest_rate, c_loan.interest_formula)
+                interest = calculate_interest(c_loan.principal_amount, c_loan.interest_rate, c_loan.interest_formula, c_loan.duration_days)
                 total_due = c_loan.principal_amount + interest
                 remaining = max(total_due - total_paid, Decimal("0"))
 

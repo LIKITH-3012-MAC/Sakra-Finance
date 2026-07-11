@@ -103,7 +103,7 @@ async def record_payment(
 
     loan_payments = PaymentRepository.list_by_loan(db, loan.id)
     total_paid_for_loan = sum((p.amount_paid for p in loan_payments), Decimal("0"))
-    loan_total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+    loan_total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
     remaining_balance_val = float(max(loan_total_due - total_paid_for_loan, Decimal("0")))
 
     repayment_rows = get_loan_repayment_rows(db, loan)

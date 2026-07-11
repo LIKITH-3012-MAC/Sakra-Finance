@@ -51,7 +51,7 @@ def generate_loan_schedule(
         - loan_id, installment_number, due_date, expected_amount,
           paid_amount (0), remaining_amount, status ('PENDING')
     """
-    interest = calculate_interest(principal, interest_rate, interest_formula)
+    interest = calculate_interest(principal, interest_rate, interest_formula, duration_days)
     total_due = principal + interest
 
     # Calculate daily installment amount
@@ -115,7 +115,7 @@ def get_loan_status_details(
     formula = loan.interest_formula
     duration = loan.duration_days
 
-    interest = calculate_interest(principal, rate, formula)
+    interest = calculate_interest(principal, rate, formula, duration)
     total_due = principal + interest
 
     # Daily expected payment
@@ -145,7 +145,7 @@ def get_loan_status_details(
     ).quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
 
     # Get balance summary
-    balance = get_loan_balance_summary(principal, rate, formula, total_paid)
+    balance = get_loan_balance_summary(principal, rate, formula, total_paid, duration)
 
     # Determine status
     if total_paid >= total_due:
@@ -197,7 +197,7 @@ def get_loan_repayment_rows(db, loan) -> list[dict]:
         recorders_dict = {u.id: u.username for u in recorders}
 
     # Calculate overall loan totals
-    total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+    total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
     total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
     remaining_balance = max(total_due - total_paid, Decimal("0"))
 
@@ -290,7 +290,7 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
         loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
         total_paid_all += loan_total_paid
 
-        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         loan_total_due = loan.principal_amount + interest
         total_due_all += loan_total_due
 
@@ -385,7 +385,7 @@ def get_dashboard_metrics_details(db) -> dict:
 
     for loan in all_loans:
         # Calculate due
-        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         loan_total_due = loan.principal_amount + interest
         total_due += loan_total_due
 
@@ -395,7 +395,7 @@ def get_dashboard_metrics_details(db) -> dict:
         loan_remaining = max(loan_total_due - loan_total_paid, Decimal("0"))
 
         # Remaining principal balance calculation
-        bal_sum = get_loan_balance_summary(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid)
+        bal_sum = get_loan_balance_summary(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid, loan.duration_days)
         active_principal += bal_sum["remaining_balance"]
 
         # Loan counts

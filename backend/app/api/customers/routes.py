@@ -114,7 +114,7 @@ async def list_customers(
                 active_loans += 1
 
             balance = get_loan_balance_summary(
-                loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid
+                loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid, loan.duration_days
             )
             loan_dict["balance_summary"] = {k: str(v) for k, v in balance.items()}
             loan_dict["payments_count"] = len(payments)
@@ -388,7 +388,7 @@ async def get_customer(
         total_paid_all += loan_total_paid
 
         balance = get_loan_balance_summary(
-            loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid
+            loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid, loan.duration_days
         )
         loan_dict["balance_summary"] = {k: str(v) for k, v in balance.items()}
         loan_dict["payments_count"] = len(payments)

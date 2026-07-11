@@ -195,6 +195,20 @@ def on_startup():
             logger.info("✓ Column preferred_language successfully added to users table.")
     except Exception as migrate_err:
         logger.error("Failed to automatically migrate users table for preferred_language: %s", str(migrate_err))
+
+    # Automatically alter interest_rate column in loans table to DECIMAL(8,4) if its precision/scale is different
+    try:
+        inspector = inspect(engine)
+        loans_columns = {col["name"]: col for col in inspector.get_columns("loans")}
+        if "interest_rate" in loans_columns:
+            col_type = loans_columns["interest_rate"]["type"]
+            if getattr(col_type, "scale", None) != 4 or getattr(col_type, "precision", None) != 8:
+                logger.info("Column interest_rate in loans table does not have DECIMAL(8,4) precision. Migrating schema...")
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE loans MODIFY COLUMN interest_rate DECIMAL(8,4) NOT NULL"))
+                logger.info("✓ Column interest_rate successfully migrated to DECIMAL(8,4).")
+    except Exception as migrate_err:
+        logger.error("Failed to automatically migrate loans table for interest_rate precision: %s", str(migrate_err))
     
 
     

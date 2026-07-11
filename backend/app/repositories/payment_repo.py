@@ -88,7 +88,7 @@ class PaymentRepository:
 
         # Compute outstanding amounts
         from app.services.interest import calculate_interest
-        total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
+        total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
         
         # Calculate sum of other payments
         other_payments_sum = db.query(Payment).filter(

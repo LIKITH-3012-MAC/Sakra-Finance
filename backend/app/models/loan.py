@@ -26,7 +26,7 @@ class Loan(Base):
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False, index=True)
     principal_amount = Column(Numeric(15, 2), nullable=False)
     interest_formula = Column(String(50), nullable=False)
-    interest_rate = Column(Numeric(5, 2), nullable=False)
+    interest_rate = Column(Numeric(8, 4), nullable=False)
     loan_start_date = Column(Date, nullable=False, index=True)
     loan_end_date = Column(Date, nullable=False, index=True)
     duration_days = Column(Integer, default=100, nullable=False)

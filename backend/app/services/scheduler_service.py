@@ -59,6 +59,7 @@ def run_daily_overdue_check(db: Session, today_date: date) -> dict:
             loan.principal_amount,
             loan.interest_rate,
             loan.interest_formula,
+            loan.duration_days,
         )
         total_due = loan.principal_amount + interest
         remaining = (total_due - total_paid).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

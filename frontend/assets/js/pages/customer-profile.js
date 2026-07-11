@@ -1,5 +1,5 @@
 import api, { customFetch } from "../api.js";
-import { formatCurrency, formatDate } from "../helpers.js";
+import { formatCurrency, formatDate, formatInterestRate } from "../helpers.js";
 
 
 let profileId = null;
@@ -201,7 +201,7 @@ function renderProfile(data) {
         <tr>
           <td class="font-mono text-xs text-text-muted">#${loan.id}</td>
           <td class="text-right font-bold text-text-primary font-mono">${formatCurrency(loan.principal_amount)}</td>
-          <td class="text-text-secondary font-semibold text-xs">${loan.interest_formula} @ ${loan.interest_rate}%</td>
+          <td class="text-text-secondary font-semibold text-xs">${loan.interest_formula} @ ${formatInterestRate(loan.interest_rate)}</td>
           <td class="text-xs text-text-secondary font-mono">${loan.loan_start_date} → ${loan.loan_end_date}</td>
           <td class="text-center">
             <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded border uppercase ${variantClass}">

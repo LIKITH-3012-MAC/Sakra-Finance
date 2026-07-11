@@ -6,39 +6,46 @@ from decimal import Decimal, ROUND_HALF_UP
 QUANTIZE_PRECISION = Decimal("0.01")
 
 
-def calculate_interest(principal: Decimal, rate: Decimal, formula: str) -> Decimal:
+def calculate_interest(
+    principal: Decimal,
+    rate: Decimal,
+    formula: str,
+    duration_days: int = 100,
+) -> Decimal:
     """
     Calculate total interest for a loan based on the interest formula.
 
-    The rate is treated as a flat percentage over the loan term (not annualized).
-
     Args:
         principal: The loan principal amount
-        rate: Interest rate as a percentage (e.g., 10 for 10%)
-        formula: Interest formula type ('FLAT', 'REDUCING', 'COMPOUND')
+        rate: Interest rate as a percentage (e.g., 2.75 for 2.75%)
+        formula: Interest formula type ('FLAT', 'REDUCING', 'MONTHLY', 'DAILY', 'COMPOUND')
+        duration_days: Term of the loan in days (default 100)
 
     Returns:
         Total interest amount, quantized to 2 decimal places
     """
     formula = formula.upper()
+    rate_decimal = rate / Decimal("100")
 
     if formula == "FLAT":
         # Simple flat interest: principal * rate / 100
-        interest = principal * rate / Decimal("100")
+        interest = principal * rate_decimal
     elif formula == "REDUCING":
         # Reducing balance: interest on average outstanding (approximation)
-        # For a reducing balance over the term, interest ≈ principal * rate / 200
         interest = principal * rate / Decimal("200")
+    elif formula == "MONTHLY":
+        # Monthly interest: rate is monthly percentage. Number of months is duration_days / 30.
+        months = Decimal(str(duration_days)) / Decimal("30")
+        interest = principal * rate_decimal * months
+    elif formula == "DAILY":
+        # Daily interest: rate is daily percentage. Number of days is duration_days.
+        interest = principal * rate_decimal * Decimal(str(duration_days))
     elif formula == "COMPOUND":
-        # Compound interest over the term (rate applied as percentage)
-        rate_decimal = rate / Decimal("100")
-        interest = principal * ((Decimal("1") + rate_decimal) - Decimal("1"))
-        # This simplifies to same as flat for single period
-        # For multi-period compound, this would need periods parameter
+        # Compound interest over the term placeholder (rate applied as percentage)
         interest = principal * rate_decimal
     else:
         # Default to flat if formula is unrecognized
-        interest = principal * rate / Decimal("100")
+        interest = principal * rate_decimal
 
     return interest.quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
 
@@ -48,6 +55,7 @@ def get_loan_balance_summary(
     rate: Decimal,
     formula: str,
     total_paid: Decimal,
+    duration_days: int = 100,
 ) -> dict:
     """
     Calculate comprehensive loan balance summary.
@@ -57,6 +65,7 @@ def get_loan_balance_summary(
         rate: Interest rate percentage
         formula: Interest formula type
         total_paid: Total amount already paid
+        duration_days: Term of the loan in days (default 100)
 
     Returns:
         Dictionary with:
@@ -68,7 +77,7 @@ def get_loan_balance_summary(
         - interest_outstanding: Outstanding interest amount
         - total_outstanding_with_interest: Total remaining including interest
     """
-    interest = calculate_interest(principal, rate, formula)
+    interest = calculate_interest(principal, rate, formula, duration_days)
     total_due = (principal + interest).quantize(QUANTIZE_PRECISION, rounding=ROUND_HALF_UP)
 
     # Payments applied to principal first

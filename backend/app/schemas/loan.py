@@ -6,7 +6,7 @@ from typing import Optional
 from decimal import Decimal
 from datetime import date, datetime
 
-VALID_INTEREST_FORMULAS = ["FLAT", "REDUCING", "COMPOUND"]
+VALID_INTEREST_FORMULAS = ["FLAT", "REDUCING", "MONTHLY", "DAILY", "COMPOUND"]
 
 
 class LoanCreate(BaseModel):
@@ -14,7 +14,7 @@ class LoanCreate(BaseModel):
     customer_id: int = Field(..., gt=0)
     principal_amount: Decimal = Field(..., gt=0, description="Loan principal amount, must be positive")
     interest_formula: str = Field(..., description="Interest calculation formula")
-    interest_rate: Decimal = Field(..., ge=0, description="Interest rate percentage")
+    interest_rate: Decimal = Field(..., ge=0, le=100, max_digits=8, decimal_places=4, description="Interest rate percentage")
     loan_start_date: date
     duration_days: int = Field(default=100, gt=0, description="Loan duration in days")
 
@@ -31,7 +31,7 @@ class LoanUpdate(BaseModel):
     """Schema for updating loan data with optimistic locking."""
     principal_amount: Optional[Decimal] = Field(None, gt=0)
     interest_formula: Optional[str] = None
-    interest_rate: Optional[Decimal] = Field(None, ge=0)
+    interest_rate: Optional[Decimal] = Field(None, ge=0, le=100, max_digits=8, decimal_places=4)
     loan_start_date: Optional[date] = None
     duration_days: Optional[int] = Field(None, gt=0)
     version_id: int = Field(..., description="Required for optimistic locking")

@@ -313,11 +313,14 @@
                 <select name="interest_formula" class="sakra-input-tactile">
                   <option value="FLAT">Simple Interest (Flat)</option>
                   <option value="REDUCING">Reducing Balance</option>
+                  <option value="MONTHLY">Monthly Interest</option>
+                  <option value="DAILY">Daily Interest</option>
                 </select>
               </div>
               <div class="flex flex-col gap-1.5">
                 <label class="text-[9px] font-bold uppercase tracking-wider text-text-muted" data-i18n="customers_label_interest_rate">Rate (%)</label>
-                <input type="number" name="interest_rate" required min="0" max="100" class="sakra-input-tactile font-mono" placeholder="12" />
+                <input type="text" name="interest_rate" id="interest-rate-input" required class="sakra-input-tactile font-mono" placeholder="12" />
+                <p class="text-[8px] text-text-muted mt-0.5 leading-tight font-medium">e.g. 10, 10.5, 12.75, 0.50</p>
               </div>
             </div>
 

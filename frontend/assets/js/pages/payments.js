@@ -184,7 +184,7 @@ async function selectLoan(loan) {
   renderLoanSelector(); // Refreshes active class style
 
   // Fill summary details
-  summaryRate.innerText = `${loan.interest_rate}%`;
+  summaryRate.innerText = window.formatInterestRate ? window.formatInterestRate(loan.interest_rate) : `${loan.interest_rate}%`;
   summaryFormula.innerText = loan.interest_formula;
   summaryDates.innerText = `${loan.loan_start_date} → ${loan.loan_end_date}`;
 

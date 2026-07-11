@@ -652,6 +652,29 @@ async function handleAddCustomerSubmit(e) {
     return;
   }
 
+  // Validate interest rate
+  let rawRate = data.interest_rate;
+  if (typeof rawRate === "string") {
+    rawRate = rawRate.trim();
+  }
+  if (!rawRate) {
+    modalError.innerText = "Interest rate is required.";
+    modalError.classList.remove("hidden");
+    return;
+  }
+  const rateRegex = /^\d+(\.\d{1,4})?$/;
+  if (!rateRegex.test(rawRate)) {
+    modalError.innerText = "Interest rate must be a positive number with up to 4 decimal places (e.g. 10, 10.5, 12.75, 0.50).";
+    modalError.classList.remove("hidden");
+    return;
+  }
+  const parsedRate = parseFloat(rawRate);
+  if (parsedRate < 0 || parsedRate > 100) {
+    modalError.innerText = "Interest rate must be between 0% and 100%.";
+    modalError.classList.remove("hidden");
+    return;
+  }
+
   // Validate file uploads selection
   const photoInput = document.getElementById("profile-photo-input");
   const aadhaarInput = document.getElementById("aadhaar-file-input");
@@ -736,7 +759,7 @@ async function handleAddCustomerSubmit(e) {
     const loanPayload = {
       customer_id: customerId,
       principal_amount: parseFloat(data.principal_amount),
-      interest_rate: parseFloat(data.interest_rate || 0),
+      interest_rate: String(data.interest_rate).trim(),
       loan_start_date: data.loan_start_date || new Date().toISOString().split("T")[0],
       interest_formula: data.interest_formula || "FLAT",
       duration_days: parseInt(data.duration_days) || 100

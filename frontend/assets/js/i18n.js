@@ -161,8 +161,25 @@ function setupLocaleAwareHelpers() {
     return new Intl.NumberFormat(currentLocale, {
       style: "currency",
       currency: "INR",
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(val || 0);
+  };
+
+  window.formatInterestRate = function(rate) {
+    const num = parseFloat(rate);
+    if (isNaN(num)) return "0%";
+    // Strip trailing zeros from DB DECIMAL(8,4) values
+    const cleaned = String(num);
+    const parts = cleaned.split('.');
+    if (parts.length === 1) {
+      return `${parts[0]}%`;
+    }
+    const decimals = parts[1].length;
+    if (decimals === 1) {
+      return `${num.toFixed(2)}%`;
+    }
+    return `${num.toFixed(Math.min(decimals, 4))}%`;
   };
 
   window.formatDate = function(dateStr) {
