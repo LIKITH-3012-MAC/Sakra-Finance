@@ -99,28 +99,125 @@
             <div class="lg:col-span-2 flex flex-col gap-6">
               
               <!-- Unselected Placeholder -->
-              <div id="unselected-placeholder" class="glass-card text-center py-20 bg-white/60 p-6">
-                <i data-lucide="check-square" class="w-12 h-12 text-text-muted mx-auto mb-3"></i>
-                <h3 class="text-sm font-bold text-text-secondary" data-i18n="payments_select_customer">Select customer to start</h3>
-                <p class="text-xs text-text-muted mt-1" data-i18n="payments_select_customer_desc">Select an account profile from the registry left column to manage repayments.</p>
+              <div id="unselected-placeholder" class="glass-card text-center py-28 bg-white/60 p-6 flex flex-col items-center justify-center" style="border: 1px dashed rgba(59,130,246,0.25);">
+                <div class="w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
+                  <i data-lucide="user-check" class="w-8 h-8 text-blue-500"></i>
+                </div>
+                <h3 class="text-sm font-bold text-text-primary uppercase tracking-wider mb-2" data-i18n="payments_select_customer">Select Customer to Manage</h3>
+                <p class="text-xs text-text-muted max-w-sm mx-auto leading-relaxed" data-i18n="payments_select_customer_desc">Choose a customer account profile from the registry left column to manage active loans, record payments, and view repayment history.</p>
               </div>
 
               <!-- Active Workdesk -->
               <div id="active-workdesk" class="flex flex-col gap-6 hidden">
                 
-                <!-- Loan Summary Details Card -->
-                <div class="glass-card bg-slate-50/50 border border-slate-100/60 flex items-center justify-between p-6 rounded-lg select-none">
-                  <div>
-                    <h4 class="font-bold text-sm text-text-primary" data-i18n="payments_loan_details">Loan Account Details</h4>
-                    <p class="text-xs text-text-secondary mt-1 font-semibold">
-                      <span data-i18n="customers_label_interest_rate">Rate</span>: <span id="summary-rate" class="font-mono font-bold text-primary">—</span> · <span data-i18n="customers_label_interest_formula">Formula</span>: <span id="summary-formula" class="font-bold">—</span>
-                    </p>
-                    <p class="text-[10px] text-text-muted mt-1.5 font-mono font-bold uppercase">
-                      <span data-i18n="profile_col_period">Period</span>: <span id="summary-dates">—</span>
-                    </p>
+                <!-- Breadcrumbs -->
+                <div class="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-text-muted select-none">
+                  <span class="hover:text-text-primary transition-colors cursor-pointer">Customers</span>
+                  <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                  <span id="breadcrumb-customer-name" class="text-primary font-extrabold">—</span>
+                  <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                  <span class="text-text-primary font-extrabold">Daily Repayment</span>
+                </div>
+
+                <!-- ══════════ STICKY CURRENT CUSTOMER CARD ══════════ -->
+                <div id="current-customer-card" class="glass-card overflow-hidden sticky top-0 z-20" style="border: 1px solid var(--sakra-border); background: rgba(7, 13, 30, 0.95); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: var(--shadow-soft);">
+                  <!-- Subheader bar -->
+                  <div class="px-5 py-2 flex items-center gap-2 border-b border-white/5 bg-white/[0.02]">
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                    <span class="text-[9px] font-extrabold uppercase tracking-[0.15em] text-text-muted">Currently Managing</span>
                   </div>
-                  <div class="text-right">
-                    <span id="summary-status-badge"></span>
+                  
+                  <div class="p-6 flex flex-col md:flex-row items-center md:items-start gap-6">
+                    <!-- Circular Profile Photo / Initials fallback -->
+                    <div class="relative shrink-0 select-none">
+                      <div class="w-20 h-20 rounded-full overflow-hidden border-2 border-blue-500/30 flex items-center justify-center bg-gradient-to-br from-blue-500/10 to-indigo-500/5 shadow-lg shadow-blue-500/10">
+                        <img id="cc-photo" src="" alt="Profile" class="w-full h-full object-cover hidden" onerror="this.classList.add('hidden'); document.getElementById('cc-initials-fallback').classList.remove('hidden');" onload="this.classList.remove('hidden'); document.getElementById('cc-initials-fallback').classList.add('hidden');" />
+                        <div id="cc-initials-fallback" class="w-full h-full flex items-center justify-center text-xl font-extrabold text-white bg-gradient-to-br from-blue-600 to-indigo-600 font-sans tracking-wide">LN</div>
+                      </div>
+                      <span id="cc-status-dot" class="absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full border-2 border-[#040815] bg-emerald-500"></span>
+                    </div>
+
+                    <!-- Customer Identity details -->
+                    <div class="flex-1 min-w-0 text-center md:text-left">
+                      <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
+                        <h3 id="cc-customer-name" class="text-lg font-extrabold text-white tracking-tight truncate leading-tight">LIKITH NAIDU ANUMAKONDA</h3>
+                        <span id="cc-id-tag" class="inline-block shrink-0 px-2 py-0.5 text-[9px] font-extrabold font-mono rounded border border-blue-500/20 bg-blue-500/10 text-blue-400 self-center">ID #13</span>
+                      </div>
+
+                      <div class="flex flex-wrap justify-center md:justify-start items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-text-secondary font-semibold">
+                        <span class="flex items-center gap-1">
+                          <i data-lucide="phone" class="w-3.5 h-3.5 text-text-muted"></i>
+                          <span id="cc-customer-phone" class="font-mono">+91 9440113763</span>
+                        </span>
+                        <span class="text-text-muted">•</span>
+                        <span class="flex items-center gap-1">
+                          <i data-lucide="calendar" class="w-3.5 h-3.5 text-text-muted"></i>
+                          <span>Created: <span id="cc-customer-created" class="font-mono">10 Jul 2026</span></span>
+                        </span>
+                      </div>
+
+                      <div class="flex flex-wrap justify-center md:justify-start items-center gap-2 mt-4 select-none">
+                        <span id="cc-loan-status" class="px-2.5 py-0.5 text-[9px] font-bold tracking-wider rounded border uppercase bg-blue-500/10 border-blue-500/20 text-blue-400">ACTIVE</span>
+                        <span id="cc-risk-level" class="px-2.5 py-0.5 text-[9px] font-bold tracking-wider rounded border uppercase bg-emerald-500/10 border-emerald-500/20 text-emerald-400">LOW RISK</span>
+                      </div>
+                    </div>
+
+                    <!-- Outstanding Total -->
+                    <div class="shrink-0 text-center md:text-right select-none md:border-l md:border-white/5 md:pl-6">
+                      <p class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted">Outstanding Balance</p>
+                      <p id="cc-outstanding-bal" class="text-xl font-black font-mono text-rose-500 mt-1 select-all">₹42,500.00</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- ══════════ LOAN SUMMARY CARD (KPI GRIDS) ══════════ -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 select-none">
+                  <!-- Card: Principal -->
+                  <div class="glass-card p-4 flex flex-col justify-between" style="border: 1px solid var(--sakra-border); background: rgba(255,255,255,0.01);">
+                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted">Principal</span>
+                    <span id="kpi-principal" class="text-sm font-bold font-mono text-white mt-1.5">—</span>
+                  </div>
+                  <!-- Card: Paid -->
+                  <div class="glass-card p-4 flex flex-col justify-between" style="border: 1px solid var(--sakra-border); background: rgba(255,255,255,0.01);">
+                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted">Paid to Date</span>
+                    <span id="kpi-paid" class="text-sm font-bold font-mono text-emerald-500 mt-1.5">—</span>
+                  </div>
+                  <!-- Card: Remaining -->
+                  <div class="glass-card p-4 flex flex-col justify-between" style="border: 1px solid var(--sakra-border); background: rgba(255,255,255,0.01);">
+                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted">Remaining Balance</span>
+                    <span id="kpi-remaining" class="text-sm font-bold font-mono text-rose-500 mt-1.5">—</span>
+                  </div>
+                  <!-- Card: Next Due / Progress -->
+                  <div class="glass-card p-4 flex flex-col justify-between" style="border: 1px solid var(--sakra-border); background: rgba(255,255,255,0.01);">
+                    <span class="text-[9px] font-extrabold uppercase tracking-wider text-text-muted">Next Installment</span>
+                    <span id="kpi-next-due" class="text-xs font-bold font-mono text-blue-400 mt-1.5">—</span>
+                  </div>
+                </div>
+
+                <!-- KPI Progress/Meta Details -->
+                <div class="glass-card p-5 flex flex-col md:flex-row items-center justify-between gap-4 select-none" style="border: 1px solid var(--sakra-border); background: rgba(255,255,255,0.015);">
+                  <div class="flex-1 w-full">
+                    <div class="flex justify-between items-center text-xs font-bold mb-1.5">
+                      <span class="text-text-secondary">Repayment Progress</span>
+                      <span id="progress-percent" class="font-mono text-blue-400">0%</span>
+                    </div>
+                    <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/5">
+                      <div id="progress-bar-fill" class="bg-gradient-to-r from-blue-500 to-indigo-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                    </div>
+                  </div>
+                  <div class="shrink-0 flex items-center gap-6 text-xs text-text-secondary font-semibold font-sans w-full md:w-auto justify-around md:justify-end border-t border-white/5 md:border-t-0 pt-3 md:pt-0">
+                    <div>
+                      <span class="text-text-muted block text-[9px] font-bold uppercase tracking-wider">Interest Rate</span>
+                      <span id="kpi-rate" class="font-mono font-bold text-white mt-0.5 block">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block text-[9px] font-bold uppercase tracking-wider">Interest Formula</span>
+                      <span id="kpi-formula" class="font-bold text-white mt-0.5 block">—</span>
+                    </div>
+                    <div>
+                      <span class="text-text-muted block text-[9px] font-bold uppercase tracking-wider">Overdue Days</span>
+                      <span id="kpi-overdue-days" class="font-mono font-bold mt-0.5 block text-white">—</span>
+                    </div>
                   </div>
                 </div>
 
@@ -159,7 +256,22 @@
                       </div>
                     </div>
 
-                    <button type="submit" id="form-submit-btn" class="sakra-btn-tactile sakra-btn-primary w-full h-11 mt-2 text-xs">
+                    <!-- ═══ PAYMENT SAFETY CONFIRMATION ═══ -->
+                    <div id="payment-safety-confirm" class="flex items-center gap-3 px-4 py-3 rounded-lg select-none" style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.15);">
+                      <i data-lucide="shield-check" class="w-4 h-4 text-blue-500 shrink-0"></i>
+                      <div class="min-w-0">
+                        <div class="text-[9px] font-bold uppercase tracking-wider text-text-muted">Recording Payment For</div>
+                        <div class="text-xs font-bold text-text-primary mt-0.5 truncate">
+                          <span id="safety-customer-name" class="text-white">—</span> 
+                          <span class="text-text-muted font-normal">•</span> 
+                          <span id="safety-customer-id" class="font-mono text-blue-400">#0</span>
+                          <span class="text-text-muted font-normal">•</span>
+                          <span class="text-text-muted font-normal">Account</span> <span id="safety-loan-id" class="font-mono text-indigo-400">#0</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button type="submit" id="form-submit-btn" class="sakra-btn-tactile sakra-btn-primary w-full h-11 mt-2 text-xs font-bold tracking-wider uppercase">
                       <span data-i18n="payments_btn_record">Record Payment</span>
                     </button>
                   </form>
@@ -196,11 +308,41 @@
               </div>
 
             </div>
-
           </div>
 
         </div>
       </main>
+    </div>
+  </div>
+
+  <!-- ══════════ DOUBLE CONFIRMATION DIALOG MODAL ══════════ -->
+  <div id="double-confirm-modal" class="sakra-modal-overlay hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-sm transition-all duration-300">
+    <div class="sakra-modal-container bg-[#070d1e] border border-border-default rounded-xl max-w-md w-full flex flex-col overflow-hidden shadow-2xl p-6 relative">
+      <div class="flex items-center gap-3 mb-4 select-none">
+        <div class="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold uppercase tracking-wider text-rose-500">High-Value Payment Warning</h3>
+          <p class="text-[10px] text-text-muted font-semibold mt-0.5">Dual-authorization approval required</p>
+        </div>
+      </div>
+      
+      <div class="text-xs text-text-secondary leading-relaxed font-medium select-none mb-6 space-y-3">
+        <p>You are recording a high-value installment payment exceeding <strong class="text-white font-extrabold">₹50,000</strong>. Please verify the customer credentials below before confirming transaction registry entry:</p>
+        <div class="p-4 rounded-lg border border-white/5 bg-white/[0.02] space-y-2">
+          <div class="flex justify-between font-semibold"><span class="text-text-muted">Customer Name:</span><span id="confirm-customer-name" class="text-white font-extrabold">—</span></div>
+          <div class="flex justify-between font-mono"><span class="text-text-muted">Customer ID:</span><span id="confirm-customer-id" class="text-blue-400 font-bold">—</span></div>
+          <div class="flex justify-between font-mono"><span class="text-text-muted">Loan Account:</span><span id="confirm-loan-id" class="text-indigo-400 font-bold">—</span></div>
+          <div class="flex justify-between font-mono"><span class="text-text-muted">Transaction Amount:</span><span id="confirm-amount" class="text-emerald-400 font-black">—</span></div>
+        </div>
+        <p class="text-rose-400 font-bold flex items-center gap-1.5"><i data-lucide="info" class="w-3.5 h-3.5"></i> This action commits database logs instantly and cannot be undone.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 font-sans select-none">
+        <button type="button" id="confirm-cancel-btn" class="sakra-btn-tactile sakra-btn-secondary px-4 py-2 text-xs font-bold uppercase tracking-wider h-10 border-white/10 text-text-secondary cursor-pointer">Cancel</button>
+        <button type="button" id="confirm-approve-btn" class="sakra-btn-tactile bg-rose-600 hover:bg-rose-500 text-white border-0 px-5 py-2 text-xs font-bold uppercase tracking-wider h-10 shadow-lg shadow-rose-500/10 cursor-pointer">Confirm Payment</button>
+      </div>
     </div>
   </div>
 

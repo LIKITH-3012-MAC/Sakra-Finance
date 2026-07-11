@@ -11,6 +11,7 @@ let selectedCustomer = null;
 let selectedLoan = null;
 let customerLoans = [];
 let loanPayments = [];
+let pendingSubmitData = null;
 
 const paymentsContent = document.getElementById("payments-content");
 const searchInput = document.getElementById("customer-search-input");
@@ -37,6 +38,15 @@ const paymentsTable = document.getElementById("loan-payments-table-container");
 
 const exportBtn = document.getElementById("export-csv-btn");
 
+// Double confirmation warning modal selectors
+const doubleConfirmModal = document.getElementById("double-confirm-modal");
+const confirmCustomerName = document.getElementById("confirm-customer-name");
+const confirmCustomerId = document.getElementById("confirm-customer-id");
+const confirmLoanId = document.getElementById("confirm-loan-id");
+const confirmAmount = document.getElementById("confirm-amount");
+const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+const confirmApproveBtn = document.getElementById("confirm-approve-btn");
+
 // Form payment date default today
 const formDateInput = paymentForm?.querySelector('input[name="payment_date"]');
 if (formDateInput) {
@@ -52,13 +62,20 @@ async function init() {
     
     renderCustomerList();
 
-    // Bind local filter events
+    // Bind local filter events matching multiple fields (Name, Phone, Customer ID, Loan ID, Aadhaar)
     searchInput?.addEventListener("input", (e) => {
       const q = e.target.value.toLowerCase().trim();
-      filteredCustomers = customers.filter(c => 
-        (c.name || "").toLowerCase().includes(q) ||
-        (c.phone_number || "").includes(q)
-      );
+      filteredCustomers = customers.filter(c => {
+        const nameMatch = (c.name || "").toLowerCase().includes(q);
+        const phoneMatch = (c.phone_number || "").includes(q);
+        const idMatch = String(c.id).includes(q) || `#${c.id}`.includes(q);
+        const aadharMatch = (c.aadhar_masked || "").toLowerCase().includes(q);
+        const loanMatch = (c.loans || []).some(l => 
+          String(l.id).includes(q) || 
+          `#${l.id}`.toLowerCase().includes(q)
+        );
+        return nameMatch || phoneMatch || idMatch || aadharMatch || loanMatch;
+      });
       renderCustomerList();
     });
 
@@ -67,6 +84,23 @@ async function init() {
 
     // Export CSV
     exportBtn?.addEventListener("click", handleExportCsv);
+
+    // Modal click listeners
+    confirmCancelBtn?.addEventListener("click", () => {
+      doubleConfirmModal.classList.remove("active");
+      doubleConfirmModal.classList.add("hidden");
+      pendingSubmitData = null;
+    });
+
+    confirmApproveBtn?.addEventListener("click", async () => {
+      doubleConfirmModal.classList.remove("active");
+      doubleConfirmModal.classList.add("hidden");
+      if (pendingSubmitData) {
+        const payload = pendingSubmitData;
+        pendingSubmitData = null;
+        await executeRecordPayment(payload);
+      }
+    });
 
     paymentsContent?.classList.remove("hidden");
   } catch (err) {
@@ -83,18 +117,23 @@ function renderCustomerList() {
   listContainer.innerHTML = filteredCustomers.map(c => {
     const isSelected = selectedCustomer?.id === c.id;
     return `
-      <button data-id="${c.id}" class="customer-select-btn w-full text-left px-4 py-3 rounded-md transition-all duration-100 flex items-center justify-between cursor-pointer border-none bg-transparent ${
+      <button data-id="${c.id}" class="customer-select-btn w-full text-left px-4 py-3 rounded-md flex items-center justify-between cursor-pointer border bg-transparent ${
         isSelected 
-          ? "bg-primary text-white" 
-          : "text-text-primary hover:bg-slate-100/50"
-      }">
-        <div>
-          <p class="font-bold text-xs ${isSelected ? "text-white" : "text-text-primary"}">${c.name}</p>
-          <p class="text-[10px] mt-0.5" style="opacity: ${isSelected ? 0.8 : 0.6};">${c.phone_number}</p>
+          ? "active" 
+          : "text-text-primary hover:bg-white/5"
+      }" style="margin-bottom: 4px;">
+        <div class="flex-1 min-w-0 pr-2">
+          <p class="font-extrabold text-xs text-white truncate">${c.name}</p>
+          <p class="text-[10px] text-text-secondary mt-0.5 font-mono truncate">${c.phone_number} • ID #${c.id}</p>
         </div>
+        ${isSelected ? `<i data-lucide="check" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>` : ""}
       </button>
     `;
   }).join("");
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
 
   // Attach button clicks
   listContainer.querySelectorAll(".customer-select-btn").forEach(btn => {
@@ -130,6 +169,52 @@ async function selectCustomer(c) {
   try {
     const res = await api.get(`/customers/${c.id}`);
     const payload = res.data || res;
+    
+    // Store full detailed customer profile
+    const details = payload.customer || c;
+    selectedCustomer = details;
+
+    // Update breadcrumbs
+    const breadcrumbName = document.getElementById("breadcrumb-customer-name");
+    if (breadcrumbName) {
+      breadcrumbName.innerText = details.name;
+    }
+
+    // Populate Current Customer sticky header card text fields
+    document.getElementById("cc-customer-name").innerText = details.name;
+    document.getElementById("cc-id-tag").innerText = `ID #${details.id}`;
+    document.getElementById("cc-customer-phone").innerText = details.phone_number;
+
+    const createdVal = details.created_at || details.created_date || "";
+    const dateStr = createdVal ? new Date(createdVal).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }) : "—";
+    document.getElementById("cc-customer-created").innerText = dateStr;
+
+    // Handle avatar display and initials fallback
+    const photoImg = document.getElementById("cc-photo");
+    const initialsBox = document.getElementById("cc-initials-fallback");
+    if (details.has_profile_photo) {
+      photoImg.src = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"}/customers/${details.id}/photo?t=${new Date().getTime()}`;
+      photoImg.classList.remove("hidden");
+      initialsBox.classList.add("hidden");
+    } else {
+      photoImg.classList.add("hidden");
+      initialsBox.classList.remove("hidden");
+      
+      const nameParts = (details.name || "").trim().split(" ");
+      let initials = "";
+      if (nameParts.length > 0) {
+        initials += nameParts[0][0] || "";
+        if (nameParts.length > 1) {
+          initials += nameParts[nameParts.length - 1][0] || "";
+        }
+      }
+      initialsBox.innerText = initials.toUpperCase() || "C";
+    }
+
     customerLoans = payload.loans || [];
 
     if (customerLoans.length > 0) {
@@ -155,10 +240,10 @@ function renderLoanSelector() {
     return `
       <button data-loan-id="${loan.id}" class="loan-select-btn text-left px-4 py-3 rounded-md transition-all text-xs cursor-pointer border bg-transparent w-full ${
         isSelected 
-          ? "bg-blue-50/50 border-primary text-text-primary" 
-          : "border-border-default hover:bg-slate-100/50 text-text-secondary"
+          ? "bg-blue-500/10 border-blue-500/30 text-white shadow-md shadow-blue-500/5" 
+          : "border-white/5 hover:bg-white/5 text-text-secondary"
       }">
-        <p class="font-bold">Account #${loan.id}</p>
+        <p class="font-bold text-white">Account #${loan.id}</p>
         <p class="text-[10px] text-text-muted mt-0.5">${formatVal(loan.principal_amount)} · Status: ${loan.status}</p>
       </button>
     `;
@@ -183,26 +268,69 @@ async function selectLoan(loan) {
 
   renderLoanSelector(); // Refreshes active class style
 
-  // Fill summary details
-  summaryRate.innerText = window.formatInterestRate ? window.formatInterestRate(loan.interest_rate) : `${loan.interest_rate}%`;
-  summaryFormula.innerText = loan.interest_formula;
-  summaryDates.innerText = `${loan.loan_start_date} → ${loan.loan_end_date}`;
+  // Fill sticky Current Customer Card loan properties
+  document.getElementById("cc-loan-status").innerText = loan.status;
 
-  const statusVariants = {
-    ACTIVE: "bg-blue-50 text-blue-700 border-blue-100",
-    COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    OVERDUE: "bg-rose-50 text-rose-700 border-rose-100",
-    DEFAULTED: "bg-rose-50 text-rose-700 border-rose-100"
-  };
-  const variantClass = statusVariants[loan.status] || "bg-slate-50 text-slate-700 border-slate-100";
-  summaryStatusBadge.innerHTML = `
-    <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded border uppercase ${variantClass}">
-      ${loan.status}
-    </span>
-  `;
+  // Determine risk level based on loan status & credit score
+  const score = loan.credit_score || 700;
+  let riskLevel = "MEDIUM RISK";
+  let riskClass = "bg-amber-500/10 border-amber-500/20 text-amber-400";
+  if (score >= 750) {
+    riskLevel = "LOW RISK";
+    riskClass = "bg-emerald-500/10 border-emerald-500/20 text-emerald-400";
+  } else if (score < 650 || loan.status === "OVERDUE") {
+    riskLevel = "HIGH RISK";
+    riskClass = "bg-rose-500/10 border-rose-500/20 text-rose-400";
+  }
+  const riskEl = document.getElementById("cc-risk-level");
+  riskEl.innerText = riskLevel;
+  riskEl.className = `px-2.5 py-0.5 text-[9px] font-bold tracking-wider rounded border uppercase ${riskClass}`;
+
+  // Avatar active status indicator color
+  const statusDot = document.getElementById("cc-status-dot");
+  if (loan.status === "ACTIVE") {
+    statusDot.className = "absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full border-2 border-[#040815] bg-emerald-500";
+  } else if (loan.status === "OVERDUE" || loan.status === "DEFAULTED") {
+    statusDot.className = "absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full border-2 border-[#040815] bg-rose-500";
+  } else {
+    statusDot.className = "absolute bottom-0.5 right-0.5 w-4 h-4 rounded-full border-2 border-[#040815] bg-slate-500";
+  }
+
+  // outstanding and KPI micro-cards
+  const bs = loan.balance_summary || {};
+  const outstanding = parseFloat(bs.remaining_balance || loan.remaining_balance || 0);
+  document.getElementById("cc-outstanding-bal").innerText = formatVal(outstanding);
+  
+  document.getElementById("kpi-principal").innerText = formatVal(loan.principal_amount);
+  document.getElementById("kpi-paid").innerText = formatVal(bs.total_paid || 0);
+  document.getElementById("kpi-remaining").innerText = formatVal(outstanding);
+  
+  const overdueDays = parseInt(bs.overdue_days || 0);
+  document.getElementById("kpi-overdue-days").innerText = overdueDays > 0 ? `${overdueDays} Days` : "None";
+  
+  const nextDue = bs.next_due_date || "—";
+  document.getElementById("kpi-next-due").innerText = nextDue;
+
+  // Completion Progress bar calculations
+  const completion = parseFloat(bs.completion_percent || 0);
+  document.getElementById("progress-percent").innerText = `${completion.toFixed(1)}%`;
+  document.getElementById("progress-bar-fill").style.width = `${completion}%`;
+
+  document.getElementById("kpi-rate").innerText = window.formatInterestRate ? window.formatInterestRate(loan.interest_rate) : `${loan.interest_rate}%`;
+  document.getElementById("kpi-formula").innerText = loan.interest_formula;
+
+  // Safety Confirmation Block details
+  document.getElementById("safety-customer-name").innerText = selectedCustomer.name;
+  document.getElementById("safety-customer-id").innerText = `ID #${selectedCustomer.id}`;
+  document.getElementById("safety-loan-id").innerText = `Account #${loan.id}`;
 
   // Fetch payments list
   await refreshLoanPayments();
+
+  // Add workdesk animation class to prevent layout shifts
+  activeWorkdesk.classList.remove("sa-workdesk-transition");
+  void activeWorkdesk.offsetWidth;
+  activeWorkdesk.classList.add("sa-workdesk-transition");
 
   unselectedPlaceholder.classList.add("hidden");
   activeWorkdesk.classList.remove("hidden");
@@ -279,20 +407,48 @@ async function handleRecordPayment(e) {
 
   const formData = new FormData(paymentForm);
   const data = Object.fromEntries(formData.entries());
+  const amount = parseFloat(data.amount_paid);
 
+  if (isNaN(amount) || amount <= 0) {
+    formError.innerText = "Enter a valid positive payment amount.";
+    formError.classList.remove("hidden");
+    return;
+  }
+
+  const payload = {
+    loan_id: selectedLoan.id,
+    payment_date: data.payment_date,
+    amount_paid: amount,
+    payment_mode: data.payment_mode,
+    remarks: data.remarks || undefined
+  };
+
+  // Intercept high-value payments exceeding ₹50,000 for double confirmation modal
+  if (amount > 50000) {
+    pendingSubmitData = payload;
+
+    confirmCustomerName.innerText = selectedCustomer.name;
+    confirmCustomerId.innerText = `ID #${selectedCustomer.id}`;
+    confirmLoanId.innerText = `Account #${selectedLoan.id}`;
+    confirmAmount.innerText = formatVal(amount);
+
+    doubleConfirmModal.classList.remove("hidden");
+    doubleConfirmModal.classList.add("active");
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+    return;
+  }
+
+  await executeRecordPayment(payload);
+}
+
+async function executeRecordPayment(payload) {
   submitBtn.disabled = true;
   submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin mr-1"></i> Recording...`;
   if (window.lucide) window.lucide.createIcons();
 
   try {
-    const payload = {
-      loan_id: selectedLoan.id,
-      payment_date: data.payment_date,
-      amount_paid: parseFloat(data.amount_paid),
-      payment_mode: data.payment_mode,
-      remarks: data.remarks || undefined
-    };
-
     await api.post("/payments", payload);
 
     formSuccess.innerText = `₹${parseFloat(payload.amount_paid).toLocaleString("en-IN")} recorded successfully for ${payload.payment_date}.`;
@@ -320,7 +476,6 @@ async function handleRecordPayment(e) {
     } else {
       await refreshLoanPayments();
     }
-
 
   } catch (err) {
     const card = document.getElementById("payment-entry-card");
@@ -382,3 +537,4 @@ window.addEventListener("language-changed", () => {
     selectLoan(selectedLoan);
   }
 });
+
