@@ -1401,6 +1401,54 @@ label, .text-\[10px\] {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   ENTERPRISE MULTILINGUAL VOICE INPUT SYSTEM
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Microphone Active Glow & Pulsing Breathing Animation */
+#chat-mic-btn.mic-active {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  color: #3b82f6 !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.35);
+  animation: mic-pulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes mic-pulse {
+  0% {
+    box-shadow: 0 0 4px rgba(59, 130, 246, 0.15);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(59, 130, 246, 0.45);
+    transform: scale(1.05);
+  }
+}
+
+/* Waveform Visualizer bouncing bars */
+.voice-bar {
+  display: inline-block;
+  height: 4px;
+  animation: voice-bounce 0.8s ease-in-out infinite alternate;
+  will-change: height;
+}
+
+.voice-bar.bar-1 { height: 6px; animation-delay: 0.1s; }
+.voice-bar.bar-2 { height: 12px; animation-delay: 0.22s; }
+.voice-bar.bar-3 { height: 8px; animation-delay: 0.14s; }
+.voice-bar.bar-4 { height: 14px; animation-delay: 0.3s; }
+.voice-bar.bar-5 { height: 6px; animation-delay: 0.18s; }
+
+@keyframes voice-bounce {
+  0% {
+    height: 4px;
+  }
+  100% {
+    height: 18px;
+  }
+}
+
+
 
 
 

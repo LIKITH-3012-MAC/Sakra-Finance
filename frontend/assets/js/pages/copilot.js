@@ -51,6 +51,7 @@ async function init() {
 
   // Setup dynamic switcher drops and date loop
   setupLanguageSwitcher();
+  setupVoiceInput();
   updateDateTime();
   setInterval(updateDateTime, 1000);
 
@@ -400,5 +401,175 @@ async function handleClearHistory() {
   }
 }
 
+let recognition = null;
+let isListening = false;
+let selectedMicLang = sessionStorage.getItem("sakra-mic-lang") || "auto";
+
+function setupVoiceInput() {
+  const micBtn = document.getElementById("chat-mic-btn");
+  const inputEl = document.getElementById("chat-input");
+  const visualizerEl = document.getElementById("mic-visualizer");
+  const statusTextEl = document.getElementById("mic-status-text");
+  
+  const langBtn = document.getElementById("mic-lang-btn");
+  const langDropdown = document.getElementById("mic-lang-dropdown");
+  const langText = document.getElementById("mic-lang-text");
+  
+  if (!micBtn || !inputEl) return;
+
+  // Set initial language label
+  updateMicLangLabel();
+
+  // Dropdown Toggle
+  langBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    langDropdown?.classList.toggle("hidden");
+  });
+
+  // Click options
+  langDropdown?.querySelectorAll("[data-mic-lang]").forEach(option => {
+    option.addEventListener("click", () => {
+      const lang = option.getAttribute("data-mic-lang");
+      selectedMicLang = lang;
+      sessionStorage.setItem("sakra-mic-lang", lang);
+      updateMicLangLabel();
+      langDropdown.classList.add("hidden");
+
+      // If active, restart with new language configuration
+      if (isListening) {
+        stopSpeechRecognition();
+        setTimeout(() => startSpeechRecognition(), 300);
+      }
+    });
+  });
+
+  document.addEventListener("click", () => {
+    langDropdown?.classList.add("hidden");
+  });
+
+  // Mic Button Toggle
+  micBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (isListening) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  });
+
+  function updateMicLangLabel() {
+    if (!langText) return;
+    if (selectedMicLang === "auto") {
+      langText.innerText = "Auto";
+    } else if (selectedMicLang === "en-IN") {
+      langText.innerText = "EN";
+    } else if (selectedMicLang === "te-IN") {
+      langText.innerText = "TE";
+    }
+  }
+
+  function startSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showCopilotAlert("Voice input is not supported in this browser. Please use Chrome, Safari or Edge.");
+      return;
+    }
+
+    try {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      // Determine Language
+      if (selectedMicLang === "auto") {
+        recognition.lang = window.currentLanguage === "te" ? "te-IN" : "en-IN";
+      } else {
+        recognition.lang = selectedMicLang;
+      }
+
+      let finalTranscript = "";
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add("mic-active");
+        inputEl.classList.add("hidden");
+        visualizerEl.classList.remove("hidden");
+        if (statusTextEl) statusTextEl.innerText = "Listening...";
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        
+        const currentText = finalTranscript + interimTranscript;
+        inputEl.value = currentText;
+
+        if (statusTextEl && interimTranscript.trim()) {
+          statusTextEl.innerText = "Converting speech...";
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech Recognition Error:", event.error);
+        if (event.error === "not-allowed") {
+          showCopilotAlert("Microphone access denied. Please grant permission in your browser settings.");
+        } else if (event.error !== "no-speech") {
+          showCopilotAlert(`Voice recognition error: ${event.error}`);
+        }
+        cleanupMicState();
+      };
+
+      recognition.onend = () => {
+        cleanupMicState();
+      };
+
+      recognition.start();
+
+    } catch (err) {
+      console.error("Failed to start voice recognition:", err);
+      cleanupMicState();
+    }
+  }
+
+  function stopSpeechRecognition() {
+    if (recognition) {
+      recognition.stop();
+    }
+    cleanupMicState();
+  }
+
+  function cleanupMicState() {
+    isListening = false;
+    micBtn.classList.remove("mic-active");
+    visualizerEl.classList.add("hidden");
+    inputEl.classList.remove("hidden");
+    inputEl.focus();
+  }
+}
+
+// Inline alert helper for Copilot page
+function showCopilotAlert(msg) {
+  const alertDiv = document.createElement("div");
+  alertDiv.className = "fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-card bg-red-950/90 border border-red-500/30 text-red-200 px-6 py-3.5 rounded-xl shadow-enterprise-lg text-xs font-semibold uppercase tracking-wider flex items-center gap-3 animate-fade-in";
+  alertDiv.innerHTML = `
+    <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 shrink-0"></i>
+    <span>${msg}</span>
+  `;
+  document.body.appendChild(alertDiv);
+  if (window.lucide) window.lucide.createIcons();
+  
+  setTimeout(() => {
+    alertDiv.classList.add("opacity-0", "transition-all", "duration-300");
+    setTimeout(() => alertDiv.remove(), 300);
+  }, 4000);
+}
+
 // Start
 setTimeout(init, 100);
+

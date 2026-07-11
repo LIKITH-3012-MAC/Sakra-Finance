@@ -188,8 +188,39 @@
                   autocomplete="off"
                 />
 
+                <!-- Waveform & Status Visualizer -->
+                <div id="mic-visualizer" class="hidden flex-1 flex items-center justify-between px-3 h-10 select-none">
+                  <span id="mic-status-text" class="text-xs font-bold text-primary animate-pulse">Listening...</span>
+                  <div class="flex items-end gap-1 h-5">
+                    <span class="w-1 bg-primary rounded-full voice-bar bar-1"></span>
+                    <span class="w-1 bg-primary rounded-full voice-bar bar-2"></span>
+                    <span class="w-1 bg-primary rounded-full voice-bar bar-3"></span>
+                    <span class="w-1 bg-primary rounded-full voice-bar bar-4"></span>
+                    <span class="w-1 bg-primary rounded-full voice-bar bar-5"></span>
+                  </div>
+                </div>
+
+                <!-- Mic Language Selector -->
+                <div class="relative font-sans shrink-0" id="mic-lang-container">
+                  <button type="button" id="mic-lang-btn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 border border-slate-200/50 text-[9px] uppercase font-bold tracking-wider text-text-secondary cursor-pointer select-none transition-colors" title="Speech Language">
+                    <span id="mic-lang-text">Auto</span>
+                    <i data-lucide="chevron-down" class="w-2.5 h-2.5 text-text-muted"></i>
+                  </button>
+                  <div id="mic-lang-dropdown" class="absolute bottom-full right-0 mb-2 w-32 bg-white border border-slate-200 rounded-xl shadow-enterprise-lg py-1.5 hidden z-50 flex flex-col font-sans">
+                    <button type="button" data-mic-lang="auto" class="flex items-center gap-1.5 px-3 py-2 text-left hover:bg-slate-50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer w-full text-[9px] font-bold uppercase tracking-wider border-0 bg-transparent">
+                      ✨ Auto Detect
+                    </button>
+                    <button type="button" data-mic-lang="en-IN" class="flex items-center gap-1.5 px-3 py-2 text-left hover:bg-slate-50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer w-full text-[9px] font-bold uppercase tracking-wider border-0 bg-transparent">
+                      🇬🇧 English (IN)
+                    </button>
+                    <button type="button" data-mic-lang="te-IN" class="flex items-center gap-1.5 px-3 py-2 text-left hover:bg-slate-50 text-text-secondary hover:text-text-primary transition-colors cursor-pointer w-full text-[9px] font-bold uppercase tracking-wider border-0 bg-transparent">
+                      🇮🇳 Telugu (IN)
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Microphone Button -->
-                <button type="button" id="chat-mic-btn" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-text-muted flex items-center justify-center shrink-0 border-0 cursor-pointer transition-colors mr-1" title="Voice Input">
+                <button type="button" id="chat-mic-btn" class="w-10 h-10 rounded-xl hover:bg-slate-100 text-text-muted flex items-center justify-center shrink-0 border border-transparent cursor-pointer transition-all mr-1" title="Voice Input">
                   <i data-lucide="mic" class="w-4 h-4 text-slate-500"></i>
                 </button>
 
