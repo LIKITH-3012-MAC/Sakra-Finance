@@ -3,8 +3,9 @@ import time
 import logging
 from typing import Any
 
-# Enforce India Standard Time (IST) process-wide
-os.environ["TZ"] = "Asia/Kolkata"
+# Enforce India Standard Time (IST) process-wide (configurable via env)
+timezone = os.environ.get("TIMEZONE") or os.environ.get("TZ") or "Asia/Kolkata"
+os.environ["TZ"] = timezone
 if hasattr(time, "tzset"):
     time.tzset()
 from fastapi import FastAPI, Request, status

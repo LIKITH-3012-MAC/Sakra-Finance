@@ -165,7 +165,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.success && res.message && res.message.includes("delivery failed")) {
          // Email failed, show code links
          hideInviteModal();
-         showCopyModal(`http://localhost:5173/activate.html?token=n_a`, "Delivery failure - check mail queue status");
+         showCopyModal(`${window.location.origin}/activate.html?token=n_a`, "Delivery failure - check mail queue status");
          loadDashboard();
          return;
       }
@@ -177,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
       hideInviteModal();
       // Generate mock parameters for copy preview link
       const mockToken = res.data?.invite_id || "placeholder_token";
-      showCopyModal(`http://localhost:5173/activate.html?token=${mockToken}`, "Password dispatched via secure email gateway.");
+      showCopyModal(`${window.location.origin}/activate.html?token=${mockToken}`, "Password dispatched via secure email gateway.");
       loadDashboard();
     } catch (err) {
       const submitBtn = document.getElementById("btn-submit-invite");
@@ -489,7 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".btn-copy-raw-link").forEach(btn => {
           btn.addEventListener("click", (e) => {
             const token = e.currentTarget.getAttribute("data-token");
-            const link = `http://localhost:5173/activate.html?token=${token}`;
+            const link = `${window.location.origin}/activate.html?token=${token}`;
             navigator.clipboard.writeText(link);
             e.currentTarget.innerText = "Copied!";
             setTimeout(() => e.currentTarget.innerText = "Copy Link", 1500);

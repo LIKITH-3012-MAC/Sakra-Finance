@@ -6,6 +6,8 @@ Loads environment variables from the .env file at the backend root.
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pydantic import Field, AliasChoices
+
 # Resolve the .env file path relative to this config file
 # config.py is at backend/app/core/config.py → backend/.env
 ENV_FILE_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
@@ -44,7 +46,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # ── Encryption ───────────────────────────────────────────────
-    AES_ENCRYPTION_KEY: str
+    AES_ENCRYPTION_KEY: str = Field(validation_alias=AliasChoices("AES_ENCRYPTION_KEY", "AES_KEY"))
     AADHAAR_SALT: str
 
     # ── Database ─────────────────────────────────────────────────
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
 
     # ── Email (Resend) ───────────────────────────────────────────
     RESEND_API_KEY: str
-    SENDER_EMAIL: str
+    SENDER_EMAIL: str = Field(validation_alias=AliasChoices("SENDER_EMAIL", "RESEND_FROM_EMAIL"))
 
     # ── AI Copilot ───────────────────────────────────────────────
     GROQ_API_KEY: str = ""
