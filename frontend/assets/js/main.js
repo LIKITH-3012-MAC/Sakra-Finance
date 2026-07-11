@@ -10,9 +10,21 @@ const PAGE_ROLES = {
   "customer-daily.html": ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN"]
 };
 
+// Helper to get normalized page filename for clean URLs
+function getPageFilename() {
+  let path = window.location.pathname.split("/").pop();
+  if (!path) {
+    return "dashboard.html";
+  }
+  if (!path.includes(".")) {
+    path = path + ".html";
+  }
+  return path;
+}
+
 // Check page permissions
 function checkPagePermission(user) {
-  const path = window.location.pathname.split("/").pop();
+  const path = getPageFilename();
   if (PAGE_ROLES[path]) {
     if (!user || !PAGE_ROLES[path].includes(user.role)) {
       window.location.href = "/dashboard.html";
@@ -27,7 +39,7 @@ async function initLayout(user) {
   // 1. Render Sidebar
   const sidebarContainer = document.getElementById("sidebar-container");
   if (sidebarContainer) {
-    const activePath = window.location.pathname.split("/").pop() || "dashboard.html";
+    const activePath = getPageFilename();
     
     const links = [
       { name: "Dashboard", key: "nav_dashboard", file: "dashboard.html", icon: "layout-dashboard", roles: ["SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "COLLECTION_OFFICER", "AUDITOR", "DATA_ENTRY", "VIEWER"] },
@@ -177,7 +189,7 @@ async function initLayout(user) {
       mobileNav.className = "md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-950/90 backdrop-blur-md border-t border-white/5 z-50 flex justify-around items-center px-2 shadow-deep select-none";
       document.body.appendChild(mobileNav);
     }
-    const activePath = window.location.pathname.split("/").pop() || "dashboard.html";
+    const activePath = getPageFilename();
     const links = [
       { name: "Dashboard", file: "dashboard.html", icon: "layout-dashboard", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
       { name: "Customers", file: "customers.html", icon: "users", roles: ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "VIEWER"] },
@@ -359,7 +371,7 @@ async function executeMain() {
   const user = await checkSession();
   await initI18n(user);
 
-  const path = window.location.pathname.split("/").pop() || "dashboard.html";
+  const path = getPageFilename();
   const unauthenticatedPages = ["login.html", "activate.html", "forgot.html", "404.html", "500.html", "403.html"];
   const isUnauth = unauthenticatedPages.includes(path);
 
