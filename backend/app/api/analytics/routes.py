@@ -32,8 +32,20 @@ async def get_dashboard(
     """
     Get dashboard summary metrics from live database calculations.
     """
+    from app.services.cache import cache
+    
+    cached_metrics = cache.get("dashboard_metrics")
+    if cached_metrics:
+        return APIResponse(
+            success=True,
+            message="Dashboard data retrieved (cached)",
+            data=cached_metrics,
+        )
+
     from app.services.loan_service import get_dashboard_metrics_details
     metrics = get_dashboard_metrics_details(db)
+    
+    cache.set("dashboard_metrics", metrics, expire_seconds=300)
     
     return APIResponse(
         success=True,
@@ -82,6 +94,10 @@ async def chat_with_copilot(
     # 3. Log interaction to copilot_messages
     CopilotService.add_message(db, session_id, "user", payload.query, response_content)
     
+    # Invalidate cache
+    from app.services.cache import cache
+    cache.delete(f"user_chat_history:{current_user.id}")
+    
     return APIResponse(
         success=True,
         message="Copilot query completed",
@@ -97,12 +113,24 @@ async def get_copilot_history(
     """
     Load past message log history for the authenticated user session.
     """
+    from app.services.cache import cache
+    cache_key = f"user_chat_history:{current_user.id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return APIResponse(
+            success=True,
+            message="Chat history loaded successfully (cached)",
+            data={"messages": cached},
+        )
+
     history = CopilotService.get_session_history(db, current_user.id)
     formatted = []
     for msg in history:
         formatted.append({"role": "user", "content": msg.message})
         if msg.response:
             formatted.append({"role": "assistant", "content": msg.response})
+            
+    cache.set(cache_key, formatted, expire_seconds=300)
             
     return APIResponse(
         success=True,
@@ -120,6 +148,10 @@ async def clear_copilot_history(
     Permanently delete all session histories and messages for the user.
     """
     CopilotService.clear_history(db, current_user.id)
+    
+    from app.services.cache import cache
+    cache.delete(f"user_chat_history:{current_user.id}")
+    
     return APIResponse(
         success=True,
         message="Chat history successfully cleared",

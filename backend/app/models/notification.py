@@ -14,11 +14,11 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=True, index=True)
     notification_type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
-    is_read = Column(Boolean, default=False, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
     sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────

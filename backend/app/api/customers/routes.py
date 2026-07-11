@@ -97,7 +97,7 @@ async def list_customers(
         customer_dict["has_promissory_note"] = any(d.document_type == "PROMISSORY_NOTE" for d in customer.documents)
 
         # Get all loans with balance summaries and credit scores
-        loans = LoanRepository.list_by_customer(db, customer.id)
+        loans = [l for l in customer.loans if not l.is_deleted]
         loans_data = []
         total_paid_all = Decimal("0")
         total_principal = Decimal("0")
@@ -106,7 +106,7 @@ async def list_customers(
 
         for loan in loans:
             loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
-            payments = PaymentRepository.list_by_loan(db, loan.id)
+            payments = [p for p in loan.payments]
             loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
             total_paid_all += loan_total_paid
             total_principal += loan.principal_amount
@@ -305,6 +305,9 @@ async def create_customer(
         )
 
         db.commit()
+        # Invalidate dashboard metrics cache
+        from app.services.cache import cache
+        cache.delete("dashboard_metrics")
     except HTTPException as http_err:
         db.rollback()
         raise http_err
@@ -335,7 +338,19 @@ async def get_customer(
     """
     Get full customer profile with loans, aggregate payments, document presence, and metadata.
     """
-    customer = CustomerRepository.get_by_id(db, customer_id)
+    from sqlalchemy.orm import selectinload, joinedload
+    from app.models.customer_document import CustomerDocument
+    from app.models.loan import Loan
+    from app.models.payment import Payment
+    from app.models.loan_schedule import LoanSchedule
+    customer = db.query(Customer).filter(
+        Customer.id == customer_id,
+        Customer.is_deleted == False
+    ).options(
+        selectinload(Customer.documents).joinedload(CustomerDocument.uploader),
+        selectinload(Customer.loans).selectinload(Loan.payments),
+        selectinload(Customer.loans).selectinload(Loan.schedules)
+    ).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
@@ -360,15 +375,15 @@ async def get_customer(
         }
     customer_dict["documents_metadata"] = docs_meta
 
-    # Get all loans
-    loans = LoanRepository.list_by_customer(db, customer_id)
+    # Get all loans (using eager relationship)
+    loans = [l for l in customer.loans if not l.is_deleted]
     loans_data = []
     total_paid_all = Decimal("0")
     today = date.today()
 
     for loan in loans:
         loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
-        payments = PaymentRepository.list_by_loan(db, loan.id)
+        payments = [p for p in loan.payments]
         loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
         total_paid_all += loan_total_paid
 
@@ -460,6 +475,10 @@ async def update_customer(
         request=request,
     )
     db.commit()
+    
+    # Invalidate dashboard metrics cache
+    from app.services.cache import cache
+    cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,
@@ -494,6 +513,10 @@ async def delete_customer(
         request=request,
     )
     db.commit()
+    
+    # Invalidate dashboard metrics cache
+    from app.services.cache import cache
+    cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,

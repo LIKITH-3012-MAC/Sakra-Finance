@@ -66,8 +66,11 @@ app = FastAPI(
 # Attach SlowAPI limiter state
 app.state.limiter = limiter
 
+from fastapi.middleware.gzip import GZipMiddleware
+
 # Middleware
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,

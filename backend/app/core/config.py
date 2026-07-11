@@ -51,6 +51,7 @@ class Settings(BaseSettings):
 
     # ── Database ─────────────────────────────────────────────────
     DATABASE_URL: str
+    REDIS_URL: str = ""
 
     # ── Email (Resend) ───────────────────────────────────────────
     RESEND_API_KEY: str

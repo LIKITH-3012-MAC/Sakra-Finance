@@ -6,8 +6,12 @@ import bcrypt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
-# Initialize Argon2id password hasher
-ph = PasswordHasher()
+# Initialize Argon2id password hasher optimized for single-core/low-CPU environments
+ph = PasswordHasher(
+    time_cost=1,
+    memory_cost=8192,
+    parallelism=1
+)
 
 
 def hash_password(password: str) -> str:

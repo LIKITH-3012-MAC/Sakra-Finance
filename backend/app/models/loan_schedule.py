@@ -18,13 +18,13 @@ class LoanSchedule(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    loan_id = Column(Integer, ForeignKey("loans.id"), nullable=False)
+    loan_id = Column(Integer, ForeignKey("loans.id"), nullable=False, index=True)
     installment_number = Column(Integer, nullable=False)
     due_date = Column(Date, nullable=False, index=True)
     expected_amount = Column(Numeric(15, 2), nullable=False)
     paid_amount = Column(Numeric(15, 2), default=0, nullable=False)
     remaining_amount = Column(Numeric(15, 2), nullable=False)
-    status = Column(String(20), default="PENDING", nullable=False)
+    status = Column(String(20), default="PENDING", nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

@@ -25,7 +25,7 @@ class Customer(Base):
     gender = Column(String(20), nullable=True)
     occupation = Column(String(100), nullable=True)
     remarks = Column(Text, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
     version_id = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -176,12 +176,25 @@ def get_loan_repayment_rows(db, loan) -> list[dict]:
     from app.models.user import User
     from app.services.interest import calculate_interest
 
-    # Get payments for this loan
-    payments = db.query(Payment).filter(Payment.loan_id == loan.id).order_by(Payment.payment_date.asc()).all()
+    # Get payments for this loan (use preloaded if available)
+    if "payments" in loan.__dict__:
+        payments = sorted(loan.payments, key=lambda x: x.payment_date)
+    else:
+        payments = db.query(Payment).filter(Payment.loan_id == loan.id).order_by(Payment.payment_date.asc()).all()
     payments_dict = {p.payment_date: p for p in payments}
 
-    # Get loan schedules
-    schedules = db.query(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc()).all()
+    # Get loan schedules (use preloaded if available)
+    if "schedules" in loan.__dict__:
+        schedules = sorted(loan.schedules, key=lambda x: x.installment_number)
+    else:
+        schedules = db.query(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc()).all()
+
+    # Pre-fetch all recorder users in a single query
+    recorder_ids = {p.recorded_by for p in payments if p.recorded_by}
+    recorders_dict = {}
+    if recorder_ids:
+        recorders = db.query(User).filter(User.id.in_(list(recorder_ids))).all()
+        recorders_dict = {u.id: u.username for u in recorders}
 
     # Calculate overall loan totals
     total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
@@ -223,9 +236,7 @@ def get_loan_repayment_rows(db, loan) -> list[dict]:
         recorded_by_name = "—"
         recorded_time = "—"
         if p:
-            recorder_user = db.query(User).filter(User.id == p.recorded_by).first()
-            if recorder_user:
-                recorded_by_name = recorder_user.username
+            recorded_by_name = recorders_dict.get(p.recorded_by, "—")
             recorded_time = p.created_at.strftime("%Y-%m-%d %H:%M:%S")
 
         repayment_rows.append({
@@ -257,7 +268,15 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
     from app.services.interest import calculate_interest
     from app.services.credit_score import calculate_credit_score
 
-    loans = db.query(Loan).filter(Loan.customer_id == customer_id, Loan.is_deleted == False).all()
+    from sqlalchemy.orm import selectinload
+    from app.models.loan_schedule import LoanSchedule
+    loans = db.query(Loan).filter(
+        Loan.customer_id == customer_id, 
+        Loan.is_deleted == False
+    ).options(
+        selectinload(Loan.payments),
+        selectinload(Loan.schedules)
+    ).all()
     today = date.today()
 
     total_paid_all = Decimal("0")
@@ -267,7 +286,7 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
     next_due_date_candidate = None
 
     for loan in loans:
-        payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
+        payments = list(loan.payments)
         loan_total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
         total_paid_all += loan_total_paid
 
@@ -285,14 +304,11 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
         loan_score = calculate_credit_score(loan, payments, today)
         credit_scores.append(loan_score)
 
-        from app.models.loan_schedule import LoanSchedule
-        unpaid_installment = db.query(LoanSchedule).filter(
-            LoanSchedule.loan_id == loan.id,
-            LoanSchedule.remaining_amount > 0,
-            LoanSchedule.due_date >= today
-        ).order_by(LoanSchedule.installment_number.asc()).first()
-        
-        if unpaid_installment:
+        # Retrieve next due installment in memory
+        unpaid_installments = [s for s in loan.schedules if s.remaining_amount > 0 and s.due_date >= today]
+        if unpaid_installments:
+            unpaid_installments.sort(key=lambda x: x.installment_number)
+            unpaid_installment = unpaid_installments[0]
             if not next_due_date_candidate or unpaid_installment.due_date < next_due_date_candidate:
                 next_due_date_candidate = unpaid_installment.due_date
 
@@ -324,15 +340,17 @@ def get_customer_summary_details(db, customer_id: int) -> dict:
 def get_dashboard_metrics_details(db) -> dict:
     """
     Calculate comprehensive dashboard metrics dynamically from live DB.
+    Optimized to load all payments in a single query and perform loop calculations in memory.
     """
     from decimal import Decimal
     from datetime import date
+    from collections import defaultdict
     from sqlalchemy import func
     from app.models.customer import Customer
     from app.models.loan import Loan
     from app.models.payment import Payment
     from app.models.loan_schedule import LoanSchedule
-    from app.services.interest import calculate_interest
+    from app.services.interest import calculate_interest, get_loan_balance_summary
 
     today = date.today()
 
@@ -348,37 +366,46 @@ def get_dashboard_metrics_details(db) -> dict:
     today_collected_result = db.query(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today).scalar()
     today_collection = Decimal(str(today_collected_result)) if today_collected_result else Decimal("0")
 
+    # Fetch all active loans
     all_loans = db.query(Loan).filter(Loan.is_deleted == False).all()
+    loan_ids = [loan.id for loan in all_loans]
+
+    # Batch fetch all payments for these loans in a single query!
+    payments_by_loan = defaultdict(list)
+    if loan_ids:
+        all_payments = db.query(Payment).filter(Payment.loan_id.in_(loan_ids)).all()
+        for p in all_payments:
+            payments_by_loan[p.loan_id].append(p)
+
     total_due = Decimal("0")
-    for loan in all_loans:
-        interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
-        total_due += loan.principal_amount + interest
-    outstanding_balance = max(total_due - total_collected, Decimal("0"))
-
-    from app.services.interest import get_loan_balance_summary
     active_principal = Decimal("0")
-    for loan in all_loans:
-        loan_payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
-        loan_total_paid = sum((p.amount_paid for p in loan_payments), Decimal("0"))
-        bal_sum = get_loan_balance_summary(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid)
-        active_principal += bal_sum["remaining_balance"]
-
     completed_loans_count = 0
     overdue_count = 0
     overdue_customers_set = set()
 
     for loan in all_loans:
-        loan_payments = db.query(Payment).filter(Payment.loan_id == loan.id).all()
-        loan_total_paid = sum((p.amount_paid for p in loan_payments), Decimal("0"))
+        # Calculate due
         interest = calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula)
         loan_total_due = loan.principal_amount + interest
+        total_due += loan_total_due
+
+        # Process payments in memory
+        loan_payments = payments_by_loan[loan.id]
+        loan_total_paid = sum((p.amount_paid for p in loan_payments), Decimal("0"))
         loan_remaining = max(loan_total_due - loan_total_paid, Decimal("0"))
 
+        # Remaining principal balance calculation
+        bal_sum = get_loan_balance_summary(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid)
+        active_principal += bal_sum["remaining_balance"]
+
+        # Loan counts
         if loan_remaining == 0:
             completed_loans_count += 1
         elif loan.loan_end_date and today > loan.loan_end_date and loan_remaining > 0:
             overdue_count += 1
             overdue_customers_set.add(loan.customer_id)
+
+    outstanding_balance = max(total_due - total_collected, Decimal("0"))
 
     pending_payments_count = db.query(LoanSchedule).filter(
         LoanSchedule.due_date == today,

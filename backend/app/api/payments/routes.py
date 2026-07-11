@@ -86,6 +86,10 @@ async def record_payment(
         request=request,
     )
     db.commit()
+    
+    # Invalidate dashboard metrics cache
+    from app.services.cache import cache
+    cache.delete("dashboard_metrics")
 
     # Re-fetch for dynamic calculations
     db.refresh(loan)
@@ -159,6 +163,10 @@ async def modify_payment(
         request=request,
     )
     db.commit()
+    
+    # Invalidate dashboard metrics cache
+    from app.services.cache import cache
+    cache.delete("dashboard_metrics")
 
     return APIResponse(
         success=True,

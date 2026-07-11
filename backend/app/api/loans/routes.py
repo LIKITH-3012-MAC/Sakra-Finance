@@ -101,6 +101,10 @@ async def create_loan(
     )
     db.commit()
 
+    # Invalidate dashboard metrics cache
+    from app.services.cache import cache
+    cache.delete("dashboard_metrics")
+
     return APIResponse(
         success=True,
         message="Loan created with installment schedule",

@@ -52,7 +52,13 @@ class CustomerRepository:
         Returns:
             Tuple of (list of customers, total count)
         """
-        query = db.query(Customer).filter(Customer.is_deleted == False)
+        from sqlalchemy.orm import selectinload
+        from app.models.loan import Loan
+        from app.models.payment import Payment
+        query = db.query(Customer).filter(Customer.is_deleted == False).options(
+            selectinload(Customer.documents),
+            selectinload(Customer.loans).selectinload(Loan.payments)
+        )
 
         if search:
             search_term = f"%{search}%"
