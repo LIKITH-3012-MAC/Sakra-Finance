@@ -1576,6 +1576,130 @@ span[class*="bg-orange-50"] {
   background: rgba(59, 130, 246, 0.75);
 }
 
+/* ── Redesigned Customer Registry UI Classes ── */
+
+/* Premium Registry Data Grid Rows */
+.registry-row-card {
+  height: 80px;
+  background: rgba(10, 18, 36, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Alternating Row background */
+.registry-row-card:nth-of-type(even) {
+  background: rgba(16, 28, 54, 0.25);
+}
+
+/* Row Hover States */
+.registry-row-card:hover {
+  background: rgba(30, 41, 59, 0.6) !important;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  transform: translateY(-1px);
+  cursor: pointer;
+}
+
+/* Selected row: left accent bar, blue outline, scaling */
+.registry-row-card.selected-active-row {
+  background: rgba(30, 41, 59, 0.8) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.7), 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+  transform: scale(1.008);
+  z-index: 10;
+}
+
+/* Accent bar inside first td of selected row */
+.registry-row-card.selected-active-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  background: #3b82f6;
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 8px #3b82f6;
+}
+
+/* Circular glass initials avatar container */
+.initials-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.65), rgba(16, 185, 129, 0.65));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Safely truncating customer names cells */
+.truncated-name-cell {
+  max-width: 175px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Status badging and pulse effects */
+.status-pill-emerald {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.1);
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.status-pill-rose {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #ef4444 !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.1);
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.status-pill-amber {
+  background: rgba(245, 158, 11) !important;
+  color: #f59e0b !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Custom premium hover tooltips */
+.premium-hover-tooltip {
+  position: absolute;
+  z-index: 100;
+  background: rgba(7, 11, 26, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(59, 130, 246, 0.45);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  color: #ffffff;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  white-space: nowrap;
+}
+
+.premium-hover-tooltip.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 
 
 

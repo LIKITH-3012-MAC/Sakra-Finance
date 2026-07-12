@@ -62,12 +62,13 @@ let activeFilter = "all";
 let activeSort = "created_at";
 let activeSortDir = "desc";
 let currentPage = 1;
-const pageSize = 10;
+let pageSize = 10;
 
 const customersContent = document.getElementById("customers-content");
 const addCustomerBtn = document.getElementById("add-customer-btn");
 const searchForm = document.getElementById("search-form");
 const searchInput = document.getElementById("search-input");
+const searchClearBtn = document.getElementById("search-clear-btn");
 const tableBody = document.getElementById("customers-table-body");
 const tableSpinner = document.getElementById("table-loading-spinner");
 const emptyState = document.getElementById("empty-state");
@@ -76,6 +77,8 @@ const tableContainer = document.getElementById("table-container");
 const pageInfo = document.getElementById("page-info");
 const prevBtn = document.getElementById("prev-page-btn");
 const nextBtn = document.getElementById("next-page-btn");
+const pageNumbersContainer = document.getElementById("page-numbers-container");
+const rowsPerPageSelect = document.getElementById("rows-per-page-select");
 const retryLoadBtn = document.getElementById("retry-load-btn");
 const emptyStateAddBtn = document.getElementById("empty-state-add-btn");
 const mobileCardsContainer = document.getElementById("customers-cards-mobile");
@@ -309,6 +312,19 @@ async function init() {
 
   searchInput?.addEventListener("input", () => {
     searchQuery = searchInput.value || "";
+    if (searchQuery.trim()) {
+      searchClearBtn?.classList.remove("hidden");
+    } else {
+      searchClearBtn?.classList.add("hidden");
+    }
+    currentPage = 1;
+    renderRegistry();
+  });
+
+  searchClearBtn?.addEventListener("click", () => {
+    if (searchInput) searchInput.value = "";
+    searchQuery = "";
+    searchClearBtn?.classList.add("hidden");
     currentPage = 1;
     renderRegistry();
   });
@@ -320,6 +336,46 @@ async function init() {
 
   sortDirSelect?.addEventListener("change", () => {
     activeSortDir = sortDirSelect.value;
+    renderRegistry();
+  });
+
+  // Table header clicks for sorting
+  const sortCustomerHeader = document.getElementById("sort-customer");
+  sortCustomerHeader?.addEventListener("click", () => {
+    if (activeSort === "name") {
+      activeSortDir = activeSortDir === "asc" ? "desc" : "asc";
+    } else {
+      activeSort = "name";
+      activeSortDir = "asc";
+    }
+    if (sortSelect) sortSelect.value = "name";
+    if (sortDirSelect) sortDirSelect.value = activeSortDir;
+    renderRegistry();
+  });
+
+  const sortPrincipalHeader = document.getElementById("sort-principal-header");
+  sortPrincipalHeader?.addEventListener("click", () => {
+    if (activeSort === "principal") {
+      activeSortDir = activeSortDir === "asc" ? "desc" : "asc";
+    } else {
+      activeSort = "principal";
+      activeSortDir = "desc";
+    }
+    if (sortSelect) sortSelect.value = "principal";
+    if (sortDirSelect) sortDirSelect.value = activeSortDir;
+    renderRegistry();
+  });
+
+  const sortRemainingHeader = document.getElementById("sort-remaining-header");
+  sortRemainingHeader?.addEventListener("click", () => {
+    if (activeSort === "remaining") {
+      activeSortDir = activeSortDir === "asc" ? "desc" : "asc";
+    } else {
+      activeSort = "remaining";
+      activeSortDir = "desc";
+    }
+    if (sortSelect) sortSelect.value = "remaining";
+    if (sortDirSelect) sortDirSelect.value = activeSortDir;
     renderRegistry();
   });
 
@@ -340,14 +396,21 @@ async function init() {
   document.querySelectorAll(".sakra-filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".sakra-filter-btn").forEach(b => {
-        b.className = "sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white";
+        b.className = "sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all";
       });
-      btn.className = "sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider bg-blue-50 text-blue-600 border-blue-200 cursor-pointer";
+      btn.className = "sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider bg-blue-600/25 text-blue-400 border-blue-500/40 cursor-pointer transition-all hover:bg-blue-600/30";
       
       activeFilter = btn.getAttribute("data-filter");
       currentPage = 1;
       renderRegistry();
     });
+  });
+
+  // Rows per page selector event listener
+  rowsPerPageSelect?.addEventListener("change", () => {
+    pageSize = parseInt(rowsPerPageSelect.value) || 10;
+    currentPage = 1;
+    renderRegistry();
   });
 
   retryLoadBtn?.addEventListener("click", () => {
@@ -399,6 +462,43 @@ async function loadCustomers() {
 }
 
 
+function generateInitials(name) {
+  if (!name) return "SF";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0].substring(0, 2).toUpperCase();
+}
+
+function getInitialsGradient(name) {
+  const gradients = [
+    "from-blue-600/75 to-cyan-500/75",
+    "from-purple-600/75 to-pink-500/75",
+    "from-emerald-600/75 to-teal-500/75",
+    "from-amber-600/75 to-orange-500/75",
+    "from-indigo-600/75 to-violet-500/75",
+    "from-rose-600/75 to-orange-500/75"
+  ];
+  let hash = 0;
+  if (name) {
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+  }
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+}
+
+function formatPhone(phone) {
+  if (!phone) return "—";
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 12 && cleaned.startsWith("91")) {
+    return `+91 ${cleaned.slice(2, 7)} ${cleaned.slice(7)}`;
+  }
+  return phone;
+}
+
 function getFilteredAndSorted() {
   let filtered = [...customerRegistry];
 
@@ -442,6 +542,15 @@ function getFilteredAndSorted() {
       }
       if (activeFilter === "low_risk") {
         return score >= 750;
+      }
+      if (activeFilter === "perfect") {
+        return c.pending_installments_count === 0;
+      }
+      if (activeFilter === "pending") {
+        return c.pending_installments_count > 0;
+      }
+      if (activeFilter === "today") {
+        return createdDate.toDateString() === today.toDateString();
       }
       return true;
     });
@@ -509,9 +618,28 @@ function renderRegistry() {
   const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
   if (currentPage > totalPages) currentPage = totalPages;
 
-  pageInfo.innerText = `Page ${currentPage} of ${totalPages} (${totalFiltered} total)`;
+  pageInfo.innerText = `Showing ${Math.min(totalFiltered, (currentPage - 1) * pageSize + 1)}–${Math.min(totalFiltered, currentPage * pageSize)} of ${totalFiltered} accounts`;
   prevBtn.disabled = currentPage <= 1;
   nextBtn.disabled = currentPage >= totalPages;
+
+  // Render numeric page buttons inside container
+  let pageButtonsHtml = "";
+  for (let i = 1; i <= totalPages; i++) {
+    const isActive = i === currentPage;
+    const btnClass = isActive 
+      ? "px-3 py-1.5 rounded text-[10px] font-bold bg-blue-600 text-white border-0 cursor-pointer shadow-md" 
+      : "px-3 py-1.5 rounded border border-white/5 hover:bg-white/5 text-[10px] font-bold text-text-secondary bg-slate-900/60 cursor-pointer transition-all";
+    pageButtonsHtml += `<button class="page-num-btn ${btnClass}" data-page="${i}">${i}</button>`;
+  }
+  if (pageNumbersContainer) {
+    pageNumbersContainer.innerHTML = pageButtonsHtml;
+    pageNumbersContainer.querySelectorAll(".page-num-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        currentPage = parseInt(btn.getAttribute("data-page"));
+        renderRegistry();
+      });
+    });
+  }
 
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const today = new Date();
@@ -523,20 +651,7 @@ function renderRegistry() {
     const remaining = activeLoan ? parseFloat(activeLoan.balance_summary.remaining_balance) : 0;
     const paid = activeLoan ? parseFloat(activeLoan.balance_summary.total_paid) : 0;
     const creditScore = c.aggregate?.credit_score || 700;
-    const interestRate = activeLoan ? activeLoan.interest_rate : 0;
-    const formula = activeLoan ? activeLoan.interest_formula : "—";
     
-    // Risk calculations
-    let riskLevel = "MEDIUM RISK";
-    let riskClass = "text-amber-600";
-    if (creditScore >= 750) {
-      riskLevel = "LOW RISK";
-      riskClass = "text-emerald-600";
-    } else if (creditScore < 650) {
-      riskLevel = "HIGH RISK";
-      riskClass = "text-rose-600";
-    }
-
     // Days Overdue or Remaining
     let timelineText = "No active timeline";
     let daysOverdue = 0;
@@ -556,70 +671,91 @@ function renderRegistry() {
 
     // Dynamic Status Badge
     let statusText = "ACTIVE";
-    let badgeClass = "bg-blue-50 text-blue-700 border-blue-100";
+    let badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
     if (activeLoan) {
       statusText = activeLoan.status;
       if (statusText === "PAID" || remaining <= 0) {
         statusText = "PAID";
-        badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-100";
+        badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald shadow-sm select-none";
       } else if (statusText === "OVERDUE" || daysOverdue > 0) {
         statusText = "OVERDUE";
-        badgeClass = "bg-rose-50 text-rose-700 border-rose-100";
+        badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20 status-pill-rose shadow-sm select-none animate-pulse";
       } else if (statusText === "PENDING") {
-        badgeClass = "bg-amber-50 text-amber-700 border-amber-100";
+        badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20 status-pill-amber shadow-sm select-none";
       }
     }
 
     const pendingCount = c.pending_installments_count || 0;
-    let pendingBadgeClass = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-    let pendingDot = "🟢";
-    let pendingLabel = "Perfect 0";
-    if (pendingCount >= 15) {
-      pendingBadgeClass = "bg-rose-500/20 text-rose-600 border-rose-500/30 animate-pulse";
-      pendingDot = "🔴";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 8) {
-      pendingBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/25";
-      pendingDot = "🔴";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 4) {
-      pendingBadgeClass = "bg-orange-500/10 text-orange-600 border-orange-500/25";
-      pendingDot = "🟠";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 1) {
-      pendingBadgeClass = "bg-amber-500/10 text-amber-600 border-amber-500/25";
-      pendingDot = "🟡";
-      pendingLabel = `${pendingCount}`;
+    let pendingBadge = "";
+    if (pendingCount > 0) {
+      pendingBadge = `
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 shadow-[0_0_8px_rgba(239,68,68,0.05)] cursor-pointer select-none pending-trigger-badge hover:scale-105 active:scale-95 transition-all" data-id="${c.id}">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <span>${pendingCount} Behind</span>
+        </span>
+      `;
+    } else {
+      pendingBadge = `
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_8px_rgba(16,185,129,0.05)] select-none">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Perfect</span>
+        </span>
+      `;
     }
 
-    const pendingBadge = `
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer select-none transition-all hover:scale-105 active:scale-95 pending-trigger-badge ${pendingBadgeClass}" 
-            data-id="${c.id}">
-        <span>${pendingDot}</span>
-        <span class="${pendingCount >= 15 ? 'animate-pulse font-extrabold text-rose-600' : ''}">${pendingLabel}</span>
-      </span>
-    `;
-
     const statusBadge = `
-      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">
         ${statusText}
       </span>
     `;
 
+    const isSelected = c.id.toString() === selectedCustomerId?.toString();
+    const rowSelectionClass = isSelected ? "selected-active-row" : "";
+
     return `
-      <tr class="cursor-pointer hover:bg-slate-50" data-id="${c.id}">
-        <td class="text-center">
-          <img data-secure-src="/customers/${c.id}/photo" class="w-8 h-8 rounded-full border border-border-default/45 shadow-sm object-cover mx-auto select-none" />
+      <tr class="registry-row-card ${rowSelectionClass}" data-id="${c.id}">
+        <td class="py-4 px-6 text-left">
+          <div class="flex items-center gap-3">
+            <div class="relative shrink-0 w-[38px] h-[38px]">
+              <div id="avatar-fallback-${c.id}" class="initials-avatar bg-gradient-to-br ${getInitialsGradient(c.name)}">
+                ${generateInitials(c.name)}
+              </div>
+              <img id="avatar-img-${c.id}" data-secure-src="/customers/${c.id}/photo" class="absolute inset-0 w-[38px] h-[38px] rounded-full border border-white/10 shadow-md object-cover select-none hidden" />
+            </div>
+            <div class="flex flex-col min-w-0 select-none">
+              <span class="text-sm font-bold text-text-primary truncated-name-cell font-sans hover-tooltip-trigger" data-tooltip-text="${c.name}">
+                ${c.name}
+              </span>
+              <div class="flex items-center gap-2 mt-0.5 text-[11px] text-text-muted font-medium font-mono">
+                <span class="text-blue-400 font-bold uppercase tracking-wider">ID #${c.id}</span>
+                <span class="text-text-muted/40">•</span>
+                <span>${c.aadhar_masked || "—"}</span>
+              </div>
+            </div>
+          </div>
         </td>
-        <td class="font-mono text-xs text-text-muted">#${c.id}</td>
-        <td class="font-semibold text-text-primary text-xs">${c.name}</td>
-        <td class="font-mono text-xs text-text-secondary">${c.phone_number}</td>
-        <td class="text-right font-mono text-xs font-semibold text-text-secondary">${formatCurrency(principal)}</td>
-        <td class="text-right font-mono text-xs font-bold text-text-primary">${formatCurrency(remaining)}</td>
-        <td class="text-center">
+        <td class="py-4 px-6 text-left">
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950/40 border border-white/5 font-mono text-xs text-text-secondary select-none">
+            <i data-lucide="phone" class="w-3.5 h-3.5 text-text-muted"></i>
+            <span>${formatPhone(c.phone_number)}</span>
+          </div>
+        </td>
+        <td class="py-4 px-6 text-right">
+          <div class="flex flex-col text-right select-none font-mono">
+            <span class="text-sm font-bold text-text-secondary">${formatCurrency(principal)}</span>
+            <span class="text-[9px] uppercase tracking-wider text-text-muted font-semibold mt-0.5">Principal</span>
+          </div>
+        </td>
+        <td class="py-4 px-6 text-right">
+          <div class="flex flex-col text-right select-none font-mono">
+            <span class="text-sm font-extrabold text-text-primary">${formatCurrency(remaining)}</span>
+            <span class="text-[9px] uppercase tracking-wider text-text-muted font-semibold mt-0.5">Remaining</span>
+          </div>
+        </td>
+        <td class="py-4 px-6 text-center">
           ${pendingBadge}
         </td>
-        <td class="text-center">
+        <td class="py-4 px-6 text-center">
           ${statusBadge}
         </td>
       </tr>
@@ -637,78 +773,77 @@ function renderRegistry() {
     
     // Risk Level
     let riskLevel = "MEDIUM RISK";
-    let riskClass = "text-amber-600";
+    let riskClass = "text-amber-500";
     if (creditScore >= 750) {
       riskLevel = "LOW RISK";
-      riskClass = "text-emerald-600";
+      riskClass = "text-emerald-500";
     } else if (creditScore < 650) {
       riskLevel = "HIGH RISK";
-      riskClass = "text-rose-600";
+      riskClass = "text-rose-500";
     }
 
     // Status
     let statusText = "ACTIVE";
-    let badgeClass = "bg-blue-50 text-blue-700 border-blue-100";
+    let badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
     if (activeLoan) {
       statusText = activeLoan.status;
       if (statusText === "PAID" || remaining <= 0) {
         statusText = "PAID";
-        badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-100";
+        badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald shadow-sm select-none";
       } else if (statusText === "OVERDUE") {
-        badgeClass = "bg-rose-50 text-rose-700 border-rose-100";
+        badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20 status-pill-rose shadow-sm select-none animate-pulse";
       }
     }
 
     const statusBadge = `
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold border ${badgeClass}">
+      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${badgeClass}">
         ${statusText}
       </span>
     `;
 
     const pendingCount = c.pending_installments_count || 0;
-    let pendingBadgeClass = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-    let pendingDot = "🟢";
-    let pendingLabel = "Perfect 0";
-    if (pendingCount >= 15) {
-      pendingBadgeClass = "bg-rose-500/20 text-rose-600 border-rose-500/30 animate-pulse";
-      pendingDot = "🔴";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 8) {
-      pendingBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/25";
-      pendingDot = "🔴";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 4) {
-      pendingBadgeClass = "bg-orange-500/10 text-orange-600 border-orange-500/25";
-      pendingDot = "🟠";
-      pendingLabel = `${pendingCount}`;
-    } else if (pendingCount >= 1) {
-      pendingBadgeClass = "bg-amber-500/10 text-amber-600 border-amber-500/25";
-      pendingDot = "🟡";
-      pendingLabel = `${pendingCount}`;
+    let pendingBadge = "";
+    if (pendingCount > 0) {
+      pendingBadge = `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 pending-trigger-badge" data-id="${c.id}">
+          <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <span>${pendingCount} Behind</span>
+        </span>
+      `;
+    } else {
+      pendingBadge = `
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span>Perfect</span>
+        </span>
+      `;
     }
 
-    const pendingBadge = `
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer select-none pending-trigger-badge ${pendingBadgeClass}" 
-            data-id="${c.id}">
-        <span>${pendingDot}</span>
-        <span class="${pendingCount >= 15 ? 'animate-pulse font-extrabold text-rose-600' : ''}">${pendingLabel}</span>
-      </span>
-    `;
+    const isSelected = c.id.toString() === selectedCustomerId?.toString();
+    const cardSelectBorder = isSelected ? "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] scale-[1.01]" : "border-white/5";
 
     return `
-      <div class="glass-card p-5 border border-border-default/45 flex flex-col gap-4 cursor-pointer hover:border-primary/50 transition-all duration-150" data-id="${c.id}">
+      <div class="glass-card p-5 border ${cardSelectBorder} flex flex-col gap-4 cursor-pointer hover:border-blue-500/40 transition-all duration-200" data-id="${c.id}">
         <div class="flex items-center justify-between">
-          <div>
-            <span class="text-[9px] font-mono text-text-muted">UID: #${c.id}</span>
-            <h4 class="text-sm font-bold text-text-primary mt-0.5">${c.name}</h4>
-            <p class="text-[10px] text-text-muted font-mono mt-0.5">${c.phone_number}</p>
+          <div class="flex items-center gap-3">
+            <div class="relative shrink-0 w-[36px] h-[36px]">
+              <div id="avatar-fallback-mobile-${c.id}" class="initials-avatar w-[36px] h-[36px] text-xs bg-gradient-to-br ${getInitialsGradient(c.name)}">
+                ${generateInitials(c.name)}
+              </div>
+              <img id="avatar-img-mobile-${c.id}" data-secure-src="/customers/${c.id}/photo" class="absolute inset-0 w-[36px] h-[36px] rounded-full border border-white/10 shadow-md object-cover select-none hidden" />
+            </div>
+            <div>
+              <span class="text-[9px] font-mono text-text-muted">UID: #${c.id}</span>
+              <h4 class="text-xs font-bold text-text-primary font-sans">${c.name}</h4>
+              <p class="text-[10px] text-text-muted font-mono mt-0.5">${formatPhone(c.phone_number)}</p>
+            </div>
           </div>
           <div>
             ${statusBadge}
           </div>
         </div>
-        <div class="h-px bg-border-default/30"></div>
-        <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="h-px bg-white/5"></div>
+        <div class="grid grid-cols-2 gap-3 text-[11px] font-medium text-text-secondary">
           <div>
             <span class="text-[9px] uppercase tracking-wider text-text-muted block">Remaining</span>
             <span class="font-bold text-text-primary font-mono">${formatCurrency(remaining)}</span>
@@ -722,11 +857,7 @@ function renderRegistry() {
             <span class="font-bold font-mono ${riskClass}">${creditScore} (${riskLevel})</span>
           </div>
           <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Disbursed Due</span>
-            <span class="font-mono text-text-secondary">${activeLoan ? activeLoan.loan_end_date : "—"}</span>
-          </div>
-          <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Pending Installments</span>
+            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Pending</span>
             <span class="inline-block mt-0.5">${pendingBadge}</span>
           </div>
         </div>
@@ -741,8 +872,56 @@ function renderRegistry() {
   // Load secure photos for table row images
   tableBody.querySelectorAll("img[data-secure-src]").forEach(img => {
     const src = img.getAttribute("data-secure-src");
-    const fallback = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1' style='background:%23f1f5f9;'><path fill-rule='evenodd' d='M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z' clip-rule='evenodd' /></svg>`;
-    loadSecureImage(img, src, fallback);
+    const fallbackId = img.id.replace("avatar-img-", "avatar-fallback-");
+    customFetchBlob(src)
+      .then(blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        img.src = objectUrl;
+        img.classList.remove("hidden");
+      })
+      .catch(() => {
+        // Keep initials fallback visible on any failure
+      });
+  });
+
+  // Load secure photos for mobile card images
+  mobileCardsContainer.querySelectorAll("img[data-secure-src]").forEach(img => {
+    const src = img.getAttribute("data-secure-src");
+    const fallbackId = img.id.replace("avatar-img-mobile-", "avatar-fallback-mobile-");
+    customFetchBlob(src)
+      .then(blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        img.src = objectUrl;
+        img.classList.remove("hidden");
+      })
+      .catch(() => {
+        // Keep initials fallback visible
+      });
+  });
+
+  // Dynamic Tooltip Setup for truncated customer names
+  let nameTooltip = document.getElementById("registry-name-tooltip");
+  if (!nameTooltip) {
+    nameTooltip = document.createElement("div");
+    nameTooltip.id = "registry-name-tooltip";
+    nameTooltip.className = "premium-hover-tooltip";
+    document.body.appendChild(nameTooltip);
+  }
+
+  document.querySelectorAll(".hover-tooltip-trigger").forEach(trigger => {
+    trigger.addEventListener("mouseenter", () => {
+      const text = trigger.getAttribute("data-tooltip-text");
+      nameTooltip.innerText = text;
+      nameTooltip.classList.add("active");
+      
+      const rect = trigger.getBoundingClientRect();
+      nameTooltip.style.left = `${rect.left + window.scrollX + (rect.width / 2) - (nameTooltip.offsetWidth / 2)}px`;
+      nameTooltip.style.top = `${rect.top + window.scrollY - nameTooltip.offsetHeight - 8}px`;
+    });
+    
+    trigger.addEventListener("mouseleave", () => {
+      nameTooltip.classList.remove("active");
+    });
   });
 
   // Row selection setup (Desktop rows)
@@ -753,8 +932,8 @@ function renderRegistry() {
         return;
       }
       const id = row.getAttribute("data-id");
-      tableBody.querySelectorAll("tr").forEach(r => r.classList.remove("bg-blue-50/40", "border-l-4", "border-primary"));
-      row.classList.add("bg-blue-50/40", "border-l-4", "border-primary");
+      tableBody.querySelectorAll("tr").forEach(r => r.classList.remove("selected-active-row"));
+      row.classList.add("selected-active-row");
       selectCustomer(id);
     });
   });
@@ -767,8 +946,12 @@ function renderRegistry() {
         return;
       }
       const id = card.getAttribute("data-id");
-      mobileCardsContainer.querySelectorAll(".glass-card").forEach(c => c.classList.remove("border-primary"));
-      card.classList.add("border-primary");
+      mobileCardsContainer.querySelectorAll(".glass-card").forEach(c => {
+        c.classList.remove("border-blue-50", "shadow-[0_0_15px_rgba(59,130,246,0.3)]", "scale-[1.01]");
+        c.classList.add("border-white/5");
+      });
+      card.classList.remove("border-white/5");
+      card.classList.add("border-blue-50", "shadow-[0_0_15px_rgba(59,130,246,0.3)]", "scale-[1.01]");
       selectCustomer(id);
     });
   });

@@ -47,122 +47,174 @@
         <div id="customers-content" class="flex flex-col gap-6 w-full sa-reveal hidden p-4 md:p-8">
           
           <!-- Header -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-default">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border-default/45">
             <div>
               <h2 class="text-display text-2xl font-bold tracking-tight text-text-primary" data-i18n="customers_title">Customer Registry</h2>
-              <p id="total-accounts-text" class="text-xs text-text-secondary mt-1 font-semibold select-none">
-                0 accounts registered in ledger
-              </p>
+              <div class="flex items-center gap-2 mt-1 select-none">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p id="total-accounts-text" class="text-xs text-text-secondary font-semibold">
+                  0 accounts registered in ledger
+                </p>
+              </div>
             </div>
-            <button id="add-customer-btn" class="sakra-btn-tactile sakra-btn-primary h-11 px-5 text-xs select-none hidden font-sans">
+            <button id="add-customer-btn" class="sakra-btn-tactile sakra-btn-primary h-11 px-5 text-xs select-none hidden font-sans flex items-center gap-2">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="customers_register_btn">Add Customer</span>
             </button>
           </div>
 
-          <!-- Search Filter Bar (Tactile layout) -->
-          <div class="glass-card p-4 bg-white/50 flex flex-col gap-4">
-            <form id="search-form" class="flex flex-col md:flex-row gap-3">
+          <!-- Premium Search & Filter Bar Controls -->
+          <div class="glass-card p-5 bg-slate-950/20 backdrop-blur-md border border-white/5 flex flex-col gap-4">
+            <form id="search-form" class="flex flex-col lg:flex-row gap-4" onsubmit="event.preventDefault();">
               <div class="flex-1 relative font-sans">
                 <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-text-muted">
-                  <i data-lucide="search" class="w-4 h-4"></i>
+                  <i data-lucide="search" class="w-4 h-4 transition-colors"></i>
                 </div>
                 <input
                   id="search-input"
                   type="text"
                   data-i18n-placeholder="customers_search_placeholder"
-                  placeholder="Search by customer name, phone, Aadhaar, IDs..."
-                  class="sakra-input-tactile pl-10 text-xs"
+                  placeholder="Search by Name, Phone, Aadhaar, Customer ID..."
+                  class="sakra-input-tactile pl-10 pr-10 text-xs w-full bg-slate-950/40 border-white/5 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all placeholder:text-text-muted/60"
                 />
+                <button
+                  id="search-clear-btn"
+                  type="button"
+                  class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-text-muted hover:text-text-primary transition-colors cursor-pointer hidden"
+                >
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
               </div>
-              <div class="flex gap-3 shrink-0">
-                <select id="sort-select" class="sakra-input-tactile h-[44px] text-xs font-semibold uppercase tracking-wider px-3 w-40 font-sans">
-                  <option value="created_at">Created Date</option>
-                  <option value="name">Name</option>
-                  <option value="principal">Principal</option>
-                  <option value="remaining">Remaining</option>
-                  <option value="credit_score">Credit Score</option>
-                  <option value="due_date">Due Date</option>
-                  <option value="status">Status</option>
-                  <option value="pending_installments" data-i18n="pending_installments_col">Pending Installments</option>
-                </select>
-                <select id="sort-dir-select" class="sakra-input-tactile h-[44px] text-xs font-semibold uppercase tracking-wider px-3 w-32 font-sans">
-                  <option value="desc">Desc</option>
-                  <option value="asc">Asc</option>
+              <div class="flex flex-wrap sm:flex-nowrap gap-3 shrink-0">
+                <div class="flex items-center gap-2 bg-slate-950/40 rounded border border-white/5 px-3 h-[44px]">
+                  <span class="text-[9px] uppercase tracking-wider text-text-muted font-bold whitespace-nowrap">Sort By</span>
+                  <select id="sort-select" class="bg-transparent border-0 text-xs font-bold text-text-primary uppercase tracking-wide focus:outline-none cursor-pointer font-sans min-w-[120px]">
+                    <option value="created_at" class="bg-slate-900">Created Date</option>
+                    <option value="name" class="bg-slate-900">Name</option>
+                    <option value="principal" class="bg-slate-900">Principal</option>
+                    <option value="remaining" class="bg-slate-900">Remaining</option>
+                    <option value="credit_score" class="bg-slate-900">Credit Score</option>
+                    <option value="due_date" class="bg-slate-900">Due Date</option>
+                    <option value="status" class="bg-slate-900">Status</option>
+                    <option value="pending_installments" class="bg-slate-900" data-i18n="pending_installments_col">Pending Installments</option>
+                  </select>
+                </div>
+                <select id="sort-dir-select" class="sakra-input-tactile h-[44px] text-xs font-bold uppercase tracking-wider px-3 w-28 bg-slate-950/40 border-white/5 font-sans cursor-pointer">
+                  <option value="desc" class="bg-slate-900">Desc</option>
+                  <option value="asc" class="bg-slate-900">Asc</option>
                 </select>
               </div>
             </form>
 
-            <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-text-secondary select-none font-sans">
-              <span class="mr-2 uppercase text-[9px] tracking-wider text-text-muted">Filter Status:</span>
-              <button data-filter="all" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider bg-blue-50 text-blue-600 border-blue-200 cursor-pointer">All</button>
-              <button data-filter="active" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white">Active</button>
-              <button data-filter="completed" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white">Completed</button>
-              <button data-filter="overdue" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white">Overdue</button>
-              <button data-filter="high_risk" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white">High Risk</button>
-              <button data-filter="low_risk" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-border-default hover:bg-slate-50 text-text-secondary cursor-pointer bg-white">Low Risk</button>
+            <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-text-secondary select-none font-sans border-t border-white/5 pt-3">
+              <span class="mr-2 uppercase text-[9px] tracking-wider text-text-muted flex items-center gap-1"><i data-lucide="filter" class="w-3.5 h-3.5"></i> Quick Filters:</span>
+              <button data-filter="all" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider bg-blue-600/25 text-blue-400 border-blue-500/40 cursor-pointer transition-all hover:bg-blue-600/30">All</button>
+              <button data-filter="active" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Active</button>
+              <button data-filter="completed" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Completed</button>
+              <button data-filter="overdue" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Overdue</button>
+              <button data-filter="high_risk" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">High Risk</button>
+              <button data-filter="low_risk" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Low Risk</button>
+              <button data-filter="perfect" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Perfect</button>
+              <button data-filter="pending" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Pending</button>
+              <button data-filter="today" class="sakra-filter-btn px-3 py-1.5 rounded border text-[9px] uppercase tracking-wider border-white/5 hover:bg-white/5 text-text-secondary cursor-pointer bg-slate-950/40 transition-all">Today</button>
             </div>
           </div>
 
           <!-- Table Spinner -->
-          <div id="table-loading-spinner" class="flex items-center justify-center py-20 bg-white/60 border border-border-default rounded-md hidden">
+          <div id="table-loading-spinner" class="flex items-center justify-center py-20 bg-slate-950/20 border border-white/5 rounded-xl hidden">
             <i data-lucide="loader-2" class="w-8 h-8 animate-spin text-primary"></i>
           </div>
 
           <!-- Error State -->
-          <div id="error-state" class="glass-card text-center py-16 flex flex-col items-center justify-center hidden bg-white/60 border-rose-100 font-sans">
+          <div id="error-state" class="glass-card text-center py-16 flex flex-col items-center justify-center hidden bg-slate-950/20 border-rose-500/20 font-sans">
             <i data-lucide="alert-octagon" class="w-12 h-12 text-rose-500 mb-3 animate-bounce"></i>
             <h4 class="text-sm font-bold text-text-primary uppercase tracking-wider" data-i18n="error">Error Loading Data</h4>
             <p id="error-message" class="text-xs text-text-muted mt-1 max-w-sm"></p>
             <button id="retry-load-btn" class="sakra-btn-tactile bg-slate-900 border border-white/5 text-white px-4 py-2 mt-4 text-xs font-bold uppercase" data-i18n="retry">Retry</button>
           </div>
 
-          <!-- Table Container -->
-          <div id="table-container" class="card-enterprise rounded-xl overflow-hidden hidden md:block">
+          <!-- Redesigned Premium Data Grid Container -->
+          <div id="table-container" class="glass-card bg-slate-950/10 border border-white/5 rounded-xl overflow-hidden hidden md:block">
             <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
+              <table class="w-full text-left border-collapse min-w-[850px] relative">
                 <thead>
-                  <tr class="border-b border-border-default text-[9px] font-bold uppercase tracking-widest text-text-muted bg-slate-950/20">
-                    <th class="py-3 px-6 text-center" style="width: 60px;">Photo</th>
-                    <th class="py-3 px-6" style="width: 80px;">UID</th>
-                    <th class="py-3 px-6">Name</th>
-                    <th class="py-3 px-6">Phone Number</th>
-                    <th class="py-3 px-6 text-right">Principal</th>
-                    <th class="py-3 px-6 text-right">Remaining Balance</th>
-                    <th class="py-3 px-6 text-center cursor-pointer select-none group" id="sort-pending" style="width: 170px;">
-                      <div class="flex items-center justify-center gap-1">
-                        <span data-i18n="pending_installments_col">Pending Installments</span>
-                        <i data-lucide="chevrons-up-down" class="w-3 h-3 text-text-muted group-hover:text-primary transition-colors" id="sort-pending-icon"></i>
+                  <tr class="border-b border-white/5 text-[10px] font-bold uppercase tracking-widest text-text-muted bg-slate-950/45 sticky top-0 backdrop-blur-lg z-20 select-none">
+                    <th class="py-4 px-6 text-left cursor-pointer group transition-colors hover:text-text-primary" id="sort-customer" style="width: 280px;">
+                      <div class="flex items-center gap-1.5">
+                        <span>Customer Info</span>
+                        <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-text-muted/60 group-hover:text-primary transition-colors"></i>
                       </div>
                     </th>
-                    <th class="py-3 px-6 text-center">Status</th>
+                    <th class="py-4 px-6 text-left" style="width: 170px;">Phone Number</th>
+                    <th class="py-4 px-6 text-right cursor-pointer group transition-colors hover:text-text-primary" id="sort-principal-header">
+                      <div class="flex items-center justify-end gap-1.5">
+                        <span>Principal</span>
+                        <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-text-muted/60 group-hover:text-primary transition-colors"></i>
+                      </div>
+                    </th>
+                    <th class="py-4 px-6 text-right cursor-pointer group transition-colors hover:text-text-primary" id="sort-remaining-header">
+                      <div class="flex items-center justify-end gap-1.5">
+                        <span>Remaining</span>
+                        <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-text-muted/60 group-hover:text-primary transition-colors"></i>
+                      </div>
+                    </th>
+                    <th class="py-4 px-6 text-center cursor-pointer group transition-colors hover:text-text-primary" id="sort-pending" style="width: 190px;">
+                      <div class="flex items-center justify-center gap-1.5">
+                        <span data-i18n="pending_installments_col">Pending Installments</span>
+                        <i data-lucide="chevrons-up-down" class="w-3.5 h-3.5 text-text-muted/60 group-hover:text-primary transition-colors" id="sort-pending-icon"></i>
+                      </div>
+                    </th>
+                    <th class="py-4 px-6 text-center" style="width: 120px;">Status</th>
                   </tr>
                 </thead>
-                <tbody id="customers-table-body" class="text-xs divide-y divide-border-default text-text-secondary font-medium">
-                  <!-- Dynamic rows -->
+                <tbody id="customers-table-body" class="text-xs divide-y divide-white/5 text-text-secondary font-medium">
+                  <!-- Dynamic rows rendered with card styling -->
                 </tbody>
               </table>
             </div>
             
-            <!-- Pagination Footer -->
-            <div class="px-6 py-4 border-t border-border-default flex items-center justify-between bg-slate-950/10 text-xs">
-              <span id="page-info" class="text-text-muted font-semibold">Page 1 of 1 (0 total)</span>
-              <div class="flex items-center gap-2">
-                <button id="prev-page-btn" class="px-3 py-1.5 border border-border-default hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-50 disabled:pointer-events-none">Prev</button>
-                <button id="next-page-btn" class="px-3 py-1.5 border border-border-default hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-50 disabled:pointer-events-none">Next</button>
+            <!-- Redesigned Premium Pagination Footer -->
+            <div class="px-6 py-4 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between bg-slate-950/20 backdrop-blur-md gap-4 text-xs">
+              <span id="page-info" class="text-text-muted font-bold tracking-wide select-none">Showing 1–10 of 124 accounts</span>
+              
+              <div class="flex items-center gap-5">
+                <!-- Rows per page selector -->
+                <div class="flex items-center gap-2 select-none">
+                  <span class="text-[10px] uppercase font-bold text-text-muted/80">Rows per page</span>
+                  <select id="rows-per-page-select" class="bg-slate-900 border border-white/5 rounded text-xs font-bold text-text-primary px-2.5 py-1 focus:outline-none focus:border-blue-500/50 cursor-pointer">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+                
+                <!-- Navigation buttons -->
+                <div class="flex items-center gap-1.5">
+                  <button id="prev-page-btn" class="px-3.5 py-2 border border-white/5 hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1">
+                    <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i> Prev
+                  </button>
+                  <div id="page-numbers-container" class="flex items-center gap-1">
+                    <!-- Page buttons injected dynamically -->
+                  </div>
+                  <button id="next-page-btn" class="px-3.5 py-2 border border-white/5 hover:bg-white/5 rounded text-[10px] font-bold uppercase tracking-wider text-text-secondary bg-transparent cursor-pointer disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1">
+                    Next <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Mobile Cards Container -->
+          <!-- Redesigned Stacked Mobile Cards Container -->
           <div id="customers-cards-mobile" class="md:hidden flex flex-col gap-4">
-            <!-- Dynamic mobile cards -->
+            <!-- Dynamic premium mobile cards -->
           </div>
 
           <!-- Empty State -->
-          <div id="empty-state" class="glass-card py-20 text-center flex flex-col items-center justify-center hidden bg-white/60 font-sans">
-            <i data-lucide="users" class="w-12 h-12 text-slate-300 mb-4"></i>
+          <div id="empty-state" class="glass-card py-20 text-center flex flex-col items-center justify-center hidden bg-slate-950/20 border-white/5 font-sans">
+            <i data-lucide="users" class="w-12 h-12 text-slate-500 mb-4 animate-pulse"></i>
             <h4 class="text-sm font-bold text-text-primary uppercase tracking-wider" data-i18n="customers_no_records">No accounts found</h4>
-            <button id="empty-state-add-btn" class="sakra-btn-tactile sakra-btn-primary h-10 px-4 text-xs font-bold uppercase tracking-wider mt-4" data-i18n="customers_register_btn">Add Customer</button>
+            <p class="text-xs text-text-muted mt-1 select-none">Refine your search keywords or clear current filters.</p>
+            <button id="empty-state-add-btn" class="sakra-btn-tactile sakra-btn-primary h-10 px-4 text-xs font-bold uppercase tracking-wider mt-5" data-i18n="customers_register_btn">Add Customer</button>
           </div>
 
           <!-- CUSTOMER ANALYTICS VISUALIZATION PANEL -->
