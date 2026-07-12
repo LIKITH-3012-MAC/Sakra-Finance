@@ -1914,6 +1914,11 @@ span[class*="bg-orange-50"] {
   }
 }
 
+#mobile-bottom-nav a span {
+  font-size: 7.5px !important;
+  letter-spacing: 0.02em !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    BREAKPOINT: MOBILE (≤ 480px) — Touch-first banking app
    ═══════════════════════════════════════════════════════════════ */
