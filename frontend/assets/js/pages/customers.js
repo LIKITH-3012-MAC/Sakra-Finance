@@ -1220,6 +1220,11 @@ async function selectCustomer(id) {
   const { customer, loans = [], aggregate_payments = [], credit_score, summary = {} } = data;
   const activeLoan = loans.find(l => l.status === "ACTIVE" || l.status === "OVERDUE") || loans[0];
 
+  const profileBtn = document.getElementById("view-profile-btn");
+  if (profileBtn) {
+    profileBtn.href = `/customer-profile.html?id=${customer.id}`;
+  }
+
   document.getElementById("detail-profile-photo").src = `/api/v1/customers/${customer.id}/photo?t=${new Date().getTime()}`;
   document.getElementById("detail-profile-name").innerText = customer.name;
   document.getElementById("detail-profile-phone").innerText = customer.phone_number;
@@ -1299,6 +1304,110 @@ async function selectCustomer(id) {
   renderOutstandingTrend(loans, sortedPayments, repayable);
   renderPaymentConsistency(activeLoan, sortedPayments);
   renderCumulativeCollection(sortedPayments);
+
+  // 8. Collection Intelligence Dashboard
+  const activeLoans = loans.filter(l => l.status === "ACTIVE" || l.status === "OVERDUE");
+  const dashboardEl = document.getElementById("collection-intelligence-dashboard");
+  if (activeLoans.length > 0) {
+    dashboardEl.classList.remove("hidden");
+    dashboardEl.innerHTML = activeLoans.map(loan => {
+      // 1. Calendar Progress
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startDate = new Date(loan.loan_start_date);
+      startDate.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - startDate.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      const daysPassed = Math.min(diffDays, loan.duration_days);
+
+      // 2. Expected Collection Till Today
+      const dailyInstallment = parseFloat(loan.daily_installment || 0);
+      const expectedCollection = daysPassed * dailyInstallment;
+
+      // 3. Actual Collection
+      const totalPaid = parseFloat(loan.balance_summary?.total_paid || 0);
+
+      // 4. Equivalent Paid Days (total_paid / daily_installment)
+      const equivalentPaidDays = dailyInstallment > 0 ? (totalPaid / dailyInstallment) : 0;
+
+      // 5. Compare Them (behind_days = days_passed - equivalent_paid_days)
+      const behindDays = daysPassed - equivalentPaidDays;
+      let progressText = "";
+      let progressClass = "";
+      if (behindDays > 0) {
+        progressText = `🔴 ${behindDays.toFixed(2)} Days Behind`;
+        progressClass = "text-rose-400 font-bold";
+      } else if (behindDays < 0) {
+        progressText = `🟢 ${Math.abs(behindDays).toFixed(2)} Days Ahead`;
+        progressClass = "text-emerald-400 font-bold";
+      } else {
+        progressText = `🟢 On Schedule`;
+        progressClass = "text-emerald-400 font-bold";
+      }
+
+      // 6. Pending Collection Till Today (expected - total_paid, min 0)
+      const pendingToday = Math.max(0, expectedCollection - totalPaid);
+
+      // 7. Remaining Balance
+      const remainingBalance = parseFloat(loan.remaining_balance || 0);
+
+      return `
+        <div class="glass-card p-6 bg-slate-950/40 border border-white/5 shadow-deep rounded-xl flex flex-col gap-5 text-slate-200">
+          <div class="flex items-center justify-between border-b border-white/5 pb-3 select-none">
+            <div class="flex items-center gap-2">
+              <i data-lucide="activity" class="w-5 h-5 text-blue-400 animate-pulse animate-duration-1000"></i>
+              <span class="text-xs font-bold text-white uppercase tracking-widest">Collection Intelligence — Loan #${loan.id}</span>
+            </div>
+            <span class="px-2.5 py-0.5 text-[9px] font-bold rounded border uppercase bg-blue-950/50 text-blue-400 border-blue-500/20 font-mono">
+              Daily Installment: ${formatCurrency(dailyInstallment)}
+            </span>
+          </div>
+          
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Loan Duration</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="duration" data-val="${loan.duration_days}">0 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Days Passed</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="days-passed" data-val="${daysPassed}">0 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Expected Collection Till Today</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="expected" data-val="${expectedCollection}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Actual Collection</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-success" data-animate="actual" data-val="${totalPaid}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Equivalent Installments Covered</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-blue-400" data-animate="equivalent" data-val="${equivalentPaidDays}">0.00 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Collection Progress</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number ${progressClass}">${progressText}</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Pending Collection Till Today</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-400" data-animate="pending" data-val="${pendingToday}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Remaining Loan Balance</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-500" data-animate="balance" data-val="${remainingBalance}">₹0.00</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+    
+    setTimeout(animateKPIs, 50);
+  } else {
+    dashboardEl.classList.add("hidden");
+    dashboardEl.innerHTML = "";
+  }
 
   // Update Icons inside summary
   if (window.lucide) {
@@ -1616,3 +1725,49 @@ window.refreshPageData = async () => {
     await selectCustomer(activeId);
   }
 };
+
+function animateKPIs() {
+  const elements = document.querySelectorAll("[data-animate]");
+  elements.forEach(el => {
+    const targetVal = parseFloat(el.getAttribute("data-val") || 0);
+    const type = el.getAttribute("data-animate");
+    
+    // Store the previous value in a custom attribute to avoid restarting from 0 if refreshed
+    const prevVal = parseFloat(el.getAttribute("data-prev") || 0);
+    el.setAttribute("data-prev", targetVal);
+    
+    if (prevVal === targetVal) {
+      if (type === "duration" || type === "days-passed") {
+        el.innerText = `${Math.round(targetVal)} Days`;
+      } else if (type === "equivalent") {
+        el.innerText = `${targetVal.toFixed(2)} Days`;
+      } else {
+        el.innerText = formatCurrency(targetVal);
+      }
+      return;
+    }
+    
+    let duration = 600; // ms
+    let startTimestamp = null;
+    
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const current = prevVal + progress * (targetVal - prevVal);
+      
+      if (type === "duration" || type === "days-passed") {
+        el.innerText = `${Math.round(current)} Days`;
+      } else if (type === "equivalent") {
+        el.innerText = `${current.toFixed(2)} Days`;
+      } else {
+        el.innerText = formatCurrency(current);
+      }
+      
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    window.requestAnimationFrame(step);
+  });
+}
+
