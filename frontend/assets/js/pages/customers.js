@@ -1334,17 +1334,25 @@ async function selectCustomer(id) {
 
       // 5. Compare Them (behind_days = days_passed - equivalent_paid_days)
       const behindDays = daysPassed - equivalentPaidDays;
-      let progressText = "";
-      let progressClass = "";
+      let progressTextOnly = "";
+      let progressBadgeClass = "";
+      let progressDotClass = "";
+      let progressAnimateClass = "";
       if (behindDays > 0) {
-        progressText = `🔴 ${behindDays.toFixed(2)} Days Behind`;
-        progressClass = "text-rose-400 font-bold";
+        progressTextOnly = `${behindDays.toFixed(2)} Days Behind`;
+        progressBadgeClass = "bg-rose-500/15 text-rose-400 border border-rose-500/30";
+        progressDotClass = "bg-rose-500";
+        progressAnimateClass = "animate-pulse";
       } else if (behindDays < 0) {
-        progressText = `🟢 ${Math.abs(behindDays).toFixed(2)} Days Ahead`;
-        progressClass = "text-emerald-400 font-bold";
+        progressTextOnly = `${Math.abs(behindDays).toFixed(2)} Days Ahead`;
+        progressBadgeClass = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+        progressDotClass = "bg-emerald-500";
+        progressAnimateClass = "";
       } else {
-        progressText = `🟢 On Schedule`;
-        progressClass = "text-emerald-400 font-bold";
+        progressTextOnly = "On Schedule";
+        progressBadgeClass = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
+        progressDotClass = "bg-emerald-500";
+        progressAnimateClass = "";
       }
 
       // 6. Pending Collection Till Today (expected - total_paid, min 0)
@@ -1358,7 +1366,7 @@ async function selectCustomer(id) {
           <div class="flex items-center justify-between border-b border-white/5 pb-3 select-none">
             <div class="flex items-center gap-2">
               <i data-lucide="activity" class="w-5 h-5 text-blue-400 animate-pulse animate-duration-1000"></i>
-              <span class="text-xs font-bold text-white uppercase tracking-widest">Collection Intelligence — Loan #${loan.id}</span>
+              <span class="text-xs font-bold text-white uppercase tracking-widest font-sans">Collection Intelligence — Loan #${loan.id}</span>
             </div>
             <span class="px-2.5 py-0.5 text-[9px] font-bold rounded border uppercase bg-blue-950/50 text-blue-400 border-blue-500/20 font-mono">
               Daily Installment: ${formatCurrency(dailyInstallment)}
@@ -1368,35 +1376,40 @@ async function selectCustomer(id) {
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Loan Duration</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="duration" data-val="${loan.duration_days}">0 Days</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-white" data-animate="duration" data-val="${loan.duration_days}">0 Days</p>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Days Passed</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="days-passed" data-val="${daysPassed}">0 Days</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-white" data-animate="days-passed" data-val="${daysPassed}">0 Days</p>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Expected Collection Till Today</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="expected" data-val="${expectedCollection}">₹0.00</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-white" data-animate="expected" data-val="${expectedCollection}">₹0.00</p>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Actual Collection</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-success" data-animate="actual" data-val="${totalPaid}">₹0.00</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-success" data-animate="actual" data-val="${totalPaid}">₹0.00</p>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Equivalent Installments Covered</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-blue-400" data-animate="equivalent" data-val="${equivalentPaidDays}">0.00 Days</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-blue-400" data-animate="equivalent" data-val="${equivalentPaidDays}">0.00 Days</p>
             </div>
-            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1 flex flex-col justify-between">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Collection Progress</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number ${progressClass}">${progressText}</p>
+              <div class="mt-2.5 flex justify-center items-center">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider ${progressBadgeClass}">
+                  <span class="w-1.5 h-1.5 rounded-full ${progressDotClass} ${progressAnimateClass}"></span>
+                  <span>${progressTextOnly}</span>
+                </span>
+              </div>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Pending Collection Till Today</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-400" data-animate="pending" data-val="${pendingToday}">₹0.00</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-rose-400" data-animate="pending" data-val="${pendingToday}">₹0.00</p>
             </div>
             <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
               <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Remaining Loan Balance</p>
-              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-500" data-animate="balance" data-val="${remainingBalance}">₹0.00</p>
+              <p class="text-lg md:text-xl font-bold mt-2 font-sans text-rose-500" data-animate="balance" data-val="${remainingBalance}">₹0.00</p>
             </div>
           </div>
         </div>
