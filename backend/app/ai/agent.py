@@ -60,7 +60,7 @@ class SakraCopilotAgent:
         - UNKNOWN (general conversation)
 
         Extract entities if present (do not guess, output null if not specified):
-        - customer_name (e.g. Likith Naidu, Priya, or Telugu equivalent name strings)
+        - customer_name (Extract the name of the customer. If the name is in English, include both English name and its Telugu script translation/transliteration separated by '|', e.g. "Karimulla|కరీముల్లా". If the name is in Telugu, include both Telugu and its English transliteration, e.g. "కరీముల్లా|Karimulla")
         - customer_id (integer ID)
         - phone_number (phone number digit string)
         - aadhaar (12-digit Aadhaar number string)
@@ -93,14 +93,106 @@ class SakraCopilotAgent:
                 max_tokens=250
             )
             raw_text = res.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-            if raw_text.startswith("```json"):
-                raw_text = raw_text[7:-3].strip()
-            elif raw_text.startswith("```"):
-                raw_text = raw_text[3:-3].strip()
+            import re
+            json_match = re.search(r"\{.*\}", raw_text, re.DOTALL)
+            if json_match:
+                raw_text = json_match.group(0)
             return json.loads(raw_text)
         except Exception as e:
             logger.error("Intent extraction failed: %s", str(e))
             return {"intent": "UNKNOWN", "entities": {}}
+
+    def _extract_entities_locally(self, query: str) -> Dict[str, Any]:
+        """Heuristic/Regex-based entity extraction as a fallback or complement to Groq classification."""
+        entities = {
+            "customer_name": None,
+            "customer_id": None,
+            "phone_number": None,
+            "aadhaar": None,
+            "loan_id": None,
+            "payment_id": None,
+            "address": None,
+            "amount": None,
+            "date": None
+        }
+        
+        query_clean = query.strip()
+        query_lower = query_clean.lower()
+        
+        # Check if this is a general/chat or math query
+        import re
+        is_general = False
+        if query_lower in ["hi", "hello", "hey", "good morning", "good afternoon", "yo", "confirm", "yes", "no"]:
+            is_general = True
+        elif re.match(r"^[0-9\s\+\-\*\/\(\)\.\=\×\:\%x]+$", query_clean):
+            is_general = True
+        else:
+            general_phrases = ["tell me", "what is", "how to", "why did", "help me", "who are you", "what are you", "who is the prime minister", "capital of"]
+            if any(phrase in query_lower for phrase in general_phrases):
+                is_general = True
+
+        # 1. Look for 10-digit phone number
+        phone_match = re.search(r"\b\d{10}\b", query_clean)
+        if phone_match:
+            entities["phone_number"] = phone_match.group(0)
+            
+        # 2. Look for 12-digit Aadhaar number
+        aadhaar_match = re.search(r"\b\d{12}\b", query_clean)
+        if aadhaar_match:
+            entities["aadhaar"] = aadhaar_match.group(0)
+            
+        # 3. Look for loan ID e.g. LN-00015, Loan 15, LN-15, loan #15
+        loan_match = re.search(r"\b(?:loan|ln)\s*#?\s*:?\s*0*(\d+)\b", query_lower)
+        if loan_match:
+            entities["loan_id"] = int(loan_match.group(1))
+            
+        # 4. Look for customer ID e.g. customer 2, id 2, customer #2, Customer ID 2, id:2, id2
+        # Avoid matching phone number or Aadhaar as ID by checking digit length
+        cust_match = re.search(r"\b(?:customer|cust|id)\s*#?\s*:?\s*(\d+)\b", query_lower)
+        if cust_match:
+            val = int(cust_match.group(1))
+            if len(str(val)) < 8:
+                entities["customer_id"] = val
+        else:
+            cust_match_no_space = re.search(r"\b(?:customer|cust|id)(\d+)\b", query_lower)
+            if cust_match_no_space:
+                val = int(cust_match_no_space.group(1))
+                if len(str(val)) < 8:
+                    entities["customer_id"] = val
+                    
+        # 5. Look for payment ID
+        pay_match = re.search(r"\bpayment\s*#?\s*:?\s*(\d+)\b", query_lower)
+        if pay_match:
+            entities["payment_id"] = int(pay_match.group(1))
+            
+        # 6. Look for payment recording amount (e.g. record payment of 500)
+        amount_match = re.search(r"\b(?:amount|payment\s+of|pay|₹|rs\.?)\s*(\d+(?:\.\d{1,2})?)\b", query_lower)
+        if amount_match:
+            try:
+                entities["amount"] = float(amount_match.group(1))
+            except ValueError:
+                pass
+                
+        # 7. Name heuristic: if the query is short and doesn't contain numeric IDs/phones/Aadhaar/loans,
+        # it might just be a name search (e.g. "Likith", "Likith Naidu", "Yalamanda")
+        if not is_general and not entities["customer_id"] and not entities["phone_number"] and not entities["aadhaar"] and not entities["loan_id"]:
+            # Strip common question/command words
+            stop_words = {
+                "show", "get", "view", "details", "find", "search", "loan", "customer", "payment", "payments",
+                "history", "status", "profile", "repayment", "repayments", "outstanding", "balance", "repay", 
+                "record", "confirm", "yes", "no", "ok", "please", "u", "i", "to", "for", "the", "a", "an",
+                "details", "ivvu", "entha", "kattali", "chupinchu", "lo", "emi", "missed", "overdue",
+                "who", "which", "what", "where", "how", "much", "many", "highest", "remaining", "installments",
+                "today", "yesterday", "repayment", "kattadu", "kattaru", "dabbu", "evaru", "evari", "eroju",
+                "ninna", "vivaralu", "kattadu?", "చూపించు", "చూపించుము", "ఇవ్వు", "ఇవ్వండి", "వివరాలు",
+                "వివరం", "కట్టారు", "కట్టాడు", "కట్టాలి", "డబ్బు", "ఎంత", "ఎవరు", "ఎవరి", "ఈరోజు", "నిన్న",
+                "రేపు", "మిస్", "అయింది", "అయ్యారు", "ఉంది"
+            }
+            words = [w for w in query_clean.split() if w.lower().strip("?,.!:;#") not in stop_words]
+            if 0 < len(words) <= 3:
+                entities["customer_name"] = " ".join(words)
+
+        return entities
 
     async def execute(
         self,
@@ -111,234 +203,391 @@ class SakraCopilotAgent:
     ) -> str:
         """Central execution pipeline for SAKRA AI COPILOT."""
         start_time = time.time()
+        user_id = 1
+        intent = "UNKNOWN"
         
-        # 1. Input Security Scan
-        if not verify_query_safety(query):
-            return "❌ SECURITY WARNING: The query contains expressions flagged as potentially unsafe by the database protection shield."
+        try:
+            # 1. Input Security Scan
+            if not verify_query_safety(query):
+                logger.warning("Query blocked by safety shield: %s", query)
+                return "❌ SECURITY WARNING: The query contains expressions flagged as potentially unsafe by the database protection shield."
 
-        # Find current user ID for auditing
-        stmt = select(User).filter(User.role == user_role, User.is_deleted == False)
-        res = await db.execute(stmt)
-        user = res.scalars().first()
-        user_id = user.id if user else 1
-
-        # Check transaction confirmation
-        clean_query = query.lower().strip()
-        if clean_query in ["confirm", "yes", "confirm payment"] and session_id in self.pending_transactions:
-            if user_role not in ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "DATA_ENTRY", "COLLECTION_OFFICER", "FINANCE_MANAGER"]:
-                return f"❌ ACCESS DENIED: Role '{user_role}' is unauthorized to record transactions."
-            
-            tx = self.pending_transactions.pop(session_id)
+            # Find current user ID for auditing
             try:
-                # Find customer
-                stmt_cust = select(Customer).filter(Customer.name.ilike(f"%{tx['customer_name']}%"), Customer.is_deleted == False)
-                res_cust = await db.execute(stmt_cust)
-                customer = res_cust.scalars().first()
-                if not customer:
-                    return f"Could not complete transaction. Customer '{tx['customer_name']}' not found."
+                stmt = select(User).filter(User.role == user_role, User.is_deleted == False)
+                res = await db.execute(stmt)
+                user = res.scalars().first()
+                if user:
+                    user_id = user.id
+            except Exception as u_err:
+                logger.error("Error retrieving user: %s", str(u_err))
+
+            # Check transaction confirmation
+            clean_query = query.lower().strip()
+            if clean_query in ["confirm", "yes", "confirm payment"] and session_id in self.pending_transactions:
+                if user_role not in ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "DATA_ENTRY", "COLLECTION_OFFICER", "FINANCE_MANAGER"]:
+                    return f"❌ ACCESS DENIED: Role '{user_role}' is unauthorized to record transactions."
                 
-                # Find active loan
-                stmt_loans = select(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False)
-                res_loans = await db.execute(stmt_loans)
-                loans = res_loans.scalars().all()
-                active_loan = next((l for l in loans if l.status in ["ACTIVE", "OVERDUE"]), None)
-                if not active_loan:
-                    return f"No active loan found for customer '{customer.name}'."
+                tx = self.pending_transactions.pop(session_id)
+                try:
+                    # Find customer
+                    stmt_cust = select(Customer).filter(Customer.name.ilike(f"%{tx['customer_name']}%"), Customer.is_deleted == False)
+                    res_cust = await db.execute(stmt_cust)
+                    customer = res_cust.scalars().first()
+                    if not customer:
+                        return f"Could not complete transaction. Customer '{tx['customer_name']}' not found."
+                    
+                    # Find active loan
+                    stmt_loans = select(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False)
+                    res_loans = await db.execute(stmt_loans)
+                    loans = res_loans.scalars().all()
+                    active_loan = next((l for l in loans if l.status in ["ACTIVE", "OVERDUE"]), None)
+                    if not active_loan:
+                        return f"No active loan found for customer '{customer.name}'."
 
-                # Create Payment
-                payment_date = tx.get("date") or today_ist().isoformat()
-                payment = await PaymentRepository.create(
-                    db=db,
-                    schema=PaymentCreate(
-                        loan_id=active_loan.id,
-                        payment_date=payment_date,
-                        amount_paid=tx["amount"],
-                        payment_mode="CASH"
-                    ),
-                    customer_id=customer.id,
-                    recorder_id=user_id
-                )
-                await db.commit()
-                
-                response_text = f"✅ **Transaction Completed:** Recorded payment of **₹{tx['amount']:,}** for **{customer.name}** on **{payment_date}**."
-                await self._log_ai_interaction(db, user_id, session_id, query, "CREATE_PAYMENT_REQUEST", "PaymentRepository.create", response_text, start_time)
-                return response_text
-            except Exception as err:
-                logger.error("Failed to commit AI payment: %s", str(err))
-                await db.rollback()
-                return f"❌ Transaction failed: {str(err)}"
+                    # Create Payment
+                    payment_date = tx.get("date") or today_ist().isoformat()
+                    payment = await PaymentRepository.create(
+                        db=db,
+                        schema=PaymentCreate(
+                            loan_id=active_loan.id,
+                            payment_date=payment_date,
+                            amount_paid=tx["amount"],
+                            payment_mode="CASH"
+                        ),
+                        customer_id=customer.id,
+                        recorder_id=user_id
+                    )
+                    await db.commit()
+                    
+                    response_text = f"✅ **Transaction Completed:** Recorded payment of **₹{tx['amount']:,}** for **{customer.name}** on **{payment_date}**."
+                    await self._log_ai_interaction(db, user_id, session_id, query, "CREATE_PAYMENT_REQUEST", "PaymentRepository.create", response_text, start_time)
+                    return response_text
+                except Exception as err:
+                    logger.error("Failed to commit AI payment: %s", str(err))
+                    await db.rollback()
+                    return f"❌ Transaction failed: {str(err)}"
 
-        # 2. Intent Classification & Entity Extraction
-        intent_info = await self._understand_intent(query)
-        intent = intent_info.get("intent", "UNKNOWN")
-        entities = intent_info.get("entities", {})
-        
-        logger.info("Classified Intent: %s | Entities: %s", intent, entities)
-
-        # Stage payment request
-        if intent == "CREATE_PAYMENT_REQUEST" and entities.get("customer_name") and entities.get("amount"):
-            if user_role not in ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "DATA_ENTRY", "COLLECTION_OFFICER", "FINANCE_MANAGER"]:
-                return f"❌ ACCESS DENIED: Role '{user_role}' is unauthorized to record transactions."
+            # 2. Intent Classification & Entity Extraction
+            intent_info = await self._understand_intent(query)
+            intent = intent_info.get("intent", "UNKNOWN")
+            llm_entities = intent_info.get("entities", {})
             
-            self.pending_transactions[session_id] = {
-                "customer_name": entities["customer_name"],
-                "amount": entities["amount"],
-                "date": entities.get("date")
-            }
-            return f"🤖 **I have prepared the following payment entry:**\n" \
-                   f"- **Customer**: {entities['customer_name']}\n" \
-                   f"- **Amount**: ₹{entities['amount']:,}\n" \
-                   f"- **Date**: {entities.get('date') or 'Today'}\n\n" \
-                   f"Please type **'confirm'** to execute this transaction."
+            # Local Heuristic Extractor
+            local_entities = self._extract_entities_locally(query)
+            
+            # Merge entities: local/regex overrides for keys like IDs, phone, aadhaar
+            entities = {}
+            for k in ["customer_name", "customer_id", "phone_number", "aadhaar", "loan_id", "payment_id", "address", "amount", "date"]:
+                entities[k] = local_entities.get(k) if local_entities.get(k) is not None else llm_entities.get(k)
+            
+            logger.info("Classified Intent: %s | Extracted LLM Entities: %s | Local Entities: %s | Merged: %s", 
+                        intent, llm_entities, local_entities, entities)
 
-        # 3. Database Search Layer (MySQL via SQLAlchemy)
-        context_data = ""
-        database_hit = False
-        searched_entities = []
-        target_search_val = None
+            # Stage payment request
+            if intent == "CREATE_PAYMENT_REQUEST" and entities.get("customer_name") and entities.get("amount"):
+                if user_role not in ["SUPER_ADMIN", "ADMIN", "ASSISTANT_ADMIN", "DATA_ENTRY", "COLLECTION_OFFICER", "FINANCE_MANAGER"]:
+                    return f"❌ ACCESS DENIED: Role '{user_role}' is unauthorized to record transactions."
+                
+                self.pending_transactions[session_id] = {
+                    "customer_name": entities["customer_name"],
+                    "amount": entities["amount"],
+                    "date": entities.get("date")
+                }
+                return f"🤖 **I have prepared the following payment entry:**\n" \
+                       f"- **Customer**: {entities['customer_name']}\n" \
+                       f"- **Amount**: ₹{entities['amount']:,}\n" \
+                       f"- **Date**: {entities.get('date') or 'Today'}\n\n" \
+                       f"Please type **'confirm'** to execute this transaction."
 
-        try:
-            # Check DB Connection
-            await db.execute(select(func.now()))
-        except Exception:
-            return "Unable to retrieve customer information because the database connection is unavailable. Do NOT fabricate answers."
+            # 3. Database Search Layer (MySQL via SQLAlchemy)
+            context_data = ""
+            database_hit = False
+            searched_entities = []
+            target_search_val = None
 
-        # Search Customer by Aadhaar
-        if entities.get("aadhaar"):
-            target_search_val = entities["aadhaar"]
-            searched_entities.append(f"Aadhaar Hash/Number: {entities['aadhaar']}")
-            hashed = hash_aadhaar(entities["aadhaar"])
-            stmt_cust = select(Customer).options(selectinload(Customer.documents)).filter(Customer.aadhar_hash == hashed, Customer.is_deleted == False)
-            res_cust = await db.execute(stmt_cust)
-            customer = res_cust.scalars().first()
-            if customer:
-                context_data += await self._build_customer_context(db, customer, user_role)
-                database_hit = True
+            try:
+                # Check DB Connection
+                await db.execute(select(func.now()))
+            except Exception:
+                logger.error("Database connection check failed.")
+                return "Unable to retrieve customer information because the database connection is unavailable. Do NOT fabricate answers."
 
-        # Search Customer by ID
-        elif entities.get("customer_id"):
-            target_search_val = str(entities["customer_id"])
-            searched_entities.append(f"Customer ID: {entities['customer_id']}")
-            stmt_cust = select(Customer).options(selectinload(Customer.documents)).filter(Customer.id == entities["customer_id"], Customer.is_deleted == False)
-            res_cust = await db.execute(stmt_cust)
-            customer = res_cust.scalars().first()
-            if customer:
-                context_data += await self._build_customer_context(db, customer, user_role)
-                database_hit = True
+            db_search_start = time.time()
+            
+            # Determine SQL Intelligence component load flags
+            query_lower = query.lower()
+            is_payment_history = (intent == "PAYMENT_HISTORY") or any(k in query_lower for k in ["payment history", "history", "ledger", "payments", "transactions", "chupinchu", "details ivvu"])
+            is_balance_query = any(k in query_lower for k in ["balance", "outstanding", "remaining", "due", "entha kattali", "entha", "emi"])
+            
+            load_documents = not (is_payment_history or is_balance_query)
+            
+            cust_options = []
+            if load_documents:
+                cust_options.append(selectinload(Customer.documents))
 
-        # Search Customer by Phone
-        elif entities.get("phone_number"):
-            target_search_val = entities["phone_number"]
-            searched_entities.append(f"Phone: {entities['phone_number']}")
-            stmt_cust = select(Customer).options(selectinload(Customer.documents)).filter(Customer.phone_number.ilike(f"%{entities['phone_number']}%"), Customer.is_deleted == False)
-            res_cust = await db.execute(stmt_cust)
-            customer = res_cust.scalars().first()
-            if customer:
-                context_data += await self._build_customer_context(db, customer, user_role)
-                database_hit = True
-
-        # Search Customer by Name
-        elif entities.get("customer_name"):
-            target_search_val = entities["customer_name"]
-            searched_entities.append(f"Customer Name: {entities['customer_name']}")
-            cleaned_name = entities["customer_name"].strip()
-            stmt_custs = select(Customer).options(selectinload(Customer.documents)).filter(Customer.name.ilike(f"%{cleaned_name}%"), Customer.is_deleted == False)
-            res_custs = await db.execute(stmt_custs)
-            customers = res_custs.scalars().all()
-            if customers:
-                for customer in customers:
-                    context_data += await self._build_customer_context(db, customer, user_role)
-                database_hit = True
-
-        # Search Customer by Address
-        elif entities.get("address"):
-            target_search_val = entities["address"]
-            searched_entities.append(f"Address: {entities['address']}")
-            stmt_custs = select(Customer).options(selectinload(Customer.documents)).filter(Customer.address.ilike(f"%{entities['address']}%"), Customer.is_deleted == False)
-            res_custs = await db.execute(stmt_custs)
-            customers = res_custs.scalars().all()
-            if customers:
-                for customer in customers:
-                    context_data += await self._build_customer_context(db, customer, user_role)
-                database_hit = True
-
-        # Search by Loan ID
-        elif entities.get("loan_id"):
-            target_search_val = str(entities["loan_id"])
-            searched_entities.append(f"Loan ID: {entities['loan_id']}")
-            stmt_loan = select(Loan).filter(Loan.id == entities["loan_id"], Loan.is_deleted == False)
-            res_loan = await db.execute(stmt_loan)
-            loan = res_loan.scalars().first()
-            if loan:
-                stmt_cust = select(Customer).options(selectinload(Customer.documents)).filter(Customer.id == loan.customer_id, Customer.is_deleted == False)
+            # Search Customer by Aadhaar
+            if entities.get("aadhaar"):
+                target_search_val = entities["aadhaar"]
+                searched_entities.append(f"Aadhaar Hash/Number: {entities['aadhaar']}")
+                hashed = hash_aadhaar(entities["aadhaar"])
+                stmt_cust = select(Customer).filter(Customer.aadhar_hash == hashed, Customer.is_deleted == False)
+                if cust_options:
+                    stmt_cust = stmt_cust.options(*cust_options)
                 res_cust = await db.execute(stmt_cust)
                 customer = res_cust.scalars().first()
                 if customer:
-                    context_data += await self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role, intent, query)
                     database_hit = True
 
-        # Search by Payment ID
-        elif entities.get("payment_id"):
-            target_search_val = str(entities["payment_id"])
-            searched_entities.append(f"Payment ID: {entities['payment_id']}")
-            stmt_pay = select(Payment).filter(Payment.id == entities["payment_id"])
-            res_pay = await db.execute(stmt_pay)
-            payment = res_pay.scalars().first()
-            if payment:
-                stmt_cust = select(Customer).options(selectinload(Customer.documents)).filter(Customer.id == payment.customer_id, Customer.is_deleted == False)
+            # Search Customer by ID
+            elif entities.get("customer_id"):
+                target_search_val = str(entities["customer_id"])
+                searched_entities.append(f"Customer ID: {entities['customer_id']}")
+                stmt_cust = select(Customer).filter(Customer.id == entities["customer_id"], Customer.is_deleted == False)
+                if cust_options:
+                    stmt_cust = stmt_cust.options(*cust_options)
                 res_cust = await db.execute(stmt_cust)
                 customer = res_cust.scalars().first()
                 if customer:
-                    context_data += await self._build_customer_context(db, customer, user_role)
+                    context_data += await self._build_customer_context(db, customer, user_role, intent, query)
                     database_hit = True
 
-        # General/Portfolio Dashboard intents
-        if not database_hit:
-            if intent in ["DASHBOARD_ANALYTICS", "TODAYS_COLLECTION", "OVERDUE_CUSTOMERS", "COMPLETED_LOANS", "RISK_ANALYSIS", "RECOVERY_SUGGESTIONS"]:
-                context_data += await self._build_portfolio_context(db, intent, user_role)
-                database_hit = True
+            # Search Customer by Phone
+            elif entities.get("phone_number"):
+                target_search_val = entities["phone_number"]
+                searched_entities.append(f"Phone: {entities['phone_number']}")
+                stmt_cust = select(Customer).filter(Customer.phone_number.ilike(f"%{entities['phone_number']}%"), Customer.is_deleted == False)
+                if cust_options:
+                    stmt_cust = stmt_cust.options(*cust_options)
+                res_cust = await db.execute(stmt_cust)
+                customer = res_cust.scalars().first()
+                if customer:
+                    context_data += await self._build_customer_context(db, customer, user_role, intent, query)
+                    database_hit = True
 
-        # If a search was performed but zero matches were found, return the requested specific format
-        if len(searched_entities) > 0 and not database_hit:
-            val = target_search_val or query
-            return f"No customer matching \"{val}\" was found.\n\nSuggestions:\n• Customer ID\n• Phone Number\n• Full Name"
+            # Search Customer by Name
+            elif entities.get("customer_name"):
+                target_search_val = entities["customer_name"]
+                searched_entities.append(f"Customer Name: {entities['customer_name']}")
+                
+                # Check for pipe separated transliterations from LLM
+                name_options = [n.strip() for n in entities["customer_name"].split("|")]
+                
+                # Hardcoded transliteration fallback dictionary for live DB records
+                fallback_map = {
+                    "karimulla": "కరీముల్లా",
+                    "yalamanda": "యలమంద",
+                    "annam": "అన్నం",
+                    "bandi": "బండి",
+                    "jaya": "జయ",
+                    "venkateswarlu": "వెంకటేశ్వర్లు"
+                }
+                
+                search_stop_words = {
+                    "show", "get", "view", "details", "find", "search", "loan", "customer", "payment", "payments",
+                    "history", "status", "profile", "repayment", "repayments", "outstanding", "balance", "repay",
+                    "record", "confirm", "yes", "no", "ok", "please", "who", "which", "what", "where", "how", "much",
+                    "highest", "remaining", "installments", "overdue", "missed", "today", "yesterday",
+                    "entha", "kattali", "chupinchu", "lo", "emi", "ivvu", "kattadu", "kattaru", "dabbu", "evaru",
+                    "evari", "eroju", "ninna", "vivaralu", "చూపించు", "చూపించుము", "ఇవ్వు", "ఇవ్వండి", "వివరాలు",
+                    "వివరం", "కట్టారు", "కట్టాడు", "కట్టాలి", "డబ్బు", "ఎంత", "ఎవరు", "ఎవరి", "ఈరోజు", "నిన్న",
+                    "రేపు", "మిస్", "అయింది", "అయ్యారు", "ఉంది", "kattadu?", "చూపించు"
+                }
 
-        # 4. Groq Reasoning Layer
-        ist_now = now_ist()
-        today_str = ist_now.date().isoformat()
-        current_time = ist_now.strftime("%A, %d %B %Y %I:%M %p IST")
-        
-        system_prompt = SYSTEM_PROMPT.format(user_role=user_role, current_time=current_time)
-        
-        messages = [
-            {"role": "system", "content": f"{system_prompt}\n\nDATABASE CONTEXT:\n{context_data}\nToday's Date: {today_str}"},
-            {"role": "user", "content": query}
-        ]
+                customers = []
+                
+                # Try search for each option (e.g. English, Telugu script)
+                for name_opt in name_options:
+                    words = [w.strip("?,.!:;#") for w in name_opt.split()]
+                    filtered_words = [w for w in words if w.lower() not in search_stop_words and len(w) >= 2]
+                    
+                    # Expand words with transliterated equivalents
+                    expanded_words = []
+                    for w in filtered_words:
+                        expanded_words.append(w)
+                        if w.lower() in fallback_map:
+                            expanded_words.append(fallback_map[w.lower()])
+                    
+                    if expanded_words:
+                        # 1. Search joined words
+                        joined_clean = " ".join(expanded_words)
+                        stmt_custs = select(Customer).filter(Customer.name.ilike(f"%{joined_clean}%"), Customer.is_deleted == False)
+                        if cust_options:
+                            stmt_custs = stmt_custs.options(*cust_options)
+                        res_custs = await db.execute(stmt_custs)
+                        for c in res_custs.scalars().all():
+                            if c.id not in [x.id for x in customers]:
+                                customers.append(c)
+                        
+                        # 2. Search individual words
+                        for word in expanded_words:
+                            stmt_word = select(Customer).filter(Customer.name.ilike(f"%{word}%"), Customer.is_deleted == False)
+                            if cust_options:
+                                stmt_word = stmt_word.options(*cust_options)
+                            res_word = await db.execute(stmt_word)
+                            for c in res_word.scalars().all():
+                                if c.id not in [x.id for x in customers]:
+                                    customers.append(c)
 
-        try:
-            res = await self.client.get_response(
-                messages=messages,
-                temperature=0.2
-            )
-            final_content = res.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-        except Exception as groq_err:
-            logger.error("Groq call failed: %s", str(groq_err))
-            final_content = "Failed to compile AI response. Live database data is secured but Groq service is temporarily unreachable."
+                if customers:
+                    for customer in customers:
+                        context_data += await self._build_customer_context(db, customer, user_role, intent, query)
+                    database_hit = True
 
-        # 5. Save interaction audit trail
-        await self._log_ai_interaction(db, user_id, session_id, query, intent, "SQLAlchemy DB Search", final_content, start_time)
-        
-        return final_content
+            # Search Customer by Address
+            elif entities.get("address"):
+                target_search_val = entities["address"]
+                searched_entities.append(f"Address: {entities['address']}")
+                stmt_custs = select(Customer).filter(Customer.address.ilike(f"%{entities['address']}%"), Customer.is_deleted == False)
+                if cust_options:
+                    stmt_custs = stmt_custs.options(*cust_options)
+                res_custs = await db.execute(stmt_custs)
+                customers = res_custs.scalars().all()
+                if customers:
+                    for customer in customers:
+                        context_data += await self._build_customer_context(db, customer, user_role, intent, query)
+                    database_hit = True
 
-    async def _build_customer_context(self, db: AsyncSession, customer: Customer, role: str) -> str:
+            # Search by Loan ID
+            elif entities.get("loan_id"):
+                target_search_val = str(entities["loan_id"])
+                searched_entities.append(f"Loan ID: {entities['loan_id']}")
+                stmt_loan = select(Loan).filter(Loan.id == entities["loan_id"], Loan.is_deleted == False)
+                res_loan = await db.execute(stmt_loan)
+                loan = res_loan.scalars().first()
+                if loan:
+                    stmt_cust = select(Customer).filter(Customer.id == loan.customer_id, Customer.is_deleted == False)
+                    if cust_options:
+                        stmt_cust = stmt_cust.options(*cust_options)
+                    res_cust = await db.execute(stmt_cust)
+                    customer = res_cust.scalars().first()
+                    if customer:
+                        context_data += await self._build_customer_context(db, customer, user_role, intent, query)
+                        database_hit = True
+
+            # Search by Payment ID
+            elif entities.get("payment_id"):
+                target_search_val = str(entities["payment_id"])
+                searched_entities.append(f"Payment ID: {entities['payment_id']}")
+                stmt_pay = select(Payment).filter(Payment.id == entities["payment_id"])
+                res_pay = await db.execute(stmt_pay)
+                payment = res_pay.scalars().first()
+                if payment:
+                    stmt_cust = select(Customer).filter(Customer.id == payment.customer_id, Customer.is_deleted == False)
+                    if cust_options:
+                        stmt_cust = stmt_cust.options(*cust_options)
+                    res_cust = await db.execute(stmt_cust)
+                    customer = res_cust.scalars().first()
+                    if customer:
+                        context_data += await self._build_customer_context(db, customer, user_role, intent, query)
+                        database_hit = True
+
+            # General/Portfolio Dashboard intents
+            if not database_hit:
+                is_portfolio_query = intent in ["DASHBOARD_ANALYTICS", "TODAYS_COLLECTION", "OVERDUE_CUSTOMERS", "COMPLETED_LOANS", "RISK_ANALYSIS", "RECOVERY_SUGGESTIONS"]
+                if not is_portfolio_query:
+                    portfolio_keywords = ["portfolio", "overview", "analytics", "collection", "today", "yesterday", "overdue", "highest", "remaining balance", "paid today", "missed", "emi"]
+                    if any(k in query_lower for k in portfolio_keywords):
+                        is_portfolio_query = True
+                        intent = "DASHBOARD_ANALYTICS"
+                
+                if is_portfolio_query:
+                    context_data += await self._build_portfolio_context(db, intent, user_role)
+                    database_hit = True
+
+            db_search_time_ms = int((time.time() - db_search_start) * 1000)
+            logger.info("SQL Search and Context Assembly completed in %d ms | Context Size: %d characters", 
+                        db_search_time_ms, len(context_data))
+
+            # If a search was performed but zero matches were found, return the requested specific format
+            if len(searched_entities) > 0 and not database_hit:
+                val = target_search_val or query
+                return f"No customer matching \"{val}\" was found.\n\nTry:\n• Customer ID\n• Phone Number\n• Full Name"
+
+            # 4. Groq Reasoning Layer
+            ist_now = now_ist()
+            today_str = ist_now.date().isoformat()
+            current_time = ist_now.strftime("%A, %d %B %Y %I:%M %p IST")
+            
+            system_prompt = SYSTEM_PROMPT.format(user_role=user_role, current_time=current_time)
+            
+            messages = [
+                {"role": "system", "content": f"{system_prompt}\n\nDATABASE CONTEXT:\n{context_data}\nToday's Date: {today_str}"},
+                {"role": "user", "content": query}
+            ]
+
+            groq_start = time.time()
+            try:
+                res = await self.client.get_response(
+                    messages=messages,
+                    temperature=0.2
+                )
+                final_content = res.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                groq_time_ms = int((time.time() - groq_start) * 1000)
+                
+                # Estimate tokens
+                prompt_words = sum(len(m["content"].split()) for m in messages)
+                response_words = len(final_content.split())
+                logger.info("Groq API Call completed in %d ms | Prompt tokens (est): %d | Response tokens (est): %d | Model: %s", 
+                            groq_time_ms, prompt_words, response_words, res.get("model", self.client.default_model))
+            except Exception as groq_err:
+                logger.error("Groq call failed: %s", str(groq_err), exc_info=True)
+                final_content = "Failed to compile AI response. Live database data is secured but Groq service is temporarily unreachable."
+
+            # 5. Save interaction audit trail
+            await self._log_ai_interaction(db, user_id, session_id, query, intent, "SQLAlchemy DB Search + Groq", final_content, start_time)
+            
+            total_time_ms = int((time.time() - start_time) * 1000)
+            logger.info("AI Copilot request fully processed in %d ms | Intent: %s | Role: %s | User ID: %d", 
+                        total_time_ms, intent, user_role, user_id)
+            
+            return final_content
+
+        except Exception as e:
+            logger.error("Critical Exception in Copilot Agent execution: %s", str(e), exc_info=True)
+            return "Unable to retrieve response. An unexpected error occurred while processing your request. Please try again."
+
+    async def _build_customer_context(self, db: AsyncSession, customer: Customer, role: str, intent: str = "UNKNOWN", query: str = "") -> str:
         """Fetch all customer details, calculate business metrics and format into context."""
         from app.models.customer_document import CustomerDocument
         from app.models.payment_adjustment import PaymentAdjustment
         from app.models.audit_log import AuditLog
         from app.models.notification import Notification
 
+        query_lower = query.lower()
+        
+        # Decide what to load based on intent and query content
+        load_documents = True
+        load_schedules = True
+        load_payments = True
+        load_notifications = True
+        load_audit_logs = True
+        
+        is_payment_history = (intent == "PAYMENT_HISTORY") or any(k in query_lower for k in ["payment history", "history", "ledger", "payments", "transactions", "chupinchu", "details ivvu"])
+        is_balance_query = any(k in query_lower for k in ["balance", "outstanding", "remaining", "due", "entha kattali", "entha", "emi"])
+        
+        if is_payment_history:
+            load_documents = False
+            load_schedules = False
+            load_notifications = False
+            load_audit_logs = False
+        elif is_balance_query:
+            load_documents = False
+            load_notifications = False
+            load_audit_logs = False
+
+        # Build options dynamically
+        loan_options = []
+        if load_payments:
+            loan_options.append(selectinload(Loan.payments))
+        if load_schedules:
+            loan_options.append(selectinload(Loan.schedules))
+
         # Fetch customer's loans
         stmt_loans = select(Loan).filter(Loan.customer_id == customer.id, Loan.is_deleted == False)
+        if loan_options:
+            stmt_loans = stmt_loans.options(*loan_options)
         res_loans = await db.execute(stmt_loans)
         loans = res_loans.scalars().all()
 
@@ -357,47 +606,59 @@ class SakraCopilotAgent:
         context += f"- Address: {customer.address or '—'}\n"
         context += f"- Occupation: {customer.occupation or '—'}\n"
         context += f"- Created Date: {customer.created_at.strftime('%Y-%m-%d %I:%M %p IST') if customer.created_at else '—'}\n"
+        context += f"- Last Updated: {customer.updated_at.strftime('%Y-%m-%d %I:%M %p IST') if customer.updated_at else '—'}\n"
         context += f"- Promissory Note Remarks: {customer.promissory_note or '—'}\n"
         
         # Document uploads presence indicators
-        has_photo = any(d.document_type == "PROFILE_PHOTO" for d in customer.documents)
-        has_aadhaar = any(d.document_type == "AADHAAR" for d in customer.documents)
-        has_promissory = any(d.document_type == "PROMISSORY_NOTE" for d in customer.documents)
+        if load_documents:
+            try:
+                has_photo = any(d.document_type == "PROFILE_PHOTO" for d in customer.documents)
+                has_aadhaar = any(d.document_type == "AADHAAR" for d in customer.documents)
+                has_promissory = any(d.document_type == "PROMISSORY_NOTE" for d in customer.documents)
 
-        context += f"- Profile Photo Uploaded: {'Yes' if has_photo else 'No'}\n"
-        context += f"- Aadhaar Document Uploaded: {'Yes' if has_aadhaar else 'No'}\n"
-        context += f"- Promissory Note Document Uploaded: {'Yes' if has_promissory else 'No'}\n"
+                context += f"- Profile Photo Uploaded: {'Yes' if has_photo else 'No'}\n"
+                context += f"- Aadhaar Document Uploaded: {'Yes' if has_aadhaar else 'No'}\n"
+                context += f"- Promissory Note Document Uploaded: {'Yes' if has_promissory else 'No'}\n"
+            except Exception:
+                pass
         
         context += f"- Date of Birth: {customer.date_of_birth or '—'}\n"
         context += f"- Gender: {customer.gender or '—'}\n"
         context += f"- Remarks: {customer.remarks or '—'}\n"
 
-        # Calculate collection intelligence delinquency metadata
-        from app.services.loan_service import compute_pending_installments_metadata
-        delinquency = compute_pending_installments_metadata(loans, today)
-        context += f"- Pending Installments Count: {delinquency['pending_installments_count']}\n"
-        context += f"- Oldest Pending Date: {delinquency['oldest_pending_date'] or '—'}\n"
-        context += f"- Latest Pending Date: {delinquency['latest_pending_date'] or '—'}\n"
-        context += f"- Total Overdue Pending Amount: ₹{delinquency['pending_amount']:,}\n"
-        if delinquency["pending_dates"]:
-            context += f"- Detailed Missed Installments:\n"
-            for d in delinquency["pending_dates"]:
-                context += f"  * {d['date']}: Expected ₹{d['expected_amount']:,} - Status: {d['status']}\n"
+        # Calculate collection intelligence delinquency metadata if schedules and payments are loaded
+        if load_schedules and load_payments:
+            from app.services.loan_service import compute_pending_installments_metadata
+            delinquency = compute_pending_installments_metadata(loans, today)
+            context += f"- Pending Installments Count: {delinquency['pending_installments_count']}\n"
+            context += f"- Oldest Pending Date: {delinquency['oldest_pending_date'] or '—'}\n"
+            context += f"- Latest Pending Date: {delinquency['latest_pending_date'] or '—'}\n"
+            context += f"- Total Overdue Pending Amount: ₹{delinquency['pending_amount']:,}\n"
+            if delinquency["pending_dates"]:
+                context += f"- Detailed Missed Installments:\n"
+                for d in delinquency["pending_dates"]:
+                    context += f"  * {d['date']}: Expected ₹{d['expected_amount']:,} - Status: {d['status']}\n"
 
         # Fetch notifications for this customer
-        stmt_notif = select(Notification).filter(Notification.customer_id == customer.id).order_by(Notification.sent_at.desc()).limit(5)
-        res_notif = await db.execute(stmt_notif)
-        notifications = res_notif.scalars().all()
+        notifications = []
+        if load_notifications:
+            stmt_notif = select(Notification).filter(Notification.customer_id == customer.id).order_by(Notification.sent_at.desc()).limit(5)
+            res_notif = await db.execute(stmt_notif)
+            notifications = res_notif.scalars().all()
 
         # Fetch audit logs related to this customer
-        stmt_audit = select(AuditLog).filter(AuditLog.record_id == customer.id, AuditLog.table_name == "customers").order_by(AuditLog.created_at.desc()).limit(5)
-        res_audit = await db.execute(stmt_audit)
-        audits = res_audit.scalars().all()
+        audits = []
+        if load_audit_logs:
+            stmt_audit = select(AuditLog).filter(AuditLog.record_id == customer.id, AuditLog.table_name == "customers").order_by(AuditLog.created_at.desc()).limit(5)
+            res_audit = await db.execute(stmt_audit)
+            audits = res_audit.scalars().all()
 
         for idx, loan in enumerate(loans, 1):
-            stmt_pay = select(Payment).filter(Payment.loan_id == loan.id)
-            res_pay = await db.execute(stmt_pay)
-            payments = res_pay.scalars().all()
+            payments = []
+            if load_payments:
+                stmt_pay = select(Payment).filter(Payment.loan_id == loan.id)
+                res_pay = await db.execute(stmt_pay)
+                payments = res_pay.scalars().all()
             total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
             
             # Dynamic calculations
@@ -426,14 +687,21 @@ class SakraCopilotAgent:
             daily_due = total_due / Decimal(str(loan.duration_days))
             
             # Fetch schedules to count paid, pending, missed installments
-            stmt_sched = select(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc())
-            res_sched = await db.execute(stmt_sched)
-            schedules = res_sched.scalars().all()
+            schedules = []
+            paid_scheds = 0
+            pending_scheds = 0
+            missed_scheds = 0
+            next_due_sched = None
+            
+            if load_schedules:
+                stmt_sched = select(LoanSchedule).filter(LoanSchedule.loan_id == loan.id).order_by(LoanSchedule.installment_number.asc())
+                res_sched = await db.execute(stmt_sched)
+                schedules = res_sched.scalars().all()
 
-            paid_scheds = sum(1 for s in schedules if s.remaining_amount == 0)
-            pending_scheds = sum(1 for s in schedules if s.remaining_amount > 0 and s.due_date >= today)
-            missed_scheds = sum(1 for s in schedules if s.remaining_amount > 0 and s.due_date < today)
-            next_due_sched = next((s for s in schedules if s.remaining_amount > 0 and s.due_date >= today), None)
+                paid_scheds = sum(1 for s in schedules if s.remaining_amount == 0)
+                pending_scheds = sum(1 for s in schedules if s.remaining_amount > 0 and s.due_date >= today)
+                missed_scheds = sum(1 for s in schedules if s.remaining_amount > 0 and s.due_date < today)
+                next_due_sched = next((s for s in schedules if s.remaining_amount > 0 and s.due_date >= today), None)
 
             context += f"\n  * Loan #{idx} (Loan ID: {loan.id})\n"
             context += f"    - Principal Amount: ₹{loan.principal_amount:,}\n"
@@ -447,34 +715,38 @@ class SakraCopilotAgent:
             context += f"    - Risk Level / Category: {risk_level}\n"
             context += f"    - Daily Installment: ₹{daily_due:.2f}\n"
             context += f"    - Loan Status: {loan.status}\n"
+            context += f"    - Loan Start Date: {loan.loan_start_date}\n"
+            context += f"    - Loan End Date: {loan.loan_end_date}\n"
             context += f"    - Remaining Days: {remaining_days}\n"
             context += f"    - Overdue Days: {overdue_days}\n"
-            context += f"    - Next Due Date: {next_due_sched.due_date if next_due_sched else 'Fully Paid'}\n"
-            context += f"    - Schedule Summary: {paid_scheds} Paid, {pending_scheds} Pending, {missed_scheds} Missed\n"
+            if load_schedules:
+                context += f"    - Next Due Date: {next_due_sched.due_date if next_due_sched else 'Fully Paid'}\n"
+                context += f"    - Schedule Summary: {paid_scheds} Paid, {pending_scheds} Pending, {missed_scheds} Missed\n"
             
             # Check for adjustments on these payments
-            pay_ids = [p.id for p in payments]
-            adjustments = []
-            if pay_ids:
-                stmt_adj = select(PaymentAdjustment).filter(PaymentAdjustment.payment_id.in_(pay_ids))
-                res_adj = await db.execute(stmt_adj)
-                adjustments = res_adj.scalars().all()
+            if load_payments:
+                pay_ids = [p.id for p in payments]
+                adjustments = []
+                if pay_ids:
+                    stmt_adj = select(PaymentAdjustment).filter(PaymentAdjustment.payment_id.in_(pay_ids))
+                    res_adj = await db.execute(stmt_adj)
+                    adjustments = res_adj.scalars().all()
 
-            context += "    - Recent Payments:\n"
-            for p in payments[-5:]:
-                context += f"      * {p.payment_date}: ₹{p.amount_paid:,} ({p.payment_mode}) - Status: PAID\n"
+                context += "    - Recent Payments:\n"
+                for p in payments[-5:]:
+                    context += f"      * {p.payment_date}: ₹{p.amount_paid:,} ({p.payment_mode}) - Status: PAID\n"
 
-            if adjustments:
-                context += "    - Payment Adjustments:\n"
-                for adj in adjustments:
-                    context += f"      * Payment ID {adj.payment_id}: shifted from ₹{adj.old_amount:,} to ₹{adj.new_amount:,} due to: {adj.reason} (Approved on: {adj.created_at.strftime('%Y-%m-%d') if adj.created_at else '—'})\n"
+                if adjustments:
+                    context += "    - Payment Adjustments:\n"
+                    for adj in adjustments:
+                        context += f"      * Payment ID {adj.payment_id}: shifted from ₹{adj.old_amount:,} to ₹{adj.new_amount:,} due to: {adj.reason} (Approved on: {adj.created_at.strftime('%Y-%m-%d') if adj.created_at else '—'})\n"
 
-        if notifications:
+        if load_notifications and notifications:
             context += "  - Recent Notifications:\n"
             for n in notifications:
                 context += f"    * [{n.sent_at.strftime('%Y-%m-%d %I:%M %p') if n.sent_at else '—'}] Type: {n.notification_type} - {n.message} (Read: {n.is_read})\n"
 
-        if audits:
+        if load_audit_logs and audits:
             context += "  - Audit Log Activity:\n"
             for a in audits:
                 context += f"    * [{a.created_at.strftime('%Y-%m-%d %I:%M %p') if a.created_at else '—'}] Action: {a.action} - Details: {a.new_values}\n"

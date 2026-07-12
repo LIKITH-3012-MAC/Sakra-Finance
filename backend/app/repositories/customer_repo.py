@@ -25,7 +25,8 @@ class CustomerRepository:
             Customer.is_deleted == False,
         ).options(
             selectinload(Customer.documents),
-            selectinload(Customer.loans).selectinload(Loan.payments)
+            selectinload(Customer.loans).selectinload(Loan.payments),
+            selectinload(Customer.loans).selectinload(Loan.schedules)
         )
         result = await db.execute(stmt)
         return result.scalars().first()
