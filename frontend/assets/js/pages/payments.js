@@ -13,6 +13,8 @@ let selectedLoan = null;
 let customerLoans = [];
 let loanPayments = [];
 let pendingSubmitData = null;
+let customerDetailsCache = {};
+let aggregatePayments = [];
 
 const paymentsContent = document.getElementById("payments-content");
 const searchInput = document.getElementById("customer-search-input");
@@ -153,7 +155,7 @@ function renderCustomerList() {
     window.lucide.createIcons();
   }
 
-  // Attach button clicks
+  // Attach button clicks and hovers for instant latency prefetching
   listContainer.querySelectorAll(".customer-select-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = parseInt(btn.getAttribute("data-id"));
@@ -162,10 +164,26 @@ function renderCustomerList() {
         await selectCustomer(target);
       }
     });
+
+    btn.addEventListener("mouseenter", () => {
+      const id = parseInt(btn.getAttribute("data-id"));
+      prefetchCustomer(id);
+    });
   });
 }
 
+async function prefetchCustomer(id) {
+  if (customerDetailsCache[id]) return;
+  try {
+    const res = await api.get(`/customers/${id}`);
+    customerDetailsCache[id] = res.data || res;
+  } catch (err) {
+    console.warn(`Failed to prefetch customer details for ${id}:`, err);
+  }
+}
+
 async function selectCustomer(c) {
+  const startTime = performance.now();
   selectedCustomer = c;
   selectedLoan = null;
   customerLoans = [];
@@ -185,12 +203,23 @@ async function selectCustomer(c) {
   loanSelectorCard.classList.add("hidden");
 
   try {
-    const res = await api.get(`/customers/${c.id}`);
-    const payload = res.data || res;
+    // Check client-side cache first
+    let payload = customerDetailsCache[c.id];
+    let cached = false;
+    if (payload) {
+      cached = true;
+    } else {
+      const res = await api.get(`/customers/${c.id}`);
+      payload = res.data || res;
+      customerDetailsCache[c.id] = payload;
+    }
+
+    const apiTime = performance.now();
     
     // Store full detailed customer profile
     const details = payload.customer || c;
     selectedCustomer = details;
+    aggregatePayments = payload.aggregate_payments || [];
 
     // Update breadcrumbs
     const breadcrumbName = document.getElementById("breadcrumb-customer-name");
@@ -247,6 +276,13 @@ async function selectCustomer(c) {
     } else {
       loanSelectorCard.classList.add("hidden");
     }
+
+    const endTime = performance.now();
+    console.log(`%c[PERFORMANCE PROFILE] Customer Selection`, "color: #3b82f6; font-weight: bold;");
+    console.log(`- Fetch Type: ${cached ? "Memory Cache (Prefetched)" : "Network API Call"}`);
+    console.log(`- API Latency: ${(apiTime - startTime).toFixed(2)} ms`);
+    console.log(`- UI Rendering: ${(endTime - apiTime).toFixed(2)} ms`);
+    console.log(`- Total Selection Latency: ${(endTime - startTime).toFixed(2)} ms`);
   } catch (err) {
     console.error("Failed to load customer loans:", err);
   }
@@ -363,9 +399,8 @@ async function refreshLoanPayments() {
   if (!selectedLoan) return;
 
   try {
-    const res = await api.get(`/payments/loan/${selectedLoan.id}`);
-    const payload = res.data || res;
-    loanPayments = payload || [];
+    loanPayments = (aggregatePayments || []).filter(p => p.loan_id === selectedLoan.id);
+    loanPayments.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
 
     if (loanPayments.length === 0) {
       paymentsEmpty.classList.remove("hidden");
@@ -374,45 +409,61 @@ async function refreshLoanPayments() {
       paymentsEmpty.classList.add("hidden");
       paymentsTable.classList.remove("hidden");
 
-      paymentsBody.innerHTML = loanPayments.map(p => {
-        const norm = (p.payment_status || "PENDING").toUpperCase();
-        let badgeClass = "bg-amber-50 text-amber-700 border-amber-100"; // PENDING
-        if (norm === "PAID") {
-          badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-100";
-        } else if (norm === "PARTIALLY PAID") {
-          badgeClass = "bg-blue-50 text-blue-700 border-blue-100";
-        } else if (norm === "MISSED") {
-          badgeClass = "bg-orange-50 text-orange-700 border-orange-100";
-        } else if (norm === "OVERDUE") {
-          badgeClass = "bg-rose-50 text-rose-700 border-rose-100";
-        } else if (norm === "COMPLETED") {
-          badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-100";
-        }
-        const statusBadge = `<span class="inline-block px-2 py-0.5 text-[10px] font-bold rounded border uppercase ${badgeClass}">${norm}</span>`;
+      const CHUNK_SIZE = 25;
+      const initialChunk = loanPayments.slice(0, CHUNK_SIZE);
+      const remainingChunk = loanPayments.slice(CHUNK_SIZE);
 
-        const paidTextClass = parseFloat(p.amount_paid) > 0 ? "text-success font-bold" : "text-text-muted";
+      const renderRowHtml = (p) => {
+        const norm = (p.payment_status || "PENDING").toUpperCase();
+        let badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20"; // PENDING
+        if (norm === "PAID") {
+          badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald";
+        } else if (norm === "PARTIALLY PAID") {
+          badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+        } else if (norm === "MISSED") {
+          badgeClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+        } else if (norm === "OVERDUE") {
+          badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20 status-pill-rose animate-pulse";
+        } else if (norm === "COMPLETED") {
+          badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald";
+        }
+        const statusBadge = `<span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded-full border uppercase ${badgeClass}">${norm}</span>`;
+        const paidTextClass = parseFloat(p.amount_paid) > 0 ? "text-emerald-400 font-extrabold" : "text-text-muted";
 
         return `
-          <tr>
-            <td class="font-semibold text-text-primary text-xs">${p.payment_date}</td>
-            <td class="text-right font-mono text-xs text-text-secondary">${formatVal(p.expected_amount)}</td>
-            <td class="text-right font-mono text-xs ${paidTextClass}">${formatVal(p.amount_paid)}</td>
-            <td class="text-xs text-text-primary font-bold font-mono">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
-            <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "—"}</td>
-            <td>${statusBadge}</td>
-            <td class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>
-            <td class="text-xs text-text-muted font-mono">${p.created_at || "—"}</td>
-            <td class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
+          <tr class="h-10 hover:bg-white/5 transition-all">
+            <td class="font-semibold text-text-primary text-xs py-2.5 px-4 font-mono">${p.payment_date}</td>
+            <td class="text-right font-mono text-xs text-text-secondary py-2.5 px-4">${formatVal(p.expected_amount)}</td>
+            <td class="text-right font-mono text-xs ${paidTextClass} py-2.5 px-4">${formatVal(p.amount_paid)}</td>
+            <td class="text-xs text-text-primary font-bold font-mono py-2.5 px-4">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
+            <td class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.payment_mode || "—"}</td>
+            <td class="py-2.5 px-4">${statusBadge}</td>
+            <td class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.recorded_by_name || "—"}</td>
+            <td class="text-xs text-text-muted font-mono py-2.5 px-4">${p.created_at || "—"}</td>
+            <td class="text-xs text-text-secondary italic py-2.5 px-4 max-w-[150px] truncate hover:whitespace-normal" title="${p.remarks || ''}">${p.remarks || "—"}</td>
           </tr>
         `;
-      }).join("");
+      };
 
+      paymentsBody.innerHTML = initialChunk.map(renderRowHtml).join("");
+
+      if (remainingChunk.length > 0) {
+        requestAnimationFrame(() => {
+          const div = document.createElement("tbody");
+          div.innerHTML = remainingChunk.map(renderRowHtml).join("");
+          while (div.firstChild) {
+            paymentsBody.appendChild(div.firstChild);
+          }
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
+        });
+      }
     }
 
     if (window.lucide) {
       window.lucide.createIcons();
     }
-
   } catch (err) {
     console.error("Failed to load loan payments:", err);
   }
@@ -482,15 +533,20 @@ async function executeRecordPayment(payload) {
     paymentForm.querySelector('input[name="amount_paid"]').value = "";
     paymentForm.querySelector('input[name="remarks"]').value = "";
 
-    // Dynamic UI Refresh: reload customer list and details cards asynchronously in background
+    // Invalidate client-side details cache for this customer
     const customerId = selectedCustomer.id;
     const loanId = selectedLoan.id;
+    delete customerDetailsCache[customerId];
+
+    // Dynamic UI Refresh: reload customer list and details cards asynchronously in background
     init().then(async () => {
       const updatedCustomer = customers.find(c => c.id === customerId);
       if (updatedCustomer) {
         selectedCustomer = updatedCustomer;
         const resLoans = await api.get(`/customers/${customerId}`);
         const payloadLoans = resLoans.data || resLoans;
+        customerDetailsCache[customerId] = payloadLoans; // Re-populate cache
+        aggregatePayments = payloadLoans.aggregate_payments || []; // Update local payments list
         customerLoans = payloadLoans.loans || [];
         renderLoanSelector();
         const updatedLoan = customerLoans.find(l => l.id === loanId);

@@ -147,7 +147,7 @@ def get_loan_status_details(
     }
 
 
-async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
+async def get_loan_repayment_rows(db: AsyncSession, loan, recorders_dict=None) -> list[dict]:
     """
     Build repayment rows dynamically for a loan by merging its schedule and payments.
     """
@@ -172,14 +172,15 @@ async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
         res = await db.execute(stmt)
         schedules = list(res.scalars().all())
 
-    # Pre-fetch all recorder users in a single query
-    recorder_ids = {p.recorded_by for p in payments if p.recorded_by}
-    recorders_dict = {}
-    if recorder_ids:
-        stmt = select(User).filter(User.id.in_(list(recorder_ids)))
-        res = await db.execute(stmt)
-        recorders = res.scalars().all()
-        recorders_dict = {u.id: u.username for u in recorders}
+    # Pre-fetch all recorder users in a single query if not provided
+    if recorders_dict is None:
+        recorder_ids = {p.recorded_by for p in payments if p.recorded_by}
+        recorders_dict = {}
+        if recorder_ids:
+            stmt = select(User).filter(User.id.in_(list(recorder_ids)))
+            res = await db.execute(stmt)
+            recorders = res.scalars().all()
+            recorders_dict = {u.id: u.username for u in recorders}
 
     # Calculate overall loan totals
     total_due = loan.total_repayable_amount if loan.total_repayable_amount is not None else (loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days))
@@ -245,7 +246,7 @@ async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
     return repayment_rows
 
 
-async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> dict:
+async def get_customer_summary_details(db: AsyncSession, customer_id: int, loans=None) -> dict:
     """
     Compute customer summary details (Total Paid, Remaining Balance, Expected Till Today,
     Pending Amount, Credit Score, Risk Level, Completion %, Next Due Date).
@@ -253,15 +254,16 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
     from app.models.loan import Loan
     from app.services.credit_score import calculate_credit_score
 
-    stmt = select(Loan).filter(
-        Loan.customer_id == customer_id, 
-        Loan.is_deleted == False
-    ).options(
-        selectinload(Loan.payments),
-        selectinload(Loan.schedules)
-    )
-    res = await db.execute(stmt)
-    loans = res.scalars().all()
+    if loans is None:
+        stmt = select(Loan).filter(
+            Loan.customer_id == customer_id, 
+            Loan.is_deleted == False
+        ).options(
+            selectinload(Loan.payments),
+            selectinload(Loan.schedules)
+        )
+        res = await db.execute(stmt)
+        loans = res.scalars().all()
     today = today_ist()
 
     total_principal_all = Decimal("0")

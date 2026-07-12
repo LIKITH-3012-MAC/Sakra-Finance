@@ -936,6 +936,11 @@ function renderRegistry() {
       row.classList.add("selected-active-row");
       selectCustomer(id);
     });
+
+    row.addEventListener("mouseenter", () => {
+      const id = row.getAttribute("data-id");
+      if (id) prefetchCustomerAnalytics(id);
+    });
   });
 
   // Card selection setup (Mobile cards)
@@ -953,6 +958,11 @@ function renderRegistry() {
       card.classList.remove("border-white/5");
       card.classList.add("border-blue-50", "shadow-[0_0_15px_rgba(59,130,246,0.3)]", "scale-[1.01]");
       selectCustomer(id);
+    });
+
+    card.addEventListener("mouseenter", () => {
+      const id = card.getAttribute("data-id");
+      if (id) prefetchCustomerAnalytics(id);
     });
   });
 
@@ -1427,6 +1437,16 @@ function destroyExistingCharts() {
       activeCharts[key] = null;
     }
   });
+}
+
+async function prefetchCustomerAnalytics(id) {
+  if (customerAnalyticsCache[id]) return;
+  try {
+    const res = await api.get(`/customers/${id}`);
+    customerAnalyticsCache[id] = res.data || res;
+  } catch (err) {
+    console.warn(`Failed to prefetch analytics for customer ${id}:`, err);
+  }
 }
 
 async function selectCustomer(id) {

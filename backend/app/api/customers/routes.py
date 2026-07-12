@@ -442,9 +442,25 @@ async def get_customer(
 
     # Fetch dynamic aggregate repayment rows for all loans
     from app.services.loan_service import get_loan_repayment_rows
+    from app.models.user import User
+
+    # Pre-fetch all recorder users in a single query across all payments
+    all_recorder_ids = set()
+    for loan in loans:
+        for p in loan.payments:
+            if p.recorded_by:
+                all_recorder_ids.add(p.recorded_by)
+
+    recorders_dict = {}
+    if all_recorder_ids:
+        stmt_rec = select(User).filter(User.id.in_(list(all_recorder_ids)))
+        res_rec = await db.execute(stmt_rec)
+        for u in res_rec.scalars().all():
+            recorders_dict[u.id] = u.username
+
     aggregate_payments = []
     for loan in loans:
-        repayment_rows = await get_loan_repayment_rows(db, loan)
+        repayment_rows = await get_loan_repayment_rows(db, loan, recorders_dict=recorders_dict)
         aggregate_payments.extend(repayment_rows)
 
     # Sort payments by date descending
@@ -452,7 +468,7 @@ async def get_customer(
 
     # Fetch backend summary details to prevent frontend JavaScript calculations
     from app.services.loan_service import get_customer_summary_details
-    summary_details = await get_customer_summary_details(db, customer_id)
+    summary_details = await get_customer_summary_details(db, customer_id, loans=loans)
 
     response_payload = {
         "customer": customer_dict,
