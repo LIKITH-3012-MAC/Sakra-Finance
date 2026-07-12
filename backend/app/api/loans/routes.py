@@ -23,6 +23,7 @@ from app.services.audit import log_audit
 from app.services.loan_service import get_loan_status_details
 from app.exceptions.handlers import LoanNotFound, ConflictError
 from app.services.cache import cache
+from app.utils.timezone import today_ist
 from app.core.config import settings
 
 logger = logging.getLogger("sakra.loans")
@@ -197,7 +198,7 @@ async def get_loan(
     ]
 
     # Get status details
-    today = date.today()
+    today = today_ist()
     status_details = get_loan_status_details(loan, payments, today)
     status_data = {k: str(v) if isinstance(v, Decimal) else v for k, v in status_details.items()}
 

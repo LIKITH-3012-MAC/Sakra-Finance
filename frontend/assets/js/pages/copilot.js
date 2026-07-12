@@ -573,3 +573,8 @@ function showCopilotAlert(msg) {
 // Start
 setTimeout(init, 100);
 
+window.refreshPageData = async () => {
+  const user = getCachedUser();
+  if (user) await loadHistory(user);
+};
+

@@ -2,8 +2,6 @@
 Payment model – records individual payments made against a loan.
 """
 
-from datetime import datetime
-
 from sqlalchemy import (
     Column,
     Date,
@@ -19,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class Payment(Base):
@@ -44,8 +43,8 @@ class Payment(Base):
     remarks = Column(Text, nullable=True)
     recorded_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     version_id = Column(Integer, default=1, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     loan = relationship("Loan", back_populates="payments")

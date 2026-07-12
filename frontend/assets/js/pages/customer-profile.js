@@ -590,6 +590,10 @@ function renderScatterPlot(loans, payments) {
 // Start
 setTimeout(init, 100);
 
+window.refreshPageData = async () => {
+  await init();
+};
+
 window.addEventListener("language-changed", () => {
   if (window.currentProfileData) {
     renderProfile(window.currentProfileData);

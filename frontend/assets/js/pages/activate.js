@@ -137,10 +137,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       // Store tokens and redirect to dashboard (fixed local storage keys)
       const accessToken = data.data?.token?.access_token;
+      const refreshToken = data.data?.token?.refresh_token;
       const userData = data.data?.user;
 
       if (accessToken) {
         localStorage.setItem("access_token", accessToken);
+      }
+      if (refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
       }
       if (userData) {
         localStorage.setItem("user", JSON.stringify(userData));

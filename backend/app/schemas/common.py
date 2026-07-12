@@ -13,8 +13,8 @@ def serialize_ist_datetime(dt: datetime) -> str:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        # DB timezone-naive datetimes represent UTC internal storage, convert to IST
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        # DB stores naive IST values, so attach IST timezone info for ISO format
+        dt = dt.replace(tzinfo=IST)
     return dt.astimezone(IST).isoformat()
 
 # ISTDateTime enforces serialization to Asia/Kolkata ISO format string

@@ -11,6 +11,8 @@ import jwt
 from app.core.config import settings
 
 
+from app.utils.timezone import now_ist
+
 ALGORITHM = "HS256"
 
 
@@ -18,7 +20,7 @@ def create_access_token(data: dict) -> str:
     """
     Create a short-lived JWT access token.
     """
-    now = datetime.utcnow()
+    now = now_ist()
     expire = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = data.copy()
@@ -35,7 +37,7 @@ def create_refresh_token(data: dict) -> str:
     """
     Create a long-lived JWT refresh token.
     """
-    now = datetime.utcnow()
+    now = now_ist()
     expire = now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
     payload = data.copy()

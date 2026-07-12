@@ -2,12 +2,11 @@
 CreditScore model – tracks customer credit scores over time.
 """
 
-from datetime import datetime
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Numeric, Text
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class CreditScore(Base):
@@ -19,7 +18,7 @@ class CreditScore(Base):
     score = Column(Numeric(5, 1), nullable=False)
     previous_score = Column(Numeric(5, 1), nullable=True)
     reason = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     customer = relationship("Customer")

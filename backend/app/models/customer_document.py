@@ -2,12 +2,12 @@
 CustomerDocument model – stores document blobs and metadata for customer KYC files.
 """
 
-from datetime import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class CustomerDocument(Base):
@@ -21,7 +21,7 @@ class CustomerDocument(Base):
     content_type = Column(String(100), nullable=False)
     file_size = Column(Integer, nullable=False)
     uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     customer = relationship("Customer", back_populates="documents")

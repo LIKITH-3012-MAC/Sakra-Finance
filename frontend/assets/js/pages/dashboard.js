@@ -187,7 +187,51 @@ function renderAlerts(alerts) {
 }
 
 // Initial load check
-setTimeout(loadDashboard, 100);
+setTimeout(() => {
+  loadDashboard();
+  setupAutoRefresh();
+}, 100);
+
+// Page-specific refresh binding
+window.refreshPageData = async () => {
+  await loadDashboard();
+};
+
+let autoRefreshInterval = null;
+function setupAutoRefresh() {
+  const toggle = document.getElementById("auto-refresh-toggle");
+  if (!toggle) return;
+
+  const startAutoRefresh = () => {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(async () => {
+      console.log("Auto-refreshing dashboard...");
+      await loadDashboard();
+    }, 30000); // 30 seconds
+  };
+
+  const stopAutoRefresh = () => {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  };
+
+  const enabled = localStorage.getItem("dashboard-auto-refresh") === "true";
+  toggle.checked = enabled;
+  if (enabled) startAutoRefresh();
+
+  toggle.addEventListener("change", (e) => {
+    localStorage.setItem("dashboard-auto-refresh", e.target.checked);
+    if (e.target.checked) {
+      startAutoRefresh();
+      if (window.showToast) window.showToast("Dashboard auto-refresh enabled (30s interval)", "success");
+    } else {
+      stopAutoRefresh();
+      if (window.showToast) window.showToast("Dashboard auto-refresh disabled", "info");
+    }
+  });
+}
 
 // Redraw stats on language change
 window.addEventListener("language-changed", () => {

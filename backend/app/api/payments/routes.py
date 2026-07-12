@@ -23,6 +23,7 @@ from app.services.audit import log_audit
 from app.exceptions.handlers import PaymentError, ConflictError, ExportError
 from app.services.cache import cache
 from app.core.config import settings
+from app.utils.timezone import today_ist
 
 logger = logging.getLogger("sakra.payments")
 
@@ -262,7 +263,7 @@ async def get_today_payments(
     """
     Get all payments recorded for today.
     """
-    today = date.today()
+    today = today_ist()
     cache_key = f"payments:today:{today.isoformat()}"
     if settings.CACHE_ENABLED:
         cached_data = await cache.get(cache_key)
@@ -338,14 +339,14 @@ async def export_payments_csv(
         # Write to CSV buffer with secure metadata header
         buffer = io.StringIO()
         buffer.write("# SAKRA FINANCE — SECURE WORKSPACE DATA DESK\n")
-        buffer.write(f"# Export Date: {date.today().isoformat()}\n")
+        buffer.write(f"# Export Date: {today_ist().isoformat()}\n")
         buffer.write("# Classification: RESTRICTED FINANCIAL RECORD\n")
         buffer.write("# Verified Official Branding Asset ID: sakra-logo-v5\n")
         buffer.write("# ------------------------------------------------\n")
         df.to_csv(buffer, index=False)
         buffer.seek(0)
 
-        filename = f"payments_export_{date.today().isoformat()}.csv"
+        filename = f"payments_export_{today_ist().isoformat()}.csv"
 
         return StreamingResponse(
             iter([buffer.getvalue()]),

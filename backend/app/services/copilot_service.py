@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.models.copilot_session import CopilotSession
 from app.models.copilot_message import CopilotMessage
+from app.utils.timezone import now_ist_naive
 
 logger = logging.getLogger("sakra.copilot_service")
 
@@ -25,7 +26,7 @@ class CopilotService:
             session = CopilotSession(
                 user_id=user_id,
                 session_id=session_id,
-                created_at=datetime.utcnow()
+                created_at=now_ist_naive()
             )
             db.add(session)
             await db.commit()
@@ -60,7 +61,7 @@ class CopilotService:
             role=role,
             message=message,
             response=response,
-            timestamp=datetime.utcnow()
+            timestamp=now_ist_naive()
         )
         db.add(msg)
         await db.commit()

@@ -13,7 +13,8 @@ export function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString("en-IN", {
       year: "numeric",
       month: "short",
-      day: "numeric"
+      day: "numeric",
+      timeZone: "Asia/Kolkata"
     });
   } catch {
     return dateStr;

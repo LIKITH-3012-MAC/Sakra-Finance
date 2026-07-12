@@ -2,12 +2,11 @@
 User model – represents application users (admins, agents, etc.).
 """
 
-from datetime import datetime
-
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class User(Base):
@@ -46,8 +45,8 @@ class User(Base):
     designation = Column(String(100), nullable=True)
     phone_number = Column(String(20), nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     customers_created = relationship("Customer", back_populates="creator", foreign_keys="Customer.created_by")

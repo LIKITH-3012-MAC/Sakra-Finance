@@ -151,6 +151,10 @@ async function loadAuditLogs() {
 // Start
 setTimeout(init, 100);
 
+window.refreshPageData = async () => {
+  await loadAuditLogs();
+};
+
 window.addEventListener("language-changed", () => {
   loadAuditLogs();
 });

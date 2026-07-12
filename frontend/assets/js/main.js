@@ -144,6 +144,13 @@ async function initLayout(user) {
           </div>
           
           <span class="text-white/5">|</span>
+          <!-- Premium Sync Refresh Button -->
+          <button id="global-refresh-btn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-[9px] uppercase font-bold tracking-wider text-slate-300 hover:text-slate-100 transition-colors select-none cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400" id="global-refresh-icon"></i>
+            <span data-i18n="btn_refresh">REFRESH</span>
+          </button>
+          
+          <span class="text-white/5">|</span>
           <div class="flex items-center gap-1.5 select-none text-[9px] font-bold text-emerald-400">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
             <span class="hidden md:inline-block uppercase tracking-widest" data-i18n="audit_active">${window.t ? window.t("audit_active") : "AUDIT ACTIVE"}</span>
@@ -186,7 +193,38 @@ async function initLayout(user) {
       });
     }
 
-    // 4. Render Mobile Bottom Navigation (for screens < 768px)
+    // Global Refresh mechanism
+    const refreshBtn = document.getElementById("global-refresh-btn");
+    const refreshIcon = document.getElementById("global-refresh-icon");
+    if (refreshBtn && refreshIcon) {
+      refreshBtn.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        refreshIcon.classList.add("animate-spin");
+        const startTime = Date.now();
+        try {
+          if (window.refreshPageData) {
+            await window.refreshPageData();
+            window.showToast("Data synchronized with live database successfully.", "success");
+          } else {
+            // default fallback
+            window.location.reload();
+          }
+        } catch (err) {
+          console.error("Refresh synchronization failed:", err);
+          window.showToast("Unable to synchronize data. Please check connection.", "error");
+        } finally {
+          const elapsed = Date.now() - startTime;
+          if (elapsed < 400) {
+            await new Promise(r => setTimeout(r, 400 - elapsed));
+          }
+          refreshBtn.disabled = false;
+          refreshIcon.classList.remove("animate-spin");
+          if (window.lucide) window.lucide.createIcons();
+        }
+      });
+    }
+
+  // 4. Render Mobile Bottom Navigation (for screens < 768px)
     let mobileNav = document.getElementById("mobile-bottom-nav");
     if (!mobileNav) {
       mobileNav = document.createElement("div");
@@ -661,6 +699,69 @@ if (document.readyState === "loading") {
     characterData: true
   });
 }
+
+// Premium glassmorphic toast notification system
+window.showToast = function(message, type = "info") {
+  let container = document.getElementById("toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toast-container";
+    container.className = "fixed top-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none max-w-sm w-full";
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement("div");
+  toast.className = `glass-card p-4 rounded-xl border border-white/10 shadow-enterprise-lg flex items-start gap-3 pointer-events-auto transform translate-x-12 opacity-0 transition-all duration-300 bg-slate-900/90 backdrop-blur-md`;
+  
+  let iconName = "info";
+  let iconColor = "text-blue-400";
+  if (type === "success") {
+    iconName = "check-circle-2";
+    iconColor = "text-emerald-400";
+  } else if (type === "error") {
+    iconName = "alert-triangle";
+    iconColor = "text-rose-400";
+  } else if (type === "warning") {
+    iconName = "alert-circle";
+    iconColor = "text-amber-400";
+  }
+
+  toast.innerHTML = `
+    <div class="${iconColor} shrink-0 mt-0.5">
+      <i data-lucide="${iconName}" class="w-4 h-4"></i>
+    </div>
+    <div class="flex-1">
+      <p class="text-xs font-semibold text-text-primary leading-relaxed">${message}</p>
+    </div>
+    <button class="text-text-muted hover:text-text-primary shrink-0 transition-colors close-btn cursor-pointer">
+      <i data-lucide="x" class="w-3.5 h-3.5"></i>
+    </button>
+  `;
+
+  container.appendChild(toast);
+  
+  if (window.lucide) window.lucide.createIcons({ node: toast });
+
+  // Slide/Fade In
+  requestAnimationFrame(() => {
+    toast.classList.remove("translate-x-12", "opacity-0");
+  });
+
+  const dismiss = () => {
+    toast.classList.add("translate-x-12", "opacity-0");
+    setTimeout(() => {
+      toast.remove();
+      if (container.children.length === 0) {
+        container.remove();
+      }
+    }, 300);
+  };
+
+  toast.querySelector(".close-btn").addEventListener("click", dismiss);
+
+  // Auto-dismiss after 4 seconds
+  setTimeout(dismiss, 4000);
+};
 
 // Run bootstrap
 executeMain();

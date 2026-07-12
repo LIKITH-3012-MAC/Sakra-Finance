@@ -152,7 +152,50 @@ async function handleMarkAllRead() {
 }
 
 // Start load
-setTimeout(init, 100);
+setTimeout(() => {
+  init();
+  setupAutoRefresh();
+}, 100);
+
+window.refreshPageData = async () => {
+  await loadNotifications();
+};
+
+let autoRefreshInterval = null;
+function setupAutoRefresh() {
+  const toggle = document.getElementById("auto-refresh-toggle");
+  if (!toggle) return;
+
+  const startAutoRefresh = () => {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(async () => {
+      console.log("Auto-refreshing notifications...");
+      await loadNotifications();
+    }, 30000); // 30 seconds
+  };
+
+  const stopAutoRefresh = () => {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  };
+
+  const enabled = localStorage.getItem("notifications-auto-refresh") === "true";
+  toggle.checked = enabled;
+  if (enabled) startAutoRefresh();
+
+  toggle.addEventListener("change", (e) => {
+    localStorage.setItem("notifications-auto-refresh", e.target.checked);
+    if (e.target.checked) {
+      startAutoRefresh();
+      if (window.showToast) window.showToast("Notifications auto-refresh enabled (30s interval)", "success");
+    } else {
+      stopAutoRefresh();
+      if (window.showToast) window.showToast("Notifications auto-refresh disabled", "info");
+    }
+  });
+}
 
 window.addEventListener("language-changed", () => {
   loadNotifications();

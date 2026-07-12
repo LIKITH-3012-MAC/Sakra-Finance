@@ -2,8 +2,6 @@
 Loan model – represents a loan issued to a customer.
 """
 
-from datetime import datetime
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -18,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class Loan(Base):
@@ -43,8 +42,8 @@ class Loan(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     version_id = Column(Integer, default=1, nullable=False)
     is_deleted = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
     # ── New calculated columns ───────────────────────────────────
     interest_amount = Column(Numeric(15, 2), nullable=True)

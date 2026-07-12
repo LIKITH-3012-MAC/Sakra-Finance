@@ -1,9 +1,9 @@
 """
 UserInvitation model – represents employee invitations with token validation and expiration.
 """
-from datetime import datetime
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
@@ -23,8 +23,8 @@ class UserInvitation(Base):
     expires_at = Column(DateTime, nullable=False)
     status = Column(String(20), default="PENDING", nullable=False) # PENDING, USED, REVOKED
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
     def __repr__(self) -> str:
         return f"<UserInvitation(id='{self.id}', email='{self.email}', status='{self.status}')>"

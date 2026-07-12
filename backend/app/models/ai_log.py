@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 class AIAuditLog(Base):
     __tablename__ = "ai_logs"
@@ -13,4 +13,4 @@ class AIAuditLog(Base):
     tools_used = Column(Text, nullable=True) # Comma-separated or JSON
     response_summary = Column(Text, nullable=True)
     tokens_used = Column(Integer, default=0)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=now_ist_naive)

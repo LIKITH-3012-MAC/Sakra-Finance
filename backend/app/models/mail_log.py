@@ -1,9 +1,9 @@
 """
 MailLog model – tracks all emails sent from the Sakra Finance subsystem.
 """
-from datetime import datetime
 from sqlalchemy import Column, DateTime, Integer, String, Text, Index
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 class MailLog(Base):
     __tablename__ = "mail_logs"
@@ -19,7 +19,7 @@ class MailLog(Base):
     template = Column(String(50), nullable=False) # e.g. "INVITATION", "PASSWORD_RESET"
     status = Column(String(20), nullable=False, index=True) # SENT, FAILED
     provider_message_id = Column(String(100), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     def __repr__(self) -> str:
         return f"<MailLog(id={self.id}, recipient='{self.recipient}', template='{self.template}')>"

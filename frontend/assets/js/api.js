@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "./config.js";
-import { getAccessToken, setAccessToken, removeAccessToken } from "./storage.js";
+import { getAccessToken, setAccessToken, removeAccessToken, getRefreshToken, setRefreshToken } from "./storage.js";
 
 let isRefreshing = false;
 let failedQueue = [];
@@ -39,14 +39,17 @@ async function customFetch(url, options = {}) {
 
     // Handle 401 Token Expiration Rotation
     if (response.status === 401) {
+      console.warn(`[AUTH] 401 Unauthorized received for request: ${url}`);
       const isRefreshRequest = url.includes("/auth/refresh") || url.includes("/auth/login");
       if (isRefreshRequest) {
+        console.error(`[AUTH] Refresh request failed with 401. Logging out user.`);
         removeAccessToken();
         const errPayload = await response.json().catch(() => ({}));
         throw errPayload;
       }
 
       if (isRefreshing) {
+        console.log(`[AUTH] Silent token refresh already in progress. Queueing request: ${url}`);
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
@@ -58,24 +61,32 @@ async function customFetch(url, options = {}) {
       }
 
       isRefreshing = true;
+      console.log(`[AUTH] Access token expired. Attempting silent token rotation...`);
 
       try {
+        const rToken = getRefreshToken();
         // Attempt token rotation via fetch
         const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
+          body: JSON.stringify({ refresh_token: rToken }),
           credentials: "include"
         });
 
         if (!refreshResponse.ok) {
-          throw new Error("Refresh failed");
+          throw new Error(`Refresh request failed with status: ${refreshResponse.status}`);
         }
 
         const refreshPayload = await refreshResponse.json();
         const newAccessToken = refreshPayload.data.access_token;
+        const newRefreshToken = refreshPayload.data.refresh_token;
+        console.log(`[AUTH] Silent token rotation succeeded. Updating token in storage.`);
         setAccessToken(newAccessToken);
+        if (newRefreshToken) {
+          setRefreshToken(newRefreshToken);
+        }
 
         processQueue(null, newAccessToken);
         isRefreshing = false;
@@ -85,6 +96,7 @@ async function customFetch(url, options = {}) {
         return await customFetch(url, options);
 
       } catch (refreshErr) {
+        console.error(`[AUTH] Silent token rotation failed: ${refreshErr.message}. Clearing session and triggering logout.`);
         processQueue(refreshErr, null);
         isRefreshing = false;
         removeAccessToken();

@@ -1,9 +1,9 @@
 """
 LoginLog model – security audit records for tracking sign-in operations.
 """
-from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 class LoginLog(Base):
     __tablename__ = "login_logs"
@@ -20,7 +20,7 @@ class LoginLog(Base):
     country = Column(String(100), nullable=True)
     user_agent = Column(String(500), nullable=True)
     reason = Column(String(255), nullable=True) # e.g. "INVALID_PASSWORD", "SUCCESS"
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     def __repr__(self) -> str:
         return f"<LoginLog(id={self.id}, username='{self.username}', success={self.success})>"

@@ -1,5 +1,6 @@
 import api from "../api.js";
 import { formatCurrency } from "../helpers.js";
+import { API_BASE_URL } from "../config.js";
 
 const formatVal = (v) => {
   return window.formatCurrency ? window.formatCurrency(v) : formatCurrency(v);
@@ -214,7 +215,7 @@ async function selectCustomer(c) {
     const photoImg = document.getElementById("cc-photo");
     const initialsBox = document.getElementById("cc-initials-fallback");
     if (details.has_profile_photo) {
-      photoImg.src = `${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"}/customers/${details.id}/photo?t=${new Date().getTime()}`;
+      photoImg.src = `${API_BASE_URL}/customers/${details.id}/photo?t=${new Date().getTime()}`;
       photoImg.classList.remove("hidden");
       initialsBox.classList.add("hidden");
     } else {
@@ -525,7 +526,7 @@ async function handleExportCsv() {
     }
 
     // Direct browser download by building custom headers with credentials inclusion
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api/v1"}/payments/export/csv${params}`, {
+    const response = await fetch(`${API_BASE_URL}/payments/export/csv${params}`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${localStorage.getItem("access_token")}`
@@ -552,6 +553,10 @@ async function handleExportCsv() {
 
 // Start load
 setTimeout(init, 100);
+
+window.refreshPageData = async () => {
+  await init();
+};
 
 window.addEventListener("language-changed", () => {
   renderCustomerList();

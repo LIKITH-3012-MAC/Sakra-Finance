@@ -6,6 +6,7 @@ import secrets
 import logging
 import asyncio
 from datetime import datetime, timedelta
+from app.utils.timezone import now_ist_naive, now_ist
 from typing import Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,7 +78,7 @@ async def invite_employee(
     stmt_invite = select(UserInvitation).filter(
         UserInvitation.email == payload.email,
         UserInvitation.status == "PENDING",
-        UserInvitation.expires_at > datetime.utcnow()
+        UserInvitation.expires_at > now_ist_naive()
     )
     result_invite = await db.execute(stmt_invite)
     existing_invite = result_invite.scalars().first()
@@ -91,7 +92,7 @@ async def invite_employee(
     temp_password_hash = hash_password(temp_password)
 
     # Expiry calculation
-    expires_at = datetime.utcnow() + timedelta(hours=payload.expiration_hours)
+    expires_at = now_ist_naive() + timedelta(hours=payload.expiration_hours)
 
     # Create temporary Username
     base_username = payload.email.split("@")[0].lower().replace(".", "_")
@@ -142,9 +143,9 @@ async def invite_employee(
     db.add(invite)
     await db.flush()
 
-    # Compose template
+    # expires_at is already in IST (naive), attach IST tzinfo for display formatting
     from zoneinfo import ZoneInfo
-    expires_at_ist = expires_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Asia/Kolkata"))
+    expires_at_ist = expires_at.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
     activation_link = f"http://localhost:5173/activate.html?token={token}"
     email_html = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; background: #0f172a; color: #f1f5f9;">
@@ -277,7 +278,7 @@ async def resend_invitation(
     token = secrets.token_urlsafe(32)
     temp_password = "SakraTemp@" + secrets.token_hex(4) + "!"
     temp_password_hash = hash_password(temp_password)
-    expires_at = datetime.utcnow() + timedelta(hours=24)
+    expires_at = now_ist_naive() + timedelta(hours=24)
 
     invite.token = token
     invite.temp_password_hash = temp_password_hash
@@ -288,9 +289,9 @@ async def resend_invitation(
         emp.password_hash = temp_password_hash
         emp.status = "INVITED"
 
-    # Compose template
+    # expires_at is already in IST (naive), attach IST tzinfo for display formatting
     from zoneinfo import ZoneInfo
-    expires_at_ist = expires_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(ZoneInfo("Asia/Kolkata"))
+    expires_at_ist = expires_at.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
     activation_link = f"http://localhost:5173/activate.html?token={token}"
     email_html = f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; background: #0f172a; color: #f1f5f9;">
@@ -790,20 +791,20 @@ async def get_security_metrics(
 ):
     """Gather aggregates for the Admin Security Dashboard."""
     # Build select statements
-    active_threshold = datetime.utcnow() - timedelta(minutes=15)
+    active_threshold = now_ist_naive() - timedelta(minutes=15)
     
     total_users_stmt = select(func.count(User.id)).filter(User.is_deleted == False)
     active_sessions_stmt = select(func.count(UserSession.id)).filter(UserSession.is_active == True)
     failed_logins_stmt = select(func.count(LoginLog.id)).filter(LoginLog.success == False)
     expired_invites_stmt = select(func.count(UserInvitation.id)).filter(
         UserInvitation.status == "PENDING",
-        UserInvitation.expires_at < datetime.utcnow()
+        UserInvitation.expires_at < now_ist_naive()
     )
     accepted_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.status == "USED")
     revoked_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.status == "REVOKED")
     pending_invites_stmt = select(func.count(UserInvitation.id)).filter(
         UserInvitation.status == "PENDING",
-        UserInvitation.expires_at >= datetime.utcnow()
+        UserInvitation.expires_at >= now_ist_naive()
     )
     locked_accounts_stmt = select(func.count(User.id)).filter(User.status == "locked", User.is_deleted == False)
     online_count_stmt = select(func.count(UserSession.user_id.distinct())).filter(
@@ -811,10 +812,9 @@ async def get_security_metrics(
         UserSession.last_active_at >= active_threshold
     )
 
-    from zoneinfo import ZoneInfo
-    ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    ist_now = now_ist()
     ist_midnight = ist_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_midnight = ist_midnight.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    today_midnight = ist_midnight.replace(tzinfo=None)
 
     today_logins_stmt = select(func.count(LoginLog.id)).filter(LoginLog.created_at >= today_midnight)
     today_invites_stmt = select(func.count(UserInvitation.id)).filter(UserInvitation.created_at >= today_midnight)

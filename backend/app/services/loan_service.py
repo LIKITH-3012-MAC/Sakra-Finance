@@ -10,6 +10,7 @@ import asyncio
 from collections import defaultdict
 
 from app.services.interest import calculate_interest, get_loan_balance_summary
+from app.utils.timezone import today_ist
 
 QUANTIZE_PRECISION = Decimal("0.01")
 
@@ -185,7 +186,7 @@ async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
     total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
     remaining_balance = max(total_due - total_paid, Decimal("0"))
 
-    today = date.today()
+    today = today_ist()
     repayment_rows = []
 
     for s in schedules:
@@ -257,7 +258,7 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
     )
     res = await db.execute(stmt)
     loans = res.scalars().all()
-    today = date.today()
+    today = today_ist()
 
     total_principal_all = Decimal("0")
     total_interest_all = Decimal("0")
@@ -337,7 +338,7 @@ async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
     from app.models.payment import Payment
     from app.models.loan_schedule import LoanSchedule
 
-    today = date.today()
+    today = today_ist()
 
     # Define tasks for parallel execution
     cust_count_task = db.execute(select(func.count(Customer.id)).filter(Customer.is_deleted == False))

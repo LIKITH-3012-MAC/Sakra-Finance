@@ -2,12 +2,11 @@
 Customer model – represents loan customers with encrypted Aadhaar data.
 """
 
-from datetime import datetime
-
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class Customer(Base):
@@ -34,8 +33,8 @@ class Customer(Base):
     created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     is_deleted = Column(Boolean, default=False, nullable=False)
     version_id = Column(Integer, default=1, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
 
     # ── Relationships ────────────────────────────────────────────

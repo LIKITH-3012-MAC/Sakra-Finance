@@ -6,6 +6,7 @@ from app.repositories.loan_repo import LoanRepository
 from app.repositories.payment_repo import PaymentRepository
 from app.services.interest import get_loan_balance_summary
 from app.services.credit_score import calculate_credit_score
+from app.utils.timezone import today_ist
 
 logger = logging.getLogger("sakra.ai.tools")
 
@@ -40,7 +41,7 @@ def get_customer_profile(db: Session, customer_id: int) -> Dict[str, Any]:
         # Calculate active credit score
         active_score = 700.0
         if loans:
-            active_score = calculate_credit_score(loans[0], payments, date.today() if hasattr(date, 'today') else None)
+            active_score = calculate_credit_score(loans[0], payments, today_ist())
 
         return {
             "customer": {

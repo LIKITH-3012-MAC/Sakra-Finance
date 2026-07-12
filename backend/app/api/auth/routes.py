@@ -5,6 +5,7 @@ import uuid
 import secrets
 import logging
 from datetime import datetime, timedelta
+from app.utils.timezone import now_ist_naive
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -118,7 +119,7 @@ async def login(
         os=os_name,
         country="India",
         is_active=True,
-        expires_at=datetime.utcnow() + timedelta(days=7)
+        expires_at=now_ist_naive() + timedelta(days=7)
     )
     db.add(user_session)
 
@@ -143,17 +144,18 @@ async def login(
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": session_id})
     refresh_token = create_refresh_token(data={"sub": str(user.id), "type": "refresh", "sid": session_id})
 
+    is_secure = not settings.DEBUG
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=is_secure,
+        samesite="lax" if settings.DEBUG else "strict",
         max_age=7 * 24 * 60 * 60,
         path="/",
     )
 
-    token_data = TokenResponse(access_token=access_token)
+    token_data = TokenResponse(access_token=access_token, refresh_token=refresh_token)
     user_data = UserResponse.model_validate(user)
 
     return APIResponse(
@@ -176,6 +178,12 @@ async def refresh_token(
     Rotate tokens. Restricts rotation to active session hashes.
     """
     refresh_token_value = request.cookies.get("refresh_token")
+    if not refresh_token_value:
+        try:
+            body = await request.json()
+            refresh_token_value = body.get("refresh_token")
+        except Exception:
+            pass
 
     if not refresh_token_value:
         raise HTTPException(
@@ -215,17 +223,18 @@ async def refresh_token(
     new_access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": sid})
     new_refresh_token = create_refresh_token(data={"sub": str(user.id), "type": "refresh", "sid": sid})
 
+    is_secure = not settings.DEBUG
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=is_secure,
+        samesite="lax" if settings.DEBUG else "strict",
         max_age=7 * 24 * 60 * 60,
         path="/",
     )
 
-    token_data = TokenResponse(access_token=new_access_token)
+    token_data = TokenResponse(access_token=new_access_token, refresh_token=new_refresh_token)
 
     return APIResponse(
         success=True,
@@ -241,10 +250,14 @@ async def logout(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Logout. Invalidates cookie and terminates database session record.
-    """
-    response.delete_cookie(key="refresh_token", path="/", httponly=True, secure=True, samesite="strict")
+    is_secure = not settings.DEBUG
+    response.delete_cookie(
+        key="refresh_token",
+        path="/",
+        httponly=True,
+        secure=is_secure,
+        samesite="lax" if settings.DEBUG else "strict",
+    )
 
     # Invalidate active session ID
     auth_header = request.headers.get("Authorization", "")
@@ -282,7 +295,7 @@ async def invite_validate(token: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid onboarding token.")
     if invite.status != "PENDING":
         raise HTTPException(status_code=400, detail=f"Onboarding token has already been {invite.status.lower()}.")
-    if invite.expires_at < datetime.utcnow():
+    if invite.expires_at < now_ist_naive():
         raise HTTPException(status_code=400, detail="Invitation has expired.")
 
     return APIResponse(
@@ -312,7 +325,7 @@ async def activate_account(
     result = await db.execute(stmt)
     invite = result.scalars().first()
 
-    if not invite or invite.status != "PENDING" or invite.expires_at < datetime.utcnow():
+    if not invite or invite.status != "PENDING" or invite.expires_at < now_ist_naive():
         raise HTTPException(status_code=400, detail="Invalid or expired invitation token.")
 
     # Validate temporary password
@@ -399,7 +412,7 @@ async def activate_account(
         os=os_name,
         country="India",
         is_active=True,
-        expires_at=datetime.utcnow() + timedelta(days=7)
+        expires_at=now_ist_naive() + timedelta(days=7)
     )
     db.add(sess)
 
@@ -424,12 +437,13 @@ async def activate_account(
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": session_id})
     refresh_token = create_refresh_token(data={"sub": str(user.id), "type": "refresh", "sid": session_id})
 
+    is_secure = not settings.DEBUG
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=is_secure,
+        samesite="lax" if settings.DEBUG else "strict",
         max_age=7 * 24 * 60 * 60,
         path="/",
     )
@@ -438,7 +452,7 @@ async def activate_account(
         success=True,
         message="Account onboarded successfully",
         data={
-            "token": {"access_token": access_token},
+            "token": {"access_token": access_token, "refresh_token": refresh_token},
             "user": {
                 "id": user.id,
                 "username": user.username,
@@ -474,7 +488,7 @@ async def forgot_password(payload: ForgotPasswordRequest, db: AsyncSession = Dep
     # Generates secure random 6-digit verification code
     otp = str(secrets.randbelow(900000) + 100000)
     user.reset_otp_hash = hash_password(otp)
-    user.reset_otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+    user.reset_otp_expires_at = now_ist_naive() + timedelta(minutes=10)
     user.reset_otp_attempts = 0
     await db.commit()
 
@@ -518,7 +532,7 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: AsyncSessi
         raise HTTPException(status_code=400, detail="Too many attempts. Password reset has been locked.")
 
     # Expiry validation
-    if not user.reset_otp_expires_at or user.reset_otp_expires_at < datetime.utcnow():
+    if not user.reset_otp_expires_at or user.reset_otp_expires_at < now_ist_naive():
         raise HTTPException(status_code=400, detail="Verification code has expired.")
 
     # Validate OTP value
@@ -530,7 +544,7 @@ async def verify_otp(payload: VerifyOTPRequest, request: Request, db: AsyncSessi
     # OTP is valid, generate secure random reset token
     reset_token = secrets.token_urlsafe(32)
     user.reset_token = reset_token
-    user.reset_token_expires_at = datetime.utcnow() + timedelta(minutes=15)
+    user.reset_token_expires_at = now_ist_naive() + timedelta(minutes=15)
     
     # Clear OTP fields
     user.reset_otp_hash = None
@@ -570,7 +584,7 @@ async def reset_password(payload: ResetPasswordWithTokenRequest, request: Reques
     if not user.reset_token or user.reset_token != payload.token:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
         
-    if not user.reset_token_expires_at or user.reset_token_expires_at < datetime.utcnow():
+    if not user.reset_token_expires_at or user.reset_token_expires_at < now_ist_naive():
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
 
     # Enforce password policy strength rules

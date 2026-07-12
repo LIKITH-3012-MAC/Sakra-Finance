@@ -1242,3 +1242,12 @@ function renderCumulativeCollection(payments) {
     }
   });
 }
+
+window.refreshPageData = async () => {
+  await loadCustomers();
+  if (selectedCustomerId) {
+    const activeId = selectedCustomerId;
+    selectedCustomerId = null;
+    await selectCustomer(activeId);
+  }
+};

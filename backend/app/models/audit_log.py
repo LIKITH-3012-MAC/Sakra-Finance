@@ -2,13 +2,12 @@
 AuditLog model – immutable audit trail for all data mutations.
 """
 
-from datetime import datetime
-
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.dialects.mysql import JSON
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class AuditLog(Base):
@@ -29,7 +28,7 @@ class AuditLog(Base):
     new_values = Column(JSON, nullable=True)
     ip_address = Column(String(45), nullable=False)
     user_agent = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     actor = relationship("User", back_populates="audit_logs", foreign_keys=[actor_id])

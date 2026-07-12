@@ -1,9 +1,9 @@
 """
 UserSession model – handles employee active sessions, devices, and token rotation constraints.
 """
-from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Index
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 class UserSession(Base):
     __tablename__ = "user_sessions"
@@ -23,9 +23,9 @@ class UserSession(Base):
     os = Column(String(100), nullable=True)
     country = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    last_active_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_active_at = Column(DateTime, default=now_ist_naive, nullable=False)
     expires_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     def __repr__(self) -> str:
         return f"<UserSession(id='{self.id}', user_id={self.user_id}, is_active={self.is_active})>"

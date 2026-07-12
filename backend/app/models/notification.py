@@ -2,12 +2,11 @@
 Notification model – stores user/customer notifications.
 """
 
-from datetime import datetime
-
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, Index
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class Notification(Base):
@@ -24,7 +23,7 @@ class Notification(Base):
     notification_type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False, nullable=False, index=True)
-    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    sent_at = Column(DateTime, default=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     user = relationship("User", back_populates="notifications", foreign_keys=[user_id])

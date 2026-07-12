@@ -2,12 +2,11 @@
 LoanSchedule model – represents individual installment entries for a loan.
 """
 
-from datetime import datetime
-
 from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
+from app.utils.timezone import now_ist_naive
 
 
 class LoanSchedule(Base):
@@ -25,8 +24,8 @@ class LoanSchedule(Base):
     paid_amount = Column(Numeric(15, 2), default=0, nullable=False)
     remaining_amount = Column(Numeric(15, 2), nullable=False)
     status = Column(String(20), default="PENDING", nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=now_ist_naive, nullable=False)
+    updated_at = Column(DateTime, default=now_ist_naive, onupdate=now_ist_naive, nullable=False)
 
     # ── Relationships ────────────────────────────────────────────
     loan = relationship("Loan", back_populates="schedules")

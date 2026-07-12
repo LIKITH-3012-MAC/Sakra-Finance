@@ -581,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         mailLogsContainer.innerHTML = res.data.map(m => {
-          const timeStr = new Date(m.created_at).toLocaleTimeString();
+          const timeStr = new Date(m.created_at).toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" });
           const statusColor = m.status === "SENT" ? "text-emerald-400" : "text-rose-500";
           return `
             <div class="p-3 border border-white/5 rounded bg-slate-950/40 space-y-1 hover:shadow-enterprise-sm transition-all duration-150">
@@ -605,7 +605,48 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Initialize page components
+  window.refreshPageData = async () => {
+    await loadDashboard();
+  };
+
+  let autoRefreshInterval = null;
+  function setupAutoRefresh() {
+    const toggle = document.getElementById("auto-refresh-toggle");
+    if (!toggle) return;
+
+    const startAutoRefresh = () => {
+      if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+      autoRefreshInterval = setInterval(async () => {
+        console.log("Auto-refreshing admin IAM control...");
+        await loadDashboard();
+      }, 30000); // 30 seconds
+    };
+
+    const stopAutoRefresh = () => {
+      if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+      }
+    };
+
+    const enabled = localStorage.getItem("admin-auto-refresh") === "true";
+    toggle.checked = enabled;
+    if (enabled) startAutoRefresh();
+
+    toggle.addEventListener("change", (e) => {
+      localStorage.setItem("admin-auto-refresh", e.target.checked);
+      if (e.target.checked) {
+        startAutoRefresh();
+        if (window.showToast) window.showToast("IAM auto-refresh enabled (30s interval)", "success");
+      } else {
+        stopAutoRefresh();
+        if (window.showToast) window.showToast("IAM auto-refresh disabled", "info");
+      }
+    });
+  }
+
   loadDashboard();
+  setupAutoRefresh();
 
   window.addEventListener("language-changed", () => {
     loadDashboard();

@@ -6,6 +6,7 @@ import re
 import io
 import asyncio
 from datetime import date, datetime
+from app.utils.timezone import now_ist_naive
 from decimal import Decimal
 from typing import Optional
 from io import BytesIO
@@ -34,6 +35,7 @@ from app.services.credit_score import calculate_credit_score
 from app.exceptions.handlers import CustomerNotFound, DuplicateAadhaar, ConflictError
 from app.services.cache import cache
 from app.core.config import settings
+from app.utils.timezone import today_ist
 
 logger = logging.getLogger("sakra.customers")
 
@@ -128,7 +130,7 @@ async def list_customers(
         total_paid_all = Decimal("0")
         total_principal = Decimal("0")
         active_loans = 0
-        today = date.today()
+        today = today_ist()
 
         for loan in loans:
             loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
@@ -415,7 +417,7 @@ async def get_customer(
     # Get all loans (using eager relationship)
     loans = [l for l in customer.loans if not l.is_deleted]
     loans_data = []
-    today = date.today()
+    today = today_ist()
 
     for loan in loans:
         loan_dict = LoanResponse.model_validate(loan).model_dump(mode="json")
@@ -693,7 +695,7 @@ async def upload_document_replacement(
         doc.content_type = content_type
         doc.file_size = len(final_bytes) if document_type == "PROFILE_PHOTO" else size
         doc.uploaded_by = current_user.id
-        doc.created_at = datetime.utcnow()
+        doc.created_at = now_ist_naive()
         action = "DOCUMENT_REPLACED" if document_type != "PROFILE_PHOTO" else "PHOTO_UPDATED"
     else:
         doc = CustomerDocument(

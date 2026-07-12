@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+from app.utils.timezone import now_ist_naive
 from app.database.session import SessionLocal
 from app.models.user import User
 from app.models.customer import Customer
@@ -85,7 +86,7 @@ def seed_database():
             if existing_loan:
                 continue
 
-            start_date = datetime.utcnow().date() - timedelta(days=config["days_ago"])
+            start_date = now_ist_naive().date() - timedelta(days=config["days_ago"])
             end_date = start_date + timedelta(days=100) # Sakra 100 days default duration
             
             loan = Loan(
@@ -112,7 +113,7 @@ def seed_database():
             for day in range(1, 101):
                 due_date = start_date + timedelta(days=day)
                 schedule_status = "PENDING"
-                if due_date < datetime.utcnow().date():
+                if due_date < now_ist_naive().date():
                     schedule_status = "PAID" if config["status"] == "ACTIVE" else "UNPAID"
 
                 schedule = LoanSchedule(
@@ -172,7 +173,7 @@ def seed_database():
                     notification_type="OVERDUE_ALERT",
                     message=f"Customer {cust.name} loan #{loan.id} is OVERDUE. Days crossed: {config['days_ago'] - 100} days.",
                     is_read=False,
-                    sent_at=datetime.utcnow()
+                    sent_at=now_ist_naive()
                 )
                 db.add(notification)
 
@@ -185,7 +186,7 @@ def seed_database():
                 new_values={"principal": config["principal"], "status": config["status"]},
                 ip_address="127.0.0.1",
                 user_agent="CLI Seeder V3.0",
-                created_at=datetime.utcnow()
+                created_at=now_ist_naive()
             )
             db.add(audit_log)
 

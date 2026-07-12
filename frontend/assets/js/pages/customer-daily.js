@@ -48,7 +48,7 @@ async function loadDailyLedger() {
         <tr>
           <td class="font-mono text-xs text-text-muted">#${p.id}</td>
           <td class="font-semibold text-text-primary">Loan Account #${p.loan_id}</td>
-          <td class="text-xs text-text-muted font-mono">${new Date(p.created_at || p.payment_date).toLocaleTimeString(window.currentLanguage === "te" ? "te-IN" : "en-IN")}</td>
+          <td class="text-xs text-text-muted font-mono">${new Date(p.created_at || p.payment_date).toLocaleTimeString(window.currentLanguage === "te" ? "te-IN" : "en-IN", { timeZone: "Asia/Kolkata" })}</td>
           <td class="text-right font-bold text-success font-mono">${formatVal(p.amount_paid)}</td>
           <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "CASH"}</td>
           <td class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
@@ -72,6 +72,10 @@ async function loadDailyLedger() {
 
 // Start load
 setTimeout(loadDailyLedger, 100);
+
+window.refreshPageData = async () => {
+  await loadDailyLedger();
+};
 
 window.addEventListener("language-changed", () => {
   loadDailyLedger();
