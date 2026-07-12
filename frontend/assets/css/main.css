@@ -1746,9 +1746,811 @@ span[class*="bg-orange-50"] {
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   SAKRA RESPONSIVE ENGINE V2.0 — ENTERPRISE FINTECH EDITION
+   5 Breakpoints: Mobile · Large Mobile · Tablet · Laptop · Desktop
+   ═══════════════════════════════════════════════════════════════ */
 
+/* ── MOBILE SIDEBAR DRAWER ──────────────────────────────────── */
+#mobile-sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms ease;
+}
 
+#mobile-sidebar-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
 
+#mobile-sidebar-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 85vw;
+  background: rgba(4, 8, 21, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  z-index: 999;
+  transform: translateX(-100%);
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#mobile-sidebar-drawer.active {
+  transform: translateX(0);
+}
+
+/* ── MOBILE BOTTOM SHEET ────────────────────────────────────── */
+.sakra-bottom-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 900;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 250ms ease;
+}
+
+.sakra-bottom-sheet-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sakra-bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 90vh;
+  background: rgba(4, 8, 21, 0.97);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px 20px 0 0;
+  z-index: 901;
+  transform: translateY(100%);
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sakra-bottom-sheet.active {
+  transform: translateY(0);
+}
+
+.sakra-bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  margin: 12px auto 8px;
+}
+
+/* ── BUTTON ENHANCEMENTS ────────────────────────────────────── */
+.sakra-btn-tactile {
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Ripple effect container */
+.sakra-btn-tactile .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(0);
+  animation: btn-ripple 600ms linear;
+  pointer-events: none;
+}
+
+@keyframes btn-ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* Loading state */
+.sakra-btn-tactile.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.sakra-btn-tactile.loading::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 600ms linear infinite;
+  margin-left: 6px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Disabled state */
+.sakra-btn-tactile:disabled,
+.sakra-btn-tactile[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ── RESPONSIVE TABLE → CARD SYSTEM ─────────────────────────── */
+/* On mobile, tables with .sakra-responsive-table will be converted to stacked cards */
+
+/* ── MOBILE DRILL-DOWN PATTERN ──────────────────────────────── */
+.mobile-back-btn {
+  display: none;
+}
+
+/* ── SAFE AREA INSETS (for notch phones) ─────────────────────── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  #mobile-bottom-nav {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    height: calc(64px + env(safe-area-inset-bottom));
+  }
+  .sakra-bottom-sheet {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BREAKPOINT: MOBILE (≤ 480px) — Touch-first banking app
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+  /* Layout */
+  .main-content {
+    padding: 12px 12px 80px !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  /* Typography scaling */
+  :root {
+    --text-xs: 0.65rem;
+    --text-sm: 0.75rem;
+    --text-base: 0.875rem;
+    --text-lg: 1rem;
+    --text-xl: 1.125rem;
+    --text-2xl: 1.375rem;
+    --text-3xl: 1.625rem;
+    --text-4xl: 2rem;
+  }
+
+  .text-display {
+    font-size: clamp(1.25rem, 5vw, 1.625rem) !important;
+  }
+
+  /* Fixed pixel overrides for mobile */
+  .text-\[8px\], .text-\[9px\] { font-size: 10px !important; }
+  .text-\[10px\] { font-size: 11px !important; }
+  .text-\[11px\], .text-\[12px\] { font-size: 12px !important; }
+
+  /* Touch targets — enforce min 44px */
+  .sakra-btn-tactile {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 11px;
+  }
+
+  .sakra-input-tactile {
+    min-height: 44px;
+    font-size: 14px !important; /* Prevent iOS zoom */
+    padding: 10px 14px;
+  }
+
+  select {
+    min-height: 44px;
+    font-size: 14px !important;
+  }
+
+  /* KPI Cards — 2 column on mobile */
+  .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-5 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .sakra-3d-card {
+    padding: 14px !important;
+  }
+
+  .sakra-3d-card .text-financial-number {
+    font-size: clamp(14px, 6cqw, 22px) !important;
+  }
+
+  /* Glass card spacing reduction */
+  .glass-card {
+    border-radius: 12px !important;
+  }
+
+  /* Tables on mobile — stack into cards */
+  .sakra-table-wrapper {
+    border-radius: 12px;
+  }
+
+  .sakra-responsive-table thead {
+    display: none !important;
+  }
+
+  .sakra-responsive-table tbody tr {
+    display: flex;
+    flex-direction: column;
+    padding: 14px;
+    border-bottom: 1px solid var(--sakra-border);
+    gap: 6px;
+  }
+
+  .sakra-responsive-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: none;
+    font-size: 12px;
+  }
+
+  .sakra-responsive-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+
+  /* Forms — single column */
+  .grid.grid-cols-2,
+  .grid.md\:grid-cols-2,
+  .grid.lg\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .grid.grid-cols-3,
+  .grid.md\:grid-cols-3,
+  .grid.lg\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Split layouts — stack vertically */
+  .grid.lg\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lg\:col-span-1,
+  .lg\:col-span-2 {
+    grid-column: span 1 !important;
+  }
+
+  /* Modal — full screen */
+  .sakra-modal-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    margin: 0;
+  }
+
+  .sakra-modal-header {
+    padding: 14px 16px !important;
+  }
+
+  .sakra-modal-body {
+    padding: 16px !important;
+  }
+
+  .sakra-modal-footer {
+    padding: 14px 16px !important;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sakra-modal-footer .sakra-btn-tactile {
+    width: 100%;
+  }
+
+  /* Spotlight / Command Palette */
+  .spotlight-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+  }
+
+  /* Mobile drill-down back button */
+  .mobile-back-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--sakra-surface);
+    border: 1px solid var(--sakra-border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: all 150ms ease;
+  }
+
+  .mobile-back-btn:active {
+    transform: scale(0.97);
+    background: var(--sakra-surface-elevated);
+  }
+
+  /* Customer registry row cards — smaller on mobile */
+  .registry-row-card {
+    height: auto !important;
+    min-height: 64px;
+    padding: 10px 12px;
+  }
+
+  .initials-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+
+  .truncated-name-cell {
+    max-width: 140px;
+  }
+
+  /* Page header flex — stack on mobile */
+  .flex.flex-col.sm\:flex-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Reduce gap on mobile */
+  .gap-8 { gap: 16px !important; }
+  .gap-6 { gap: 12px !important; }
+
+  /* Padding reduction for p-4 md:p-8 pattern */
+  .p-4.md\:p-8 {
+    padding: 12px !important;
+  }
+
+  /* Metric slide panels — always visible on mobile (no hover) */
+  .metric-slide-panel {
+    max-height: 80px !important;
+    opacity: 1 !important;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(37, 99, 235, 0.15);
+  }
+
+  /* Payments: hide workspace until customer selected */
+  .payments-workspace-panel.mobile-hidden {
+    display: none !important;
+  }
+
+  .payments-customer-panel.mobile-hidden {
+    display: none !important;
+  }
+
+  /* Header: hide non-essential elements */
+  .header-hide-mobile {
+    display: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BREAKPOINT: LARGE MOBILE (481–768px) — Phablet / Large Phone
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 481px) and (max-width: 768px) {
+  .main-content {
+    padding: 16px 16px 80px !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  :root {
+    --text-xs: 0.68rem;
+    --text-sm: 0.78rem;
+    --text-base: 0.9rem;
+    --text-lg: 1.05rem;
+    --text-xl: 1.15rem;
+    --text-2xl: 1.45rem;
+    --text-3xl: 1.75rem;
+    --text-4xl: 2.15rem;
+  }
+
+  .text-display {
+    font-size: clamp(1.375rem, 4vw, 1.75rem) !important;
+  }
+
+  /* KPI Cards — 2 column */
+  .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-5 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  .sakra-3d-card {
+    padding: 16px !important;
+  }
+
+  /* Touch targets */
+  .sakra-btn-tactile {
+    min-height: 44px;
+    padding: 10px 18px;
+  }
+
+  .sakra-input-tactile {
+    min-height: 44px;
+    font-size: 14px !important;
+  }
+
+  /* Form grids — single column */
+  .grid.grid-cols-2,
+  .grid.md\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Split layouts — stack */
+  .grid.lg\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .lg\:col-span-1,
+  .lg\:col-span-2 {
+    grid-column: span 1 !important;
+  }
+
+  /* Modals — near full screen */
+  .sakra-modal-container {
+    width: 96% !important;
+    max-width: 96% !important;
+    max-height: 95vh !important;
+    border-radius: 16px !important;
+  }
+
+  /* Responsive tables */
+  .sakra-responsive-table thead {
+    display: none !important;
+  }
+
+  .sakra-responsive-table tbody tr {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    border-bottom: 1px solid var(--sakra-border);
+    gap: 6px;
+  }
+
+  .sakra-responsive-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: none;
+  }
+
+  .sakra-responsive-table tbody td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+
+  /* Mobile back button */
+  .mobile-back-btn {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--sakra-surface);
+    border: 1px solid var(--sakra-border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+
+  /* Reduce gap */
+  .gap-8 { gap: 20px !important; }
+  .gap-6 { gap: 14px !important; }
+
+  .p-4.md\:p-8 {
+    padding: 16px !important;
+  }
+
+  /* Metric slide panels visible */
+  .metric-slide-panel {
+    max-height: 80px !important;
+    opacity: 1 !important;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(37, 99, 235, 0.15);
+  }
+
+  .registry-row-card {
+    height: auto !important;
+    min-height: 68px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BREAKPOINT: TABLET (769–1024px) — iPad, Surface
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .main-content {
+    padding: 20px 24px !important;
+  }
+
+  :root {
+    --text-xs: 0.72rem;
+    --text-sm: 0.82rem;
+    --text-base: 0.95rem;
+    --text-lg: 1.1rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.55rem;
+    --text-3xl: 1.9rem;
+    --text-4xl: 2.3rem;
+  }
+
+  /* KPI Cards — 3 column on tablet */
+  .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-5 {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  /* Form grids — two column */
+  .grid.grid-cols-2,
+  .grid.md\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Larger touch targets */
+  .sakra-btn-tactile {
+    min-height: 42px;
+  }
+
+  .sakra-input-tactile {
+    min-height: 42px;
+  }
+
+  /* Modals */
+  .sakra-modal-container {
+    max-width: 90% !important;
+    max-height: 90vh !important;
+  }
+
+  /* Sidebar — collapsible icon-only */
+  #sidebar-container > div {
+    width: 72px !important;
+    transition: width 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+  }
+
+  #sidebar-container > div:hover {
+    width: 240px !important;
+  }
+
+  #sidebar-container > div span,
+  #sidebar-container > div .ci-subtitle {
+    opacity: 0;
+    transition: opacity 200ms ease;
+    white-space: nowrap;
+  }
+
+  #sidebar-container > div:hover span,
+  #sidebar-container > div:hover .ci-subtitle {
+    opacity: 1;
+  }
+
+  /* Table headers — keep but smaller */
+  .sakra-table th {
+    padding: 12px 14px !important;
+    font-size: 10px !important;
+  }
+
+  .sakra-table td {
+    padding: 12px 14px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BREAKPOINT: LAPTOP (1025–1440px) — Standard laptop screens
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .main-content {
+    padding: 28px 32px !important;
+  }
+
+  /* KPI cards — 5 column */
+  .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 16px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BREAKPOINT: LARGE DESKTOP (1441px+) — External monitors
+   ═══════════════════════════════════════════════════════════════ */
+@media (min-width: 1441px) {
+  .main-content {
+    padding: 32px 48px !important;
+  }
+
+  /* KPI cards — 5 column with generous spacing */
+  .grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-5 {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 20px !important;
+  }
+
+  .sakra-3d-card {
+    padding: 28px !important;
+  }
+
+  /* Tables — generous spacing */
+  .sakra-table th {
+    padding: 18px 24px !important;
+  }
+
+  .sakra-table td {
+    padding: 18px 24px !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UNIVERSAL RESPONSIVE UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hide on mobile, show on desktop */
+.hide-mobile {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .hide-mobile {
+    display: initial;
+  }
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* Horizontal scroll chips container */
+.scroll-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.scroll-chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sticky mobile action bar */
+.sticky-action-bar {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: rgba(4, 8, 21, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--sakra-border);
+  z-index: 50;
+  display: flex;
+  gap: 8px;
+}
+
+@media (min-width: 769px) {
+  .sticky-action-bar {
+    position: static;
+    background: transparent;
+    backdrop-filter: none;
+    border-top: none;
+    padding: 0;
+  }
+}
+
+/* Responsive card grid utility */
+.card-grid-responsive {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 481px) {
+  .card-grid-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 769px) {
+  .card-grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1025px) {
+  .card-grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+}
+
+/* Responsive text truncation */
+.text-truncate-responsive {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Touch-friendly link/button reset */
+@media (hover: none) and (pointer: coarse) {
+  .sakra-3d-card:hover {
+    transform: none !important;
+    box-shadow: var(--shadow-soft) !important;
+  }
+  .sakra-3d-card:active {
+    transform: scale(0.98) !important;
+    transition-duration: 100ms !important;
+  }
+  .glass-card:hover {
+    background: var(--glass-bg) !important;
+    border-color: var(--glass-border) !important;
+    box-shadow: var(--shadow-soft) !important;
+  }
+  .glass-card:active {
+    background: var(--glass-bg-hover) !important;
+    border-color: var(--glass-border-hover) !important;
+  }
+  .registry-row-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  .registry-row-card:active {
+    background: rgba(30, 41, 59, 0.6) !important;
+  }
+}
+
+/* No horizontal scroll enforcement */
+html, body {
+  overflow-x: hidden !important;
+  max-width: 100vw;
+}
+
+/* Ensure images never overflow */
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
 
 
 

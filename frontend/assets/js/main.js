@@ -105,6 +105,63 @@ async function initLayout(user) {
       </div>
     `;
 
+    // Mobile Sidebar Drawer (visible on < md)
+    let mobileDrawerOverlay = document.getElementById("mobile-sidebar-overlay");
+    let mobileDrawer = document.getElementById("mobile-sidebar-drawer");
+
+    if (!mobileDrawerOverlay) {
+      mobileDrawerOverlay = document.createElement("div");
+      mobileDrawerOverlay.id = "mobile-sidebar-overlay";
+      document.body.appendChild(mobileDrawerOverlay);
+    }
+
+    if (!mobileDrawer) {
+      mobileDrawer = document.createElement("div");
+      mobileDrawer.id = "mobile-sidebar-drawer";
+      document.body.appendChild(mobileDrawer);
+    }
+
+    mobileDrawer.innerHTML = `
+      <div class="flex flex-col h-full">
+        <div class="flex flex-col">
+          <a href="/dashboard.html" class="p-5 border-b border-white/5 flex items-center justify-center select-none">
+            <img src="/logo.png" alt="SAKRA FINANCE" class="h-8 w-auto object-contain" />
+          </a>
+          <div class="p-4 bg-slate-950/20 border-b border-white/5">
+            <p class="text-[9px] text-slate-500 uppercase tracking-widest font-bold">${window.t ? window.t("secured_profile") : "Secured Profile"}</p>
+            <p class="font-bold text-sm text-slate-200 mt-1 truncate">${user.username}</p>
+            <span class="inline-block mt-2 px-2.5 py-0.5 text-[9px] uppercase tracking-wider font-bold rounded bg-blue-950/50 text-blue-400 border border-blue-500/20">
+              ${user.role}
+            </span>
+          </div>
+          <nav class="p-3 flex flex-col gap-1">
+            ${navItemsHtml}
+          </nav>
+        </div>
+        <div class="mt-auto p-3 border-t border-white/5">
+          <button id="mobile-drawer-logout" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-xs font-semibold uppercase tracking-wider text-rose-400/80 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer min-h-[44px]">
+            <i data-lucide="log-out" class="w-4 h-4 shrink-0"></i>
+            <span data-i18n="sign_out">${window.t ? window.t("sign_out") : "Sign Out"}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Close drawer on overlay click
+    mobileDrawerOverlay.addEventListener("click", () => {
+      mobileDrawer.classList.remove("active");
+      mobileDrawerOverlay.classList.remove("active");
+    });
+
+    // Close drawer on nav link click
+    mobileDrawer.querySelectorAll("a").forEach(link => {
+      link.addEventListener("click", () => {
+        mobileDrawer.classList.remove("active");
+        mobileDrawerOverlay.classList.remove("active");
+      });
+    });
+
+    document.getElementById("mobile-drawer-logout")?.addEventListener("click", logout);
     document.getElementById("sidebar-logout")?.addEventListener("click", logout);
   }
 
@@ -114,64 +171,69 @@ async function initLayout(user) {
     const currentLangText = window.currentLanguage === "te" ? "🇮🇳 TE" : "🇬🇧 EN";
 
     headerContainer.innerHTML = `
-      <header class="h-16 bg-slate-950/30 backdrop-blur-md border-b border-white/5 px-4 md:px-8 flex items-center justify-between shrink-0 relative z-10 select-none shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
+      <header class="h-14 md:h-16 bg-slate-950/30 backdrop-blur-md border-b border-white/5 px-3 md:px-8 flex items-center justify-between shrink-0 relative z-10 select-none shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
         <div class="flex items-center gap-2 md:gap-3">
+          <!-- Mobile Hamburger Menu -->
+          <button id="mobile-hamburger-btn" class="md:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-slate-300 hover:text-white transition-all cursor-pointer" aria-label="Open menu">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
           <span class="text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-blue-950/50 text-blue-400 px-2.5 py-1 rounded border border-blue-500/25 flex items-center gap-1.5 select-none font-sans">
             <span class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-ping"></span>
-            <span data-i18n="secure_session">${window.t ? window.t("secure_session") : "SECURE SESSION"}</span>
+            <span data-i18n="secure_session" class="hidden sm:inline">${window.t ? window.t("secure_session") : "SECURE SESSION"}</span>
+            <span class="sm:hidden">LIVE</span>
           </span>
-          <span class="hidden sm:inline-flex text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-900/50 text-slate-400 px-2.5 py-1 rounded border border-white/5 select-none font-sans">
+          <span class="hidden lg:inline-flex text-[9px] md:text-[10px] font-bold uppercase tracking-wider bg-slate-900/50 text-slate-400 px-2.5 py-1 rounded border border-white/5 select-none font-sans header-hide-mobile">
             <span data-i18n="verified_ip">${window.t ? window.t("verified_ip") : "VERIFIED IP"}</span>
           </span>
         </div>
         
-        <div class="flex items-center gap-3 md:gap-4 text-xs font-semibold text-slate-400 font-sans">
+        <div class="flex items-center gap-2 md:gap-4 text-xs font-semibold text-slate-400 font-sans">
           
           <!-- Custom Premium Language Selector -->
           <div class="relative inline-block text-left" id="lang-switcher-container">
-            <button id="lang-switcher-btn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-[9px] uppercase font-bold tracking-wider text-slate-300 hover:text-slate-100 transition-colors select-none cursor-pointer">
+            <button id="lang-switcher-btn" class="flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-[9px] uppercase font-bold tracking-wider text-slate-300 hover:text-slate-100 transition-colors select-none cursor-pointer min-w-[40px] min-h-[36px] justify-center">
               <i data-lucide="languages" class="w-3.5 h-3.5 text-slate-400"></i>
-              <span id="current-lang-text">${currentLangText}</span>
-              <i data-lucide="chevron-down" class="w-3 h-3 text-slate-500"></i>
+              <span id="current-lang-text" class="hidden sm:inline">${currentLangText}</span>
+              <i data-lucide="chevron-down" class="w-3 h-3 text-slate-500 hidden sm:inline"></i>
             </button>
             <div id="lang-switcher-dropdown" class="absolute right-0 mt-2 w-32 bg-slate-950/95 border border-white/10 rounded-lg shadow-enterprise-md py-1 hidden z-50 flex flex-col backdrop-blur-md">
-              <button data-lang="en" class="flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 text-slate-300 hover:text-white transition-colors cursor-pointer w-full text-[10px] font-bold uppercase tracking-wider">
+              <button data-lang="en" class="flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 text-slate-300 hover:text-white transition-colors cursor-pointer w-full text-[10px] font-bold uppercase tracking-wider min-h-[40px]">
                 🇬🇧 English
               </button>
-              <button data-lang="te" class="flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 text-slate-300 hover:text-white transition-colors cursor-pointer w-full text-[10px] font-bold uppercase tracking-wider">
+              <button data-lang="te" class="flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 text-slate-300 hover:text-white transition-colors cursor-pointer w-full text-[10px] font-bold uppercase tracking-wider min-h-[40px]">
                 🇮🇳 తెలుగు
               </button>
             </div>
           </div>
           
-          <span class="text-white/5">|</span>
+          <span class="text-white/5 hidden md:inline">|</span>
           <!-- Premium Sync Refresh Button -->
-          <button id="global-refresh-btn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-[9px] uppercase font-bold tracking-wider text-slate-300 hover:text-slate-100 transition-colors select-none cursor-pointer">
+          <button id="global-refresh-btn" class="flex items-center gap-1.5 px-2 md:px-2.5 py-1.5 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-[9px] uppercase font-bold tracking-wider text-slate-300 hover:text-slate-100 transition-colors select-none cursor-pointer min-w-[36px] min-h-[36px] justify-center">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400" id="global-refresh-icon"></i>
-            <span data-i18n="btn_refresh">REFRESH</span>
+            <span data-i18n="btn_refresh" class="hidden md:inline">REFRESH</span>
           </button>
           
-          <span class="text-white/5">|</span>
+          <span class="text-white/5 hidden md:inline">|</span>
           <!-- Premium Notifications Bell Icon -->
           <div class="relative inline-block" id="header-notifications-bell-container">
-            <button id="header-notifications-bell" class="relative flex items-center p-2 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-slate-300 hover:text-slate-100 transition-all select-none cursor-pointer">
-              <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+            <button id="header-notifications-bell" class="relative flex items-center p-2 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-slate-300 hover:text-slate-100 transition-all select-none cursor-pointer min-w-[36px] min-h-[36px] justify-center">
+              <i data-lucide="bell" class="w-4 h-4"></i>
               <span id="notifications-badge" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full scale-0 transition-transform shadow-[0_0_8px_rgba(239,68,68,0.5)]">0</span>
             </button>
           </div>
           
-          <span class="text-white/5">|</span>
-          <div class="flex items-center gap-1.5 select-none text-[9px] font-bold text-emerald-400">
+          <span class="text-white/5 hidden lg:inline">|</span>
+          <div class="hidden lg:flex items-center gap-1.5 select-none text-[9px] font-bold text-emerald-400">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-            <span class="hidden md:inline-block uppercase tracking-widest" data-i18n="audit_active">${window.t ? window.t("audit_active") : "AUDIT ACTIVE"}</span>
+            <span class="uppercase tracking-widest" data-i18n="audit_active">${window.t ? window.t("audit_active") : "AUDIT ACTIVE"}</span>
           </div>
-          <span class="text-white/5">|</span>
-          <div class="flex items-center gap-1.5 text-slate-200">
+          <span class="text-white/5 hidden lg:inline">|</span>
+          <div class="hidden lg:flex items-center gap-1.5 text-slate-200">
             <i data-lucide="user" class="w-3.5 h-3.5 text-slate-500"></i>
             <span class="truncate max-w-[80px] sm:max-w-none">${user.username}</span>
           </div>
           <span class="md:hidden text-white/5">|</span>
-          <button id="header-logout" class="md:hidden text-rose-400 hover:text-rose-600 transition-colors p-1 rounded bg-transparent border-none cursor-pointer">
+          <button id="header-logout" class="md:hidden text-rose-400 hover:text-rose-600 transition-colors p-1 rounded bg-transparent border-none cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center">
             <i data-lucide="log-out" class="w-4 h-4"></i>
           </button>
         </div>
