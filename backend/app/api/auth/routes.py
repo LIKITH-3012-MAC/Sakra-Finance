@@ -81,7 +81,16 @@ async def login(
             reason="INVALID_PASSWORD"
         )
         db.add(log)
+        
+        # Create notifications
+        from app.services.notification_service import create_system_notification, push_realtime_notifications
+        notifs = await create_system_notification(
+            db,
+            "SECURITY_LOGIN_FAILURE",
+            f"Failed login attempt for username '{credentials.username}' from {ip_addr} ({browser} on {os_name})"
+        )
         await db.commit()
+        push_realtime_notifications(notifs)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -138,7 +147,16 @@ async def login(
         reason="LOGIN_SUCCESS"
     )
     db.add(log)
+    
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db,
+        "SECURITY_LOGIN_SUCCESS",
+        f"User {user.username} logged in successfully from {ip_addr} ({browser} on {os_name})"
+    )
     await db.commit()
+    push_realtime_notifications(notifs)
 
     # Generate tokens including session ID (`sid`)
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "type": "access", "sid": session_id})
@@ -393,9 +411,20 @@ async def activate_account(
     history = UserPasswordHistory(user_id=user.id, password_hash=new_hash)
     db.add(history)
 
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db,
+        "SECURITY_ADMIN_CREATED",
+        f"New employee account activated: {user.username} (Role: {user.role}, Name: {user.full_name})"
+    )
+
     # Update invite record status
     invite.status = "USED"
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Start login session
     session_id = str(uuid.uuid4())

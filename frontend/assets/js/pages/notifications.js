@@ -200,3 +200,18 @@ function setupAutoRefresh() {
 window.addEventListener("language-changed", () => {
   loadNotifications();
 });
+
+window.addEventListener("new-notification", (e) => {
+  const newNotif = e.detail;
+  if (showAll || !newNotif.is_read) {
+    // Add to local array if not already present
+    if (!notifications.some(n => n.id === newNotif.id)) {
+      notifications.unshift(newNotif);
+      renderNotificationsList();
+      const unreadCount = notifications.filter(n => !n.is_read).length;
+      unreadText.innerText = unreadCount > 0 
+        ? `${unreadCount} ${window.t ? window.t("notifications_unread_count") : "unread alerts pending"}`
+        : (window.t ? window.t("notifications_all_caught_up") : "All caught up.");
+    }
+  }
+});

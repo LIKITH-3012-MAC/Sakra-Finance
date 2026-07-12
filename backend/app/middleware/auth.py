@@ -4,7 +4,7 @@ Authentication middleware with JWT-based user validation and role-based access c
 import logging
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -22,6 +22,7 @@ security_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -30,14 +31,18 @@ async def get_current_user(
     then returns the authenticated User object.
     Caches user/session information in Redis to avoid unnecessary database lookups.
     """
-    if credentials is None:
+    token = None
+    if credentials:
+        token = credentials.credentials
+    elif request:
+        token = request.query_params.get("token")
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    token = credentials.credentials
 
     try:
         payload = decode_token(token)

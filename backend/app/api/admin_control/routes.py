@@ -581,7 +581,33 @@ async def update_employee(
         new_values=payload.model_dump(exclude_unset=True),
         request=request
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = []
+    if payload.status is not None and payload.status != old_values["status"]:
+        if payload.status in ["inactive", "suspended", "locked"]:
+            notifs.extend(await create_system_notification(
+                db,
+                "SECURITY_USER_DISABLED",
+                f"Employee account deactivated: {emp.username} (status: {payload.status}) by {current_user.username}"
+            ))
+    elif payload.role is not None and payload.role != old_values["role"]:
+        notifs.extend(await create_system_notification(
+            db,
+            "SECURITY_PRIVILEGES_CHANGED",
+            f"Employee privileges changed: {emp.username} (role changed from {old_values['role']} to {payload.role}) by {current_user.username}"
+        ))
+    else:
+        notifs.extend(await create_system_notification(
+            db,
+            "SECURITY_PRIVILEGES_CHANGED",
+            f"Employee details updated: {emp.username} by {current_user.username}"
+        ))
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Clear cached user and permissions
     if settings.CACHE_ENABLED:
@@ -625,7 +651,18 @@ async def delete_employee(
         record_id=emp.id,
         request=request
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db,
+        "SECURITY_USER_DISABLED",
+        f"Employee account deleted: {emp.username} by {current_user.username}"
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Clear cached user and permissions
     if settings.CACHE_ENABLED:

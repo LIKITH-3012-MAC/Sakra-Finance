@@ -45,6 +45,7 @@ async def run_daily_overdue_check(db: AsyncSession, today_date: date) -> dict:
     active_loans = list(result.scalars().all())
     total_audited = len(active_loans)
     overdue_details = []
+    notifs = []
 
     for loan in active_loans:
         # Sum all payments for this loan
@@ -104,12 +105,16 @@ async def run_daily_overdue_check(db: AsyncSession, today_date: date) -> dict:
                         f"{days_overdue} day(s). Remaining balance: ₹{remaining}"
                     ),
                     is_read=False,
+                    customer_id=loan.customer_id,
                 )
                 db.add(notification)
+                notifs.append(notification)
 
     # Commit all status updates and notifications
     if overdue_details:
         await db.commit()
+        from app.services.notification_service import push_realtime_notifications
+        push_realtime_notifications(notifs)
 
         # Send consolidated email to admins
         stmt = select(User).filter(

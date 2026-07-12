@@ -105,6 +105,16 @@ async function init() {
       }
     });
 
+    // Auto-select customer from URL query param if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramCustId = urlParams.get("customer_id");
+    if (paramCustId) {
+      const match = customers.find(c => String(c.id) === String(paramCustId));
+      if (match) {
+        selectCustomer(match);
+      }
+    }
+
     paymentsContent?.classList.remove("hidden");
   } catch (err) {
     console.error("Failed to load customer list on counter:", err);

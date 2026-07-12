@@ -2,6 +2,7 @@ import { checkSession, logout } from "./auth.js";
 import { setTheme } from "./theme.js";
 import { initI18n } from "./i18n.js";
 import { registerServiceWorker, initInstallPrompt } from "./pwa.js";
+import api from "./api.js";
 
 // Initialize PWA
 registerServiceWorker();
@@ -151,6 +152,15 @@ async function initLayout(user) {
           </button>
           
           <span class="text-white/5">|</span>
+          <!-- Premium Notifications Bell Icon -->
+          <div class="relative inline-block" id="header-notifications-bell-container">
+            <button id="header-notifications-bell" class="relative flex items-center p-2 rounded bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-slate-300 hover:text-slate-100 transition-all select-none cursor-pointer">
+              <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+              <span id="notifications-badge" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full scale-0 transition-transform shadow-[0_0_8px_rgba(239,68,68,0.5)]">0</span>
+            </button>
+          </div>
+          
+          <span class="text-white/5">|</span>
           <div class="flex items-center gap-1.5 select-none text-[9px] font-bold text-emerald-400">
             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
             <span class="hidden md:inline-block uppercase tracking-widest" data-i18n="audit_active">${window.t ? window.t("audit_active") : "AUDIT ACTIVE"}</span>
@@ -244,10 +254,11 @@ async function initLayout(user) {
     const mobileLinksHtml = allowedLinks.map(link => {
       const isActive = activePath === link.file;
       return `
-        <a href="/${link.file}" class="flex flex-col items-center gap-1 transition-all duration-150 ${
+        <a href="/${link.file}" class="relative flex flex-col items-center gap-1 transition-all duration-150 ${
           isActive ? "text-blue-400 font-bold" : "text-slate-500 hover:text-slate-300"
         }">
           <i data-lucide="${link.icon}" class="w-5 h-5"></i>
+          ${link.file === "notifications.html" ? `<span id="mobile-notifications-badge" class="absolute top-0 right-3 bg-rose-500 text-white text-[7px] font-bold px-1 rounded-full scale-0 transition-transform shadow-[0_0_8px_rgba(239,68,68,0.5)]">0</span>` : ""}
           <span class="text-[8px] uppercase tracking-wider font-semibold" data-i18n="${link.key}">${window.t ? window.t(link.key) : link.name}</span>
         </a>
       `;
@@ -623,6 +634,7 @@ async function executeMain() {
   // Setup layouts
   window.currentUserSession = user;
   await initLayout(user);
+  await initNotificationCenter(user);
 }
 
 // Global Language Changed Redraw Listener
@@ -762,6 +774,399 @@ window.showToast = function(message, type = "info") {
   // Auto-dismiss after 4 seconds
   setTimeout(dismiss, 4000);
 };
+
+let notificationSseSource = null;
+
+async function initNotificationCenter(user) {
+  // Check if drawer element already exists
+  let drawer = document.getElementById("notifications-drawer");
+  if (!drawer) {
+    drawer = document.createElement("div");
+    drawer.id = "notifications-drawer";
+    drawer.className = "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-slate-950/95 backdrop-blur-lg border-l border-white/10 z-[1000] shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col";
+    document.body.appendChild(drawer);
+  }
+
+  // Load sound preference
+  let soundEnabled = localStorage.getItem("sakra-notif-sound") !== "off";
+
+  // HTML structure
+  drawer.innerHTML = `
+    <!-- Header -->
+    <div class="p-4 border-b border-white/5 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i data-lucide="bell" class="w-4 h-4 text-blue-400"></i>
+        <h3 class="text-xs uppercase font-bold tracking-wider text-slate-200">Alert Center</h3>
+      </div>
+      <div class="flex items-center gap-3">
+        <!-- Sound toggle button -->
+        <button id="drawer-sound-toggle" class="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors cursor-pointer">
+          <i data-lucide="${soundEnabled ? "volume-2" : "volume-x"}" class="w-3.5 h-3.5" id="sound-icon"></i>
+        </button>
+        <button id="close-notifications-drawer" class="text-slate-400 hover:text-slate-200 p-1 rounded hover:bg-white/5 transition-colors cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search & Bulk Actions -->
+    <div class="p-4 border-b border-white/5 flex flex-col gap-3">
+      <div class="flex items-center gap-2 bg-slate-900/50 rounded border border-white/5 px-3 py-1.5">
+        <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400"></i>
+        <input id="drawer-search" type="text" placeholder="Search alerts..." class="bg-transparent border-none outline-none text-[11px] text-white w-full" />
+      </div>
+      <div class="flex items-center justify-between text-[10px] text-slate-400">
+        <button id="drawer-mark-all-read" class="hover:text-blue-400 transition-colors flex items-center gap-1 cursor-pointer">
+          <i data-lucide="check-check" class="w-3 h-3"></i> Mark all read
+        </button>
+        <button id="drawer-clear-read" class="hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer">
+          <i data-lucide="trash-2" class="w-3 h-3"></i> Clear read
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="px-4 py-2 bg-slate-950/40 border-b border-white/5 overflow-x-auto flex gap-1.5 select-none scrollbar-none">
+      <button data-filter="all" class="filter-chip active text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">All</button>
+      <button data-filter="unread" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">Unread</button>
+      <button data-filter="PAYMENT" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">Payments</button>
+      <button data-filter="CUSTOMER" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">Customers</button>
+      <button data-filter="LOAN" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">Loans</button>
+      <button data-filter="SECURITY" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">Security</button>
+      <button data-filter="AI" class="filter-chip text-[9px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-full border border-white/5 transition-all cursor-pointer">AI</button>
+    </div>
+
+    <!-- Notifications List -->
+    <div id="drawer-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4"></div>
+  `;
+
+  if (window.lucide) window.lucide.createIcons({ node: drawer });
+
+  // Notifications state
+  let notificationsList = [];
+  let currentFilter = "all";
+  let searchQuery = "";
+
+  // Sound cue audio
+  const notifAudio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav");
+  notifAudio.volume = 0.4;
+
+  // Toggle drawer listeners
+  const bellBtn = document.getElementById("header-notifications-bell");
+  const closeBtn = document.getElementById("close-notifications-drawer");
+
+  const openDrawer = () => {
+    drawer.classList.add("active");
+    renderList();
+  };
+
+  const closeDrawer = () => {
+    drawer.classList.remove("active");
+  };
+
+  bellBtn?.addEventListener("click", openDrawer);
+  closeBtn?.addEventListener("click", closeDrawer);
+
+  // sound toggle listener
+  const soundToggle = document.getElementById("drawer-sound-toggle");
+  const soundIcon = document.getElementById("sound-icon");
+  soundToggle?.addEventListener("click", () => {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem("sakra-notif-sound", soundEnabled ? "on" : "off");
+    if (soundIcon) {
+      soundIcon.setAttribute("data-lucide", soundEnabled ? "volume-2" : "volume-x");
+      if (window.lucide) window.lucide.createIcons({ node: soundToggle });
+    }
+  });
+
+  // Filter chips selection
+  const chips = drawer.querySelectorAll(".filter-chip");
+  chips.forEach(chip => {
+    chip.addEventListener("click", () => {
+      chips.forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      currentFilter = chip.getAttribute("data-filter");
+      renderList();
+    });
+  });
+
+  // Search input
+  const searchInput = document.getElementById("drawer-search");
+  searchInput?.addEventListener("input", (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    renderList();
+  });
+
+  // Bulk actions
+  const markAllReadBtn = document.getElementById("drawer-mark-all-read");
+  const clearReadBtn = document.getElementById("drawer-clear-read");
+
+  markAllReadBtn?.addEventListener("click", async () => {
+    try {
+      await api.post("/notifications/read-all");
+      notificationsList.forEach(n => n.is_read = true);
+      updateBadges();
+      renderList();
+      window.showToast("All notifications marked as read.", "success");
+    } catch (err) {
+      console.error(err);
+    }
+  });
+
+  clearReadBtn?.addEventListener("click", () => {
+    notificationsList = notificationsList.filter(n => !n.is_read);
+    updateBadges();
+    renderList();
+    window.showToast("Read notifications cleared from view.", "success");
+  });
+
+  // Retrieve details
+  const fetchNotifications = async () => {
+    try {
+      const res = await api.get("/notifications/");
+      const payload = res.data || res;
+      notificationsList = payload.notifications || [];
+      updateBadges();
+      renderList();
+    } catch (err) {
+      console.error("Failed to load notifications:", err);
+    }
+  };
+
+  const updateBadges = () => {
+    const unreadCount = notificationsList.filter(n => !n.is_read).length;
+    const badge = document.getElementById("notifications-badge");
+    const mobileBadge = document.getElementById("mobile-notifications-badge");
+
+    if (badge) {
+      badge.textContent = unreadCount;
+      if (unreadCount > 0) {
+        badge.classList.remove("scale-0");
+        badge.classList.add("scale-100");
+      } else {
+        badge.classList.remove("scale-100");
+        badge.classList.add("scale-0");
+      }
+    }
+    if (mobileBadge) {
+      mobileBadge.textContent = unreadCount;
+      if (unreadCount > 0) {
+        mobileBadge.classList.remove("scale-0");
+        mobileBadge.classList.add("scale-100");
+      } else {
+        mobileBadge.classList.remove("scale-100");
+        mobileBadge.classList.add("scale-0");
+      }
+    }
+  };
+
+  const renderList = () => {
+    const listContainer = document.getElementById("drawer-list");
+    if (!listContainer) return;
+
+    // Filter items
+    let filtered = notificationsList;
+    if (currentFilter === "unread") {
+      filtered = notificationsList.filter(n => !n.is_read);
+    } else if (currentFilter !== "all") {
+      filtered = notificationsList.filter(n => n.notification_type.startsWith(currentFilter));
+    }
+
+    if (searchQuery) {
+      filtered = filtered.filter(n => 
+        (n.message || "").toLowerCase().includes(searchQuery) ||
+        (n.notification_type || "").toLowerCase().includes(searchQuery)
+      );
+    }
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-12 text-slate-500 text-center">
+          <i data-lucide="bell-off" class="w-8 h-8 text-slate-600 mb-2"></i>
+          <p class="text-xs">No alerts found</p>
+        </div>
+      `;
+      if (window.lucide) window.lucide.createIcons({ node: listContainer });
+      return;
+    }
+
+    // Grouping by Date: Today, Yesterday, Last 7 Days, Older
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const groups = {
+      Today: [],
+      Yesterday: [],
+      "Last 7 Days": [],
+      Older: []
+    };
+
+    filtered.forEach(n => {
+      const dt = new Date(n.sent_at);
+      if (dt >= today) {
+        groups.Today.push(n);
+      } else if (dt >= yesterday) {
+        groups.Yesterday.push(n);
+      } else if (dt >= lastWeek) {
+        groups["Last 7 Days"].push(n);
+      } else {
+        groups.Older.push(n);
+      }
+    });
+
+    let html = "";
+    Object.keys(groups).forEach(groupName => {
+      const groupItems = groups[groupName];
+      if (groupItems.length === 0) return;
+
+      html += `
+        <div class="flex flex-col gap-2">
+          <h4 class="text-[9px] uppercase tracking-widest font-bold text-slate-500 mt-2">${groupName}</h4>
+          <div class="flex flex-col gap-2">
+      `;
+
+      groupItems.forEach(n => {
+        let severity = "info";
+        let colorClass = "severity-info";
+        let icon = "info";
+        let bgStyle = "bg-slate-900/40";
+        
+        const type = n.notification_type;
+        if (type.includes("LARGE") || type.includes("HIGH") || type.includes("ALERT") || type.includes("WARNING")) {
+          severity = "high";
+          colorClass = "severity-high";
+          icon = "alert-circle";
+          bgStyle = "bg-amber-950/10 border-amber-500/10";
+        } else if (type === "OVERDUE" || type.includes("FAILURE") || type.includes("DISABLED") || type.includes("CRITICAL")) {
+          severity = "critical";
+          colorClass = "severity-critical";
+          icon = "alert-triangle";
+          bgStyle = "bg-rose-950/10 border-rose-500/10";
+        } else if (type.includes("REGISTERED") || type.includes("SUCCESS") || type.includes("COMPLETED")) {
+          severity = "success";
+          colorClass = "severity-success";
+          icon = "check-circle-2";
+          bgStyle = "bg-emerald-950/10 border-emerald-500/10";
+        } else if (type.includes("UPDATED") || type.includes("MODIFIED")) {
+          severity = "medium";
+          colorClass = "severity-medium";
+          icon = "edit-3";
+          bgStyle = "bg-blue-950/10 border-blue-500/10";
+        }
+
+        const dateStr = new Date(n.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        html += `
+          <div data-notif-id="${n.id}" class="notification-item ${colorClass} ${bgStyle} p-3 rounded-lg border border-white/5 flex flex-col gap-1.5 transition-all hover:bg-slate-900/60 cursor-pointer ${n.is_read ? "opacity-60" : "font-semibold shadow-sm"}">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[9px] uppercase tracking-wider font-bold ${
+                severity === "critical" ? "text-rose-400" :
+                severity === "high" ? "text-amber-400" :
+                severity === "success" ? "text-emerald-400" :
+                severity === "medium" ? "text-blue-400" : "text-slate-400"
+              }">${n.notification_type.replace(/_/g, " ")}</span>
+              <span class="text-[8px] text-slate-500 font-sans font-normal">${dateStr}</span>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">${n.message}</p>
+            <div class="flex items-center justify-end text-[9px] text-blue-400 gap-1 hover:text-blue-300 transition-all font-sans font-bold">
+              <span>View details</span>
+              <i data-lucide="chevron-right" class="w-3 h-3"></i>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+    });
+
+    listContainer.innerHTML = html;
+    if (window.lucide) window.lucide.createIcons({ node: listContainer });
+
+    // Item click listeners
+    listContainer.querySelectorAll(".notification-item").forEach(item => {
+      item.addEventListener("click", async () => {
+        const id = parseInt(item.getAttribute("data-notif-id"));
+        const notif = notificationsList.find(n => n.id === id);
+        if (notif) {
+          // Mark as read
+          if (!notif.is_read) {
+            notif.is_read = true;
+            try {
+              await api.patch(`/notifications/${notif.id}/read`);
+            } catch (e) {
+              console.error(e);
+            }
+            updateBadges();
+            renderList();
+          }
+
+          // Close drawer
+          closeDrawer();
+
+          // Redirect
+          if (notif.notification_type.startsWith("CUSTOMER")) {
+            window.location.href = `/customer-profile.html?id=${notif.customer_id}`;
+          } else if (notif.notification_type.startsWith("PAYMENT") || notif.notification_type === "OVERDUE") {
+            window.location.href = `/payments.html?customer_id=${notif.customer_id}`;
+          } else if (notif.notification_type.startsWith("LOAN")) {
+            window.location.href = `/customer-profile.html?id=${notif.customer_id}#loans`;
+          } else if (notif.notification_type.startsWith("SECURITY")) {
+            window.location.href = `/reports.html`;
+          } else if (notif.notification_type.startsWith("AI")) {
+            window.location.href = `/copilot.html`;
+          }
+        }
+      });
+    });
+  };
+
+  // Perform initial fetch
+  await fetchNotifications();
+
+  // ── Establish Real-Time SSE Stream ──────────────────────────
+  if (notificationSseSource) {
+    notificationSseSource.close();
+  }
+
+  const token = localStorage.getItem("access_token");
+  if (!token) return;
+
+  notificationSseSource = new EventSource(`/api/v1/notifications/stream?token=${token}`);
+
+  notificationSseSource.onmessage = (event) => {
+    try {
+      const newNotif = JSON.parse(event.data);
+      // Prepend to list
+      notificationsList.unshift(newNotif);
+      updateBadges();
+      renderList();
+
+      // Dispatch window event for other listeners (like notifications.js)
+      window.dispatchEvent(new CustomEvent("new-notification", { detail: newNotif }));
+
+      // Show temporary toast alert
+      window.showToast(newNotif.message, newNotif.notification_type.includes("CRITICAL") || newNotif.notification_type === "OVERDUE" ? "error" : "success");
+
+      // Play soft sound cue if enabled
+      if (soundEnabled) {
+        notifAudio.play().catch(e => console.warn("Audio play prevented:", e));
+      }
+    } catch (err) {
+      console.error("Failed to parse SSE event:", err);
+    }
+  };
+
+  notificationSseSource.onerror = (err) => {
+    console.debug("Notification stream disconnected. Retrying...");
+  };
+}
 
 // Run bootstrap
 executeMain();

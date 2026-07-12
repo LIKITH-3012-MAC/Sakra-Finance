@@ -83,8 +83,48 @@ async def record_payment(
             schedule_entry.status = "PARTIAL"
             repayment_status = "PARTIAL"
 
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == loan.customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{loan.customer_id}"
+
+    notifs = []
+    amount_paid_float = float(payment_data.amount_paid)
+    if amount_paid_float >= 50000:
+        notifs.extend(await create_system_notification(
+            db,
+            "PAYMENT_LARGE_RECEIVED",
+            f"Large payment received: ₹{amount_paid_float:,.2f} from customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}",
+            customer_id=loan.customer_id
+        ))
+    
+    if loan.status == "COMPLETED":
+        notifs.extend(await create_system_notification(
+            db,
+            "LOAN_COMPLETED",
+            f"Loan fully repaid / completed for customer: {cust_name} (Loan ID #{loan.id})",
+            customer_id=loan.customer_id
+        ))
+    else:
+        is_partial = False
+        if schedule_entry and payment_data.amount_paid < schedule_entry.expected_amount:
+            is_partial = True
+            
+        notif_type = "PAYMENT_RECORDED"
+        if is_partial:
+            notif_msg = f"Partial payment of ₹{amount_paid_float:,.2f} received from customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}"
+        else:
+            notif_msg = f"Payment of ₹{amount_paid_float:,.2f} recorded for customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}"
+            
+        notifs.extend(await create_system_notification(db, notif_type, notif_msg, customer_id=loan.customer_id))
+
     # Commit the transaction immediately (1 roundtrip)
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Extract client IP and user agent safely for audit log
     ip_address = None
@@ -212,7 +252,24 @@ async def modify_payment(
         new_values={"amount_paid": str(updated.amount_paid)},
         request=request,
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == payment.customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{payment.customer_id}"
+
+    notifs = await create_system_notification(
+        db,
+        "PAYMENT_RECORDED",
+        f"Payment updated: amount modified from ₹{float(old_amount):,.2f} to ₹{float(updated.amount_paid):,.2f} for customer: {cust_name} (Loan ID #{payment.loan_id}) by {current_user.username}",
+        customer_id=payment.customer_id
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
     
     # Invalidate caches
     if settings.CACHE_ENABLED:
@@ -455,7 +512,24 @@ async def delete_payment(
 
     # 5. Delete the payment record
     await db.delete(payment)
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == loan.customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{loan.customer_id}"
+
+    notifs = await create_system_notification(
+        db,
+        "PAYMENT_RECORDED",
+        f"Payment of ₹{float(amount_paid):,.2f} deleted/reverted for customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}",
+        customer_id=loan.customer_id
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Invalidate cache
     if settings.CACHE_ENABLED:

@@ -3,8 +3,11 @@ Notification routes: listing, marking as read, and manual audit trigger.
 """
 import logging
 from datetime import date
+import asyncio
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -15,6 +18,7 @@ from app.models.notification import Notification
 from app.schemas.common import APIResponse
 from app.schemas.notification import NotificationResponse
 from app.services.scheduler_service import run_daily_overdue_check
+from app.services.notification_service import notification_bus
 
 logger = logging.getLogger("sakra.notifications")
 
@@ -126,3 +130,31 @@ async def trigger_manual_audit(
         message=f"Overdue audit completed. {result['total_overdue']} overdue loans found.",
         data=result,
     )
+
+
+@router.get("/stream")
+async def stream_notifications(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Server-Sent Events (SSE) stream for real-time notification delivery.
+    """
+    queue = asyncio.Queue()
+    notification_bus.register(current_user.id, queue)
+
+    async def event_generator():
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    # Wait for next notification (timeout to send keep-alive comment)
+                    notif_data = await asyncio.wait_for(queue.get(), timeout=20.0)
+                    yield f"data: {json.dumps(notif_data)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            notification_bus.unregister(current_user.id, queue)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

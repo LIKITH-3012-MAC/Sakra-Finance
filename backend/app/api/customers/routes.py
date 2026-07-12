@@ -269,8 +269,33 @@ async def create_customer(
         if profile_photo and profile_photo.filename:
             photo_bytes = await profile_photo.read()
 
+        # Create notifications
+        from app.services.notification_service import create_system_notification, push_realtime_notifications
+        notifs = []
+        notifs.extend(await create_system_notification(
+            db, 
+            "CUSTOMER_REGISTERED", 
+            f"New customer registered: {customer.name} (ID #{customer.id}) by {current_user.username}", 
+            customer_id=customer.id
+        ))
+        notifs.extend(await create_system_notification(
+            db, 
+            "DOCUMENT_UPLOADED", 
+            f"Aadhaar card uploaded for customer: {customer.name} (ID #{customer.id})", 
+            customer_id=customer.id
+        ))
+        notifs.extend(await create_system_notification(
+            db, 
+            "DOCUMENT_UPLOADED", 
+            f"Promissory note uploaded for customer: {customer.name} (ID #{customer.id})", 
+            customer_id=customer.id
+        ))
+
         # Commit customer record in primary database transaction
         await db.commit()
+
+        # Push real-time notifications
+        push_realtime_notifications(notifs)
 
         # Extract client IP and user agent safely for audit log
         ip_address = None
@@ -531,7 +556,19 @@ async def update_customer(
         new_values=new_values,
         request=request,
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db, 
+        "CUSTOMER_UPDATED", 
+        f"Customer details updated: {customer.name} (ID #{customer.id}) by {current_user.username}", 
+        customer_id=customer.id
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
     
     # Invalidate caches
     if settings.CACHE_ENABLED:
@@ -570,7 +607,19 @@ async def delete_customer(
         old_values={"name": customer.name},
         request=request,
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db, 
+        "CUSTOMER_DELETED", 
+        f"Customer deleted: {customer.name} (ID #{customer.id}) by {current_user.username}", 
+        customer_id=customer.id
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
     
     # Invalidate caches
     if settings.CACHE_ENABLED:
@@ -731,7 +780,29 @@ async def upload_document_replacement(
         new_values={"filename": file.filename, "size": len(final_bytes)},
         request=request
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{customer_id}"
+
+    notif_msg = ""
+    notif_type = "DOCUMENT_UPLOADED"
+    if document_type == "PROFILE_PHOTO":
+        notif_type = "CUSTOMER_UPDATED"
+        notif_msg = f"Profile photo uploaded for customer: {cust_name} (ID #{customer_id}) by {current_user.username}"
+    elif document_type == "AADHAAR":
+        notif_msg = f"Aadhaar card uploaded for customer: {cust_name} (ID #{customer_id}) by {current_user.username}"
+    else: # PROMISSORY_NOTE
+        notif_msg = f"Promissory note uploaded for customer: {cust_name} (ID #{customer_id}) by {current_user.username}"
+
+    notifs = await create_system_notification(db, notif_type, notif_msg, customer_id=customer_id)
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Invalidate caches
     if settings.CACHE_ENABLED:
@@ -770,7 +841,24 @@ async def delete_customer_document(
         old_values={"filename": doc.filename},
         request=request
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{customer_id}"
+
+    notif_msg = f"Document {document_type} deleted for customer: {cust_name} (ID #{customer_id}) by {current_user.username}"
+    notif_type = "CUSTOMER_UPDATED"
+    if document_type == "PROFILE_PHOTO":
+        notif_msg = f"Profile photo deleted for customer: {cust_name} (ID #{customer_id}) by {current_user.username}"
+
+    notifs = await create_system_notification(db, notif_type, notif_msg, customer_id=customer_id)
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Invalidate caches
     if settings.CACHE_ENABLED:

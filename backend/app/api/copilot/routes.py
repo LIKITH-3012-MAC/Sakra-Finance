@@ -53,6 +53,29 @@ async def chat_with_copilot(
     
     # Save user message and bot response
     await CopilotService.add_message(db, session_id, "user", payload.query, response_content)
+
+    # Trigger notifications based on query contents
+    query_lower = payload.query.lower()
+    notif_type = None
+    notif_msg = None
+    if "report" in query_lower:
+        notif_type = "AI_REPORT_GENERATED"
+        notif_msg = f"AI Copilot generated a custom operations report for {current_user.username}"
+    elif "risk" in query_lower:
+        notif_type = "AI_RISK_ANALYSIS"
+        notif_msg = f"AI Risk Analysis completed for query by {current_user.username}"
+    elif "pattern" in query_lower or "abnormal" in query_lower:
+        notif_type = "AI_ABNORMAL_PATTERN"
+        notif_msg = f"AI Agent flagged abnormal repayment pattern warnings"
+    elif "default" in query_lower or "predict" in query_lower:
+        notif_type = "AI_DEFAULT_PREDICTION"
+        notif_msg = f"AI Default Prediction model evaluated default risk alerts"
+        
+    if notif_type:
+        from app.services.notification_service import create_system_notification, push_realtime_notifications
+        notifs = await create_system_notification(db, notif_type, notif_msg)
+        await db.commit()
+        push_realtime_notifications(notifs)
     
     # Invalidate chat history cache
     if settings.CACHE_ENABLED:

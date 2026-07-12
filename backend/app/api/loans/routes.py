@@ -138,7 +138,19 @@ async def create_loan(
         },
         request=request,
     )
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    notifs = await create_system_notification(
+        db,
+        "LOAN_CREATED",
+        f"New loan created for customer: {customer.name} (Loan ID #{loan.id}, Principal: ₹{loan.principal_amount}) by {current_user.username}",
+        customer_id=customer.id
+    )
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Defer cache invalidations and dashboard metrics warming to background
     from app.services.background_tasks import (
@@ -246,6 +258,9 @@ async def update_loan(
         "duration_days": loan.duration_days,
     }
 
+    old_end_date = loan.loan_end_date
+    old_status = loan.status
+
     try:
         updated = await LoanRepository.update(db, loan, update_data)
     except ConflictError as e:
@@ -268,7 +283,34 @@ async def update_loan(
         new_values=new_values,
         request=request,
     )
+
+    # Create notifications
+    from app.services.notification_service import create_system_notification, push_realtime_notifications
+    from app.models.customer import Customer
+    stmt_cust = select(Customer.name).filter(Customer.id == loan.customer_id)
+    res_cust = await db.execute(stmt_cust)
+    cust_name = res_cust.scalar() or f"ID #{loan.customer_id}"
+
+    notif_type = "LOAN_MODIFIED"
+    notif_msg = f"Loan details updated for customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}"
+
+    if update_data.status is not None and update_data.status != old_status:
+        if update_data.status == "CLOSED":
+            notif_type = "LOAN_CLOSED"
+            notif_msg = f"Loan closed for customer: {cust_name} (Loan ID #{loan.id}) by {current_user.username}"
+        elif update_data.status in ["PAID", "COMPLETED"]:
+            notif_type = "LOAN_COMPLETED"
+            notif_msg = f"Loan completed/repaid for customer: {cust_name} (Loan ID #{loan.id})"
+    elif update_data.loan_end_date is not None and update_data.loan_end_date > old_end_date:
+        notif_type = "LOAN_EXTENDED"
+        notif_msg = f"Loan duration extended for customer: {cust_name} (Loan ID #{loan.id}, new end date: {update_data.loan_end_date}) by {current_user.username}"
+
+    notifs = await create_system_notification(db, notif_type, notif_msg, customer_id=loan.customer_id)
+
     await db.commit()
+
+    # Push real-time notifications
+    push_realtime_notifications(notifs)
 
     # Invalidate caches
     if settings.CACHE_ENABLED:

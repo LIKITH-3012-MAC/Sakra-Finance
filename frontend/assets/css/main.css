@@ -1700,6 +1700,52 @@ span[class*="bg-orange-50"] {
   transform: translateY(0);
 }
 
+/* Premium Notification System Styles */
+#notifications-drawer.active {
+  transform: translateX(0) !important;
+}
+
+.notification-item {
+  border-left: 4px solid transparent;
+  transition: all 0.2s ease-in-out;
+}
+
+.severity-critical {
+  border-left-color: #ef4444 !important; /* Red */
+}
+
+.severity-high {
+  border-left-color: #f97316 !important; /* Orange */
+}
+
+.severity-medium {
+  border-left-color: #3b82f6 !important; /* Blue */
+}
+
+.severity-info {
+  border-left-color: #94a3b8 !important; /* Gray */
+}
+
+.severity-success {
+  border-left-color: #10b981 !important; /* Green */
+}
+
+.filter-chip.active {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #60a5fa !important;
+}
+
+.filter-chip:not(.active) {
+  color: #94a3b8 !important;
+  background-color: transparent !important;
+}
+
+.filter-chip:hover {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
 
 
 
