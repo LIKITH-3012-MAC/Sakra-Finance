@@ -481,24 +481,25 @@ async function executeRecordPayment(payload) {
     paymentForm.querySelector('input[name="amount_paid"]').value = "";
     paymentForm.querySelector('input[name="remarks"]').value = "";
 
-    // Dynamic UI Refresh: reload customer list and details cards immediately
+    // Dynamic UI Refresh: reload customer list and details cards asynchronously in background
     const customerId = selectedCustomer.id;
     const loanId = selectedLoan.id;
-    await init();
-    const updatedCustomer = customers.find(c => c.id === customerId);
-    if (updatedCustomer) {
-      selectedCustomer = updatedCustomer;
-      const resLoans = await api.get(`/customers/${customerId}`);
-      const payloadLoans = resLoans.data || resLoans;
-      customerLoans = payloadLoans.loans || [];
-      renderLoanSelector();
-      const updatedLoan = customerLoans.find(l => l.id === loanId);
-      if (updatedLoan) {
-        await selectLoan(updatedLoan);
+    init().then(async () => {
+      const updatedCustomer = customers.find(c => c.id === customerId);
+      if (updatedCustomer) {
+        selectedCustomer = updatedCustomer;
+        const resLoans = await api.get(`/customers/${customerId}`);
+        const payloadLoans = resLoans.data || resLoans;
+        customerLoans = payloadLoans.loans || [];
+        renderLoanSelector();
+        const updatedLoan = customerLoans.find(l => l.id === loanId);
+        if (updatedLoan) {
+          await selectLoan(updatedLoan);
+        }
+      } else {
+        await refreshLoanPayments();
       }
-    } else {
-      await refreshLoanPayments();
-    }
+    });
 
   } catch (err) {
     const card = document.getElementById("payment-entry-card");

@@ -320,6 +320,12 @@ async def on_startup():
                 metadata={"category": "credit_score"}
             )
             logger.info("RAG vector database seeding completed.")
+            
+            # Warm up dashboard metrics cache on application startup asynchronously
+            from app.services.background_tasks import warm_dashboard_cache_background
+            logger.info("Warming up dashboard metrics cache on startup...")
+            import asyncio
+            asyncio.create_task(warm_dashboard_cache_background())
         except Exception as e:
             logger.error("Error during startup seed: %s", str(e))
             await db.rollback()

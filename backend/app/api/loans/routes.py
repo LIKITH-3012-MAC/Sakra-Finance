@@ -140,19 +140,26 @@ async def create_loan(
     )
     await db.commit()
 
-    # Invalidate caches
-    if settings.CACHE_ENABLED:
-        await cache.invalidate_pattern("loans:*")
-        await cache.invalidate_pattern("customers:*")
-        await cache.delete("dashboard_metrics")
+    # Defer cache invalidations and dashboard metrics warming to background
+    from app.services.background_tasks import (
+        invalidate_cache_background,
+        warm_dashboard_cache_background
+    )
+    import asyncio
+
+    asyncio.create_task(
+        invalidate_cache_background(
+            patterns=["loans:*", "customers:*"],
+            keys=[]
+        )
+    )
+    asyncio.create_task(warm_dashboard_cache_background())
 
     return APIResponse(
         success=True,
         message="Loan created with installment schedule",
         data=LoanResponse.model_validate(loan).model_dump(mode="json"),
     )
-
-
 @router.get("/{loan_id}", response_model=APIResponse)
 async def get_loan(
     loan_id: int,

@@ -346,36 +346,16 @@ async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
 
     today = today_ist()
 
-    # Define tasks for parallel execution
-    cust_count_task = db.execute(select(func.count(Customer.id)).filter(Customer.is_deleted == False))
-    loan_count_task = db.execute(select(func.count(Loan.id)).filter(Loan.is_deleted == False))
-    disbursed_task = db.execute(select(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False))
-    collected_task = db.execute(select(func.sum(Payment.amount_paid)))
-    today_collected_task = db.execute(select(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today))
-    all_loans_task = db.execute(select(Loan).filter(Loan.is_deleted == False))
-    pending_payments_task = db.execute(select(func.count(LoanSchedule.id)).filter(
+    cust_res = await db.execute(select(func.count(Customer.id)).filter(Customer.is_deleted == False))
+    loan_res = await db.execute(select(func.count(Loan.id)).filter(Loan.is_deleted == False))
+    disbursed_res = await db.execute(select(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False))
+    collected_res = await db.execute(select(func.sum(Payment.amount_paid)))
+    today_collected_res = await db.execute(select(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today))
+    all_loans_res = await db.execute(select(Loan).filter(Loan.is_deleted == False))
+    pending_payments_res = await db.execute(select(func.count(LoanSchedule.id)).filter(
         LoanSchedule.due_date == today,
         LoanSchedule.remaining_amount > 0
     ))
-
-    # Run DB calls concurrently!
-    (
-        cust_res,
-        loan_res,
-        disbursed_res,
-        collected_res,
-        today_collected_res,
-        all_loans_res,
-        pending_payments_res
-    ) = await asyncio.gather(
-        cust_count_task,
-        loan_count_task,
-        disbursed_task,
-        collected_task,
-        today_collected_task,
-        all_loans_task,
-        pending_payments_task
-    )
 
     total_customers = cust_res.scalar() or 0
     total_loans = loan_res.scalar() or 0

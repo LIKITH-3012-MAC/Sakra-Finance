@@ -6,7 +6,7 @@ import logging
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -40,32 +40,38 @@ async def record_payment(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Record a new payment for a loan. Also updates the matching installment
-    in the loan schedule.
+    Record a new payment for a loan. Pre-loads schedules and payments in one select
+    query to optimize database roundtrips, and runs cache updates incrementally.
     """
-    # Verify loan exists
-    loan = await LoanRepository.get_by_id(db, payment_data.loan_id)
+    from sqlalchemy.orm import selectinload
+    from app.models.loan import Loan
+
+    # 1. Fetch loan along with schedules and payments in a single database roundtrip
+    stmt = select(Loan).filter(Loan.id == payment_data.loan_id).options(
+        selectinload(Loan.schedules),
+        selectinload(Loan.payments)
+    )
+    result = await db.execute(stmt)
+    loan = result.scalars().first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
 
+    # 2. Record the payment (updates loan.remaining_balance in-memory & database)
     try:
         payment = await PaymentRepository.create(
             db=db,
             schema=payment_data,
             customer_id=loan.customer_id,
             recorder_id=current_user.id,
+            loan=loan,
         )
     except PaymentError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
 
-    # Update matching loan schedule installment
-    stmt = select(LoanSchedule).filter(
-        LoanSchedule.loan_id == payment_data.loan_id,
-        LoanSchedule.due_date == payment_data.payment_date,
-    )
-    result = await db.execute(stmt)
-    schedule_entry = result.scalars().first()
+    # 3. Locate and update matching loan schedule installment in memory
+    schedule_entry = next((s for s in loan.schedules if s.due_date == payment_data.payment_date), None)
 
+    repayment_status = "PAID"
     if schedule_entry:
         schedule_entry.paid_amount = payment_data.amount_paid
         schedule_entry.remaining_amount = max(
@@ -76,51 +82,83 @@ async def record_payment(
             schedule_entry.status = "PAID"
         else:
             schedule_entry.status = "PARTIAL"
+            repayment_status = "PARTIAL"
 
-    await log_audit(
-        db=db,
-        actor_id=current_user.id,
-        action="RECORD_PAYMENT",
-        table_name="payments",
-        record_id=payment.id,
-        new_values={
-            "loan_id": payment.loan_id,
-            "amount": str(payment.amount_paid),
-            "date": str(payment.payment_date),
-            "mode": payment.payment_mode,
-        },
-        request=request,
-    )
+    # Commit the transaction immediately (1 roundtrip)
     await db.commit()
-    
-    # Invalidate caches
-    if settings.CACHE_ENABLED:
-        await cache.invalidate_pattern("payments:*")
-        await cache.invalidate_pattern("loans:*")
-        await cache.invalidate_pattern("customers:*")
-        await cache.delete("dashboard_metrics")
 
-    # Re-fetch for dynamic calculations
-    await db.refresh(loan)
+    # Extract client IP and user agent safely for audit log
+    ip_address = None
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip_address = forwarded_for.split(",")[0].strip()
+    elif request.client:
+        ip_address = request.client.host
+    user_agent = request.headers.get("user-agent")
 
-    from app.services.loan_service import (
-        get_customer_summary_details,
-        get_dashboard_metrics_details,
-        get_loan_repayment_rows,
+    # Defer audit logging and simple cache invalidation (0 DB queries)
+    from app.services.background_tasks import (
+        log_audit_background,
+        invalidate_cache_background
     )
-    from app.services.interest import calculate_interest
+    import asyncio
 
-    loan_payments = await PaymentRepository.list_by_loan(db, loan.id)
-    total_paid_for_loan = sum((p.amount_paid for p in loan_payments), Decimal("0"))
-    loan_total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
-    remaining_balance_val = float(max(loan_total_due - total_paid_for_loan, Decimal("0")))
+    asyncio.create_task(
+        log_audit_background(
+            actor_id=current_user.id,
+            action="RECORD_PAYMENT",
+            table_name="payments",
+            record_id=payment.id,
+            new_values={
+                "loan_id": payment.loan_id,
+                "amount": str(payment.amount_paid),
+                "date": str(payment.payment_date),
+                "mode": payment.payment_mode,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+    )
 
-    repayment_rows = await get_loan_repayment_rows(db, loan)
-    recorded_row = next((r for r in repayment_rows if r["payment_date"] == payment_data.payment_date.isoformat()), None)
-    repayment_status = recorded_row["payment_status"] if recorded_row else "PAID"
+    asyncio.create_task(
+        invalidate_cache_background(
+            patterns=["payments:*", "loans:*", f"customers:summary:{loan.customer_id}"],
+            keys=[]
+        )
+    )
 
-    customer_summary = await get_customer_summary_details(db, loan.customer_id)
-    dashboard_metrics = await get_dashboard_metrics_details(db)
+    # Read dashboard metrics from cache or fall back to DB calculation
+    dashboard_metrics = None
+    if settings.CACHE_ENABLED:
+        dashboard_metrics = await cache.get("dashboard_metrics")
+    
+    if not dashboard_metrics:
+        from app.services.loan_service import get_dashboard_metrics_details
+        dashboard_metrics = await get_dashboard_metrics_details(db)
+    else:
+        # Perform incremental update to cached dashboard metrics in memory (takes <1ms)
+        dashboard_metrics["total_collected"] = float(Decimal(str(dashboard_metrics["total_collected"])) + Decimal(str(payment_data.amount_paid)))
+        dashboard_metrics["today_collection"] = float(Decimal(str(dashboard_metrics["today_collection"])) + Decimal(str(payment_data.amount_paid)))
+        dashboard_metrics["outstanding_balance"] = float(max(Decimal(str(dashboard_metrics["outstanding_balance"])) - Decimal(str(payment_data.amount_paid)), Decimal("0")))
+        
+        # Recalculate efficiency: total_collected / total_repayable
+        total_due = Decimal(str(dashboard_metrics["total_repayable"]))
+        if total_due > 0:
+            eff = float((Decimal(str(dashboard_metrics["total_collected"])) / total_due) * 100)
+            dashboard_metrics["collection_efficiency"] = round(eff, 2)
+            
+        # Overwrite cached metrics in Redis asynchronously
+        asyncio.create_task(cache.set("dashboard_metrics", dashboard_metrics, expire_seconds=settings.CACHE_TTL))
+
+    # Read customer summaries from cache or fall back to DB calculation
+    customer_summary = None
+    if settings.CACHE_ENABLED:
+        customer_summary = await cache.get(f"customers:summary:{loan.customer_id}")
+    if not customer_summary:
+        from app.services.loan_service import get_customer_summary_details
+        customer_summary = await get_customer_summary_details(db, loan.customer_id)
+
+    remaining_balance_val = float(loan.remaining_balance)
 
     payment_dict = PaymentResponse.model_validate(payment).model_dump(mode="json")
     payment_dict["payment_status"] = repayment_status
@@ -136,8 +174,6 @@ async def record_payment(
             "dashboard_metrics": dashboard_metrics
         },
     )
-
-
 @router.put("/{payment_id}", response_model=APIResponse)
 async def modify_payment(
     payment_id: int,

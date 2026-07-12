@@ -1,7 +1,7 @@
 """
 Payment repository with duplicate detection, optimistic locking, and adjustment tracking.
 """
-from typing import Optional
+from typing import Optional, Any
 from datetime import date
 from decimal import Decimal
 from sqlalchemy import select
@@ -57,65 +57,17 @@ class PaymentRepository:
         schema: PaymentCreate,
         customer_id: int,
         recorder_id: int,
+        loan: Any,
     ) -> Payment:
         """
-        Create a new payment with duplicate detection.
-
-        Checks for existing payment on the same loan and date.
-
-        Args:
-            db: Database session
-            schema: PaymentCreate schema with payment data
-            customer_id: ID of the customer making the payment
-            recorder_id: ID of the user recording the payment
-
-        Returns:
-            The created Payment object
-
-        Raises:
-            PaymentError: If a payment already exists for this loan on this date
+        Create a new payment with duplicate detection using unique constraints.
         """
-        # Check for duplicate payment
-        stmt = select(Payment).filter(
-            Payment.loan_id == schema.loan_id,
-            Payment.payment_date == schema.payment_date,
-        )
-        result = await db.execute(stmt)
-        existing = result.scalars().first()
+        from decimal import Decimal
+        from sqlalchemy.exc import IntegrityError
 
-        if existing:
-            raise PaymentError(
-                f"A payment for loan #{schema.loan_id} on {schema.payment_date} already exists (ID: {existing.id})"
-            )
-
-        # Retrieve loan to check and update remaining amount/payment status
-        from app.models.loan import Loan
-        stmt = select(Loan).filter(Loan.id == schema.loan_id)
-        result = await db.execute(stmt)
-        loan = result.scalars().first()
-        if not loan:
-            raise PaymentError(f"Loan #{schema.loan_id} not found.")
-
-        # Compute outstanding amounts
-        if loan.total_repayable_amount is not None:
-            total_due = loan.total_repayable_amount
-        else:
-            from app.services.interest import calculate_interest
-            total_due = loan.principal_amount + calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
-        
-        # Calculate sum of other payments
-        stmt = select(Payment.amount_paid).filter(
-            Payment.loan_id == loan.id
-        )
-        result = await db.execute(stmt)
-        other_payments_sum = result.all()
-        
-        already_paid = sum(float(p[0]) for p in other_payments_sum)
         amount_paid_decimal = Decimal(str(schema.amount_paid))
-        
-        new_paid = Decimal(str(already_paid)) + amount_paid_decimal
-        remaining = max(Decimal(str(total_due)) - new_paid, Decimal("0"))
-        
+        remaining = max(loan.remaining_balance - amount_paid_decimal, Decimal("0"))
+
         payment_status = "PAID"
         loan.remaining_balance = remaining
         if remaining <= 0:
@@ -127,7 +79,7 @@ class PaymentRepository:
             loan_id=schema.loan_id,
             customer_id=customer_id,
             payment_date=schema.payment_date,
-            expected_amount=schema.amount_paid, # Expected matches paid for the day record
+            expected_amount=schema.amount_paid,
             amount_paid=schema.amount_paid,
             remaining_amount=remaining,
             payment_mode=schema.payment_mode,
@@ -137,11 +89,15 @@ class PaymentRepository:
             version_id=1,
         )
 
-        db.add(payment)
-        await db.flush()
-        return payment
+        try:
+            db.add(payment)
+            await db.flush()
+        except IntegrityError:
+            raise PaymentError(
+                f"A payment for loan #{schema.loan_id} on {schema.payment_date} already exists."
+            )
 
-    @staticmethod
+        return payment
     async def update(db: AsyncSession, payment: Payment, schema: PaymentUpdate) -> Payment:
         """
         Update a payment with optimistic locking and adjustment tracking.

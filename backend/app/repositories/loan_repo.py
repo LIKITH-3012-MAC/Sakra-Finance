@@ -92,17 +92,9 @@ class LoanRepository:
             duration_days=schema.duration_days,
         )
 
-        for entry in schedule_data:
-            schedule_record = LoanSchedule(
-                loan_id=entry["loan_id"],
-                installment_number=entry["installment_number"],
-                due_date=entry["due_date"],
-                expected_amount=entry["expected_amount"],
-                paid_amount=entry["paid_amount"],
-                remaining_amount=entry["remaining_amount"],
-                status=entry["status"],
-            )
-            db.add(schedule_record)
+        from sqlalchemy import insert
+        if schedule_data:
+            await db.execute(insert(LoanSchedule), schedule_data)
 
         await db.flush()
         return loan

@@ -12,7 +12,7 @@ from typing import Optional
 from io import BytesIO
 from PIL import Image
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, File, UploadFile, Form, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, File, UploadFile, Form, Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload, joinedload
@@ -202,6 +202,7 @@ async def list_customers(
 @router.post("/", response_model=APIResponse)
 async def create_customer(
     request: Request,
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     phone_number: str = Form(...),
     address: Optional[str] = Form(None),
@@ -219,7 +220,7 @@ async def create_customer(
 ):
     """
     Onboard a new customer with identity fields and binary document uploads.
-    Saves document blobs to the database LONGBLOB column.
+    Saves document blobs to the database LONGBLOB column in the background.
     """
     # 1. Validate Form Fields using Pydantic schema
     try:
@@ -237,7 +238,7 @@ async def create_customer(
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
 
-    # 2. Validate Document Uploads
+    # 2. Validate Document Uploads (Fast check on content typings and size metadata)
     aadhaar_size = validate_uploaded_file(
         aadhaar, 10, ["pdf", "png", "jpeg", "jpg"], ["application/pdf", "image/jpeg", "image/png"]
     )
@@ -250,102 +251,85 @@ async def create_customer(
             profile_photo, 5, ["jpg", "jpeg", "png", "webp"], ["image/jpeg", "image/png", "image/webp"]
         )
 
-    # 3. Create Customer Record & Documents Transaction
+    # 3. Create Customer Record & Defer Documents/Audits to Background
     try:
-        # Create Customer
         try:
             customer = await CustomerRepository.create(db, schema_data, current_user.id)
         except DuplicateAadhaar as e:
             raise HTTPException(status_code=e.status_code, detail=e.message)
 
-        # Save to get customer ID
+        # Save immediately to lock the customer record and acquire customer ID
         await db.flush()
 
-        # Save Aadhaar
+        # Read files into memory to safely pass bytes to background thread
         aadhaar_bytes = await aadhaar.read()
-        aadhaar_doc = CustomerDocument(
-            customer_id=customer.id,
-            document_type="AADHAAR",
-            file_blob=aadhaar_bytes,
-            filename=aadhaar.filename or "aadhaar.pdf",
-            content_type=aadhaar.content_type or "application/pdf",
-            file_size=aadhaar_size,
-            uploaded_by=current_user.id
-        )
-        db.add(aadhaar_doc)
-        await log_audit(
-            db=db,
-            actor_id=current_user.id,
-            action="AADHAAR_UPLOADED",
-            table_name="customer_documents",
-            record_id=customer.id,
-            new_values={"filename": aadhaar.filename, "size": aadhaar_size},
-            request=request
-        )
-
-        # Save Promissory Note
         promissory_bytes = await promissory_file.read()
-        promissory_doc = CustomerDocument(
-            customer_id=customer.id,
-            document_type="PROMISSORY_NOTE",
-            file_blob=promissory_bytes,
-            filename=promissory_file.filename or "promissory.pdf",
-            content_type=promissory_file.content_type or "application/pdf",
-            file_size=promissory_size,
-            uploaded_by=current_user.id
-        )
-        db.add(promissory_doc)
-        await log_audit(
-            db=db,
-            actor_id=current_user.id,
-            action="PROMISSORY_UPLOADED",
-            table_name="customer_documents",
-            record_id=customer.id,
-            new_values={"filename": promissory_file.filename, "size": promissory_size},
-            request=request
-        )
-
-        # Save Profile Photo if uploaded
+        
+        photo_bytes = None
         if profile_photo and profile_photo.filename:
             photo_bytes = await profile_photo.read()
-            compressed_bytes = process_profile_photo(photo_bytes)
-            photo_doc = CustomerDocument(
-                customer_id=customer.id,
-                document_type="PROFILE_PHOTO",
-                file_blob=compressed_bytes,
-                filename=profile_photo.filename,
-                content_type="image/jpeg",
-                file_size=len(compressed_bytes),
-                uploaded_by=current_user.id
-            )
-            db.add(photo_doc)
-            await log_audit(
-                db=db,
-                actor_id=current_user.id,
-                action="PHOTO_UPLOADED",
-                table_name="customer_documents",
-                record_id=customer.id,
-                new_values={"filename": profile_photo.filename, "size": len(compressed_bytes)},
-                request=request
-            )
 
-        # Main Customer Create Audit Log
-        await log_audit(
-            db=db,
-            actor_id=current_user.id,
-            action="CREATE_CUSTOMER",
-            table_name="customers",
-            record_id=customer.id,
-            new_values={"name": customer.name, "phone": customer.phone_number},
-            request=request,
+        # Commit customer record in primary database transaction
+        await db.commit()
+
+        # Extract client IP and user agent safely for audit log
+        ip_address = None
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            ip_address = forwarded_for.split(",")[0].strip()
+        elif request.client:
+            ip_address = request.client.host
+        user_agent = request.headers.get("user-agent")
+
+        # Defer files processing, documents saving, and audit logs to background tasks
+        from app.services.background_tasks import (
+            process_customer_registration_documents,
+            log_audit_background,
+            invalidate_cache_background
+        )
+        import asyncio
+
+        asyncio.create_task(
+            process_customer_registration_documents(
+                customer_id=customer.id,
+                creator_id=current_user.id,
+                aadhaar_filename=aadhaar.filename or "aadhaar.pdf",
+                aadhaar_content_type=aadhaar.content_type or "application/pdf",
+                aadhaar_bytes=aadhaar_bytes,
+                aadhaar_size=aadhaar_size,
+                promissory_filename=promissory_file.filename or "promissory.pdf",
+                promissory_content_type=promissory_file.content_type or "application/pdf",
+                promissory_bytes=promissory_bytes,
+                promissory_size=promissory_size,
+                profile_photo_filename=profile_photo.filename if profile_photo else None,
+                profile_photo_content_type=profile_photo.content_type if profile_photo else None,
+                profile_photo_bytes=photo_bytes,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
         )
 
-        await db.commit()
-        
-        # Invalidate caches
-        if settings.CACHE_ENABLED:
-            await cache.invalidate_pattern("customers:*")
-            await cache.delete("dashboard_metrics")
+        # Main Customer Create Audit Log in background
+        asyncio.create_task(
+            log_audit_background(
+                actor_id=current_user.id,
+                action="CREATE_CUSTOMER",
+                table_name="customers",
+                record_id=customer.id,
+                new_values={"name": customer.name, "phone": customer.phone_number},
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+        )
+
+        # Invalidate caches in background
+        asyncio.create_task(
+            invalidate_cache_background(
+                patterns=["customers:*"],
+                keys=[]
+            )
+        )
+
     except HTTPException as http_err:
         await db.rollback()
         raise http_err
@@ -353,7 +337,7 @@ async def create_customer(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Onboarding transaction failed: " + str(err))
 
-    # Build response schema
+    # Build response schema instantly
     response_dict = CustomerResponse.model_validate(customer).model_dump(mode="json")
     response_dict["has_profile_photo"] = (profile_photo is not None and profile_photo.filename is not None)
     response_dict["has_aadhaar"] = True
