@@ -432,8 +432,13 @@ async function refreshLoanPayments() {
       if (cardsContainer) cardsContainer.classList.add("hidden");
     } else {
       paymentsEmpty.classList.add("hidden");
-      paymentsTable.classList.remove("hidden");
-      if (cardsContainer) cardsContainer.classList.remove("hidden");
+      if (window.innerWidth < 768) {
+        paymentsTable.classList.add("hidden");
+        if (cardsContainer) cardsContainer.classList.remove("hidden");
+      } else {
+        paymentsTable.classList.remove("hidden");
+        if (cardsContainer) cardsContainer.classList.add("hidden");
+      }
 
       const CHUNK_SIZE = 25;
       const initialChunk = loanPayments.slice(0, CHUNK_SIZE);
