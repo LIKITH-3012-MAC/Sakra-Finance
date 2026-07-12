@@ -397,6 +397,7 @@ async function refreshLoanPayments() {
             <td class="font-semibold text-text-primary text-xs">${p.payment_date}</td>
             <td class="text-right font-mono text-xs text-text-secondary">${formatVal(p.expected_amount)}</td>
             <td class="text-right font-mono text-xs ${paidTextClass}">${formatVal(p.amount_paid)}</td>
+            <td class="text-xs text-text-primary font-bold font-mono">${p.equivalent_coverage != null ? p.equivalent_coverage + ' Days' : '—'}</td>
             <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "—"}</td>
             <td>${statusBadge}</td>
             <td class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>

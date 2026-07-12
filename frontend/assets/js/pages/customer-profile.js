@@ -67,6 +67,18 @@ function renderProfile(data) {
   document.getElementById("stat-pending-installments").innerText = customer.pending_installments_count || 0;
   document.getElementById("stat-loans-count").innerText = activeLoansCount;
 
+  // Calculate coverage stats dynamically
+  let latestCoverage = "—";
+  let largestCoverage = "—";
+  const actualPayments = aggregate_payments.filter(p => parseFloat(p.amount_paid) > 0 && p.equivalent_coverage != null);
+  if (actualPayments.length > 0) {
+    latestCoverage = `${actualPayments[0].equivalent_coverage} Days`;
+    const maxCoverage = Math.max(...actualPayments.map(p => p.equivalent_coverage));
+    largestCoverage = `${maxCoverage} Days`;
+  }
+  document.getElementById("stat-latest-coverage").innerText = latestCoverage;
+  document.getElementById("stat-largest-coverage").innerText = largestCoverage;
+
   // Bind collection intelligence pending installments card listeners
   bindPendingKpiListeners(customer);
 
@@ -252,6 +264,7 @@ function renderProfile(data) {
           <td class="font-semibold text-text-primary text-xs">${p.payment_date}</td>
           <td class="text-right font-mono text-xs text-text-secondary">${formatCurrency(p.expected_amount)}</td>
           <td class="text-right font-mono text-xs ${paidTextClass}">${formatCurrency(p.amount_paid)}</td>
+          <td class="text-xs text-text-primary font-bold font-mono">${p.equivalent_coverage != null ? p.equivalent_coverage + ' Days' : '—'}</td>
           <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "—"}</td>
           <td>${statusBadge}</td>
           <td class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>

@@ -220,9 +220,12 @@ async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
 
         recorded_by_name = "—"
         recorded_time = "—"
+        equivalent_coverage = None
         if p:
             recorded_by_name = recorders_dict.get(p.recorded_by, "—")
             recorded_time = p.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if loan.daily_installment and loan.daily_installment > 0:
+                equivalent_coverage = round(float(amount_paid) / float(loan.daily_installment), 2)
 
         repayment_rows.append({
             "id": p.id if p else None,
@@ -236,6 +239,7 @@ async def get_loan_repayment_rows(db: AsyncSession, loan) -> list[dict]:
             "remarks": p.remarks if (p and p.remarks) else "—",
             "recorded_by_name": recorded_by_name,
             "created_at": recorded_time,
+            "equivalent_coverage": equivalent_coverage,
         })
 
     return repayment_rows

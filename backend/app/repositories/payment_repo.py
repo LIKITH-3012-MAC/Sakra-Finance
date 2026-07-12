@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.models.payment import Payment
 from app.models.payment_adjustment import PaymentAdjustment
@@ -19,7 +20,7 @@ class PaymentRepository:
     @staticmethod
     async def get_by_id(db: AsyncSession, payment_id: int) -> Optional[Payment]:
         """Get a payment by ID."""
-        stmt = select(Payment).filter(Payment.id == payment_id)
+        stmt = select(Payment).filter(Payment.id == payment_id).options(joinedload(Payment.loan))
         result = await db.execute(stmt)
         return result.scalars().first()
 
@@ -29,7 +30,7 @@ class PaymentRepository:
         stmt = select(Payment).filter(
             Payment.loan_id == loan_id,
             Payment.payment_date == payment_date,
-        )
+        ).options(joinedload(Payment.loan))
         result = await db.execute(stmt)
         return result.scalars().first()
 
@@ -38,7 +39,7 @@ class PaymentRepository:
         """Get all payments for a specific loan, ordered by date."""
         stmt = select(Payment).filter(
             Payment.loan_id == loan_id,
-        ).order_by(Payment.payment_date.asc())
+        ).order_by(Payment.payment_date.asc()).options(joinedload(Payment.loan))
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
@@ -47,10 +48,9 @@ class PaymentRepository:
         """Get all payments for a specific customer, ordered by date descending."""
         stmt = select(Payment).filter(
             Payment.customer_id == customer_id,
-        ).order_by(Payment.payment_date.desc())
+        ).order_by(Payment.payment_date.desc()).options(joinedload(Payment.loan))
         result = await db.execute(stmt)
         return list(result.scalars().all())
-
     @staticmethod
     async def create(
         db: AsyncSession,
@@ -171,6 +171,6 @@ class PaymentRepository:
         """Get all payments recorded for today."""
         stmt = select(Payment).filter(
             Payment.payment_date == today,
-        ).order_by(Payment.created_at.desc())
+        ).order_by(Payment.created_at.desc()).options(joinedload(Payment.loan))
         result = await db.execute(stmt)
         return list(result.scalars().all())

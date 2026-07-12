@@ -1,7 +1,7 @@
 """
 Payment-related Pydantic schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional
 from decimal import Decimal
 from datetime import date, datetime
@@ -44,6 +44,19 @@ class PaymentResponse(BaseModel):
     expected_amount: Optional[Decimal] = None
     payment_status: Optional[str] = None
     recorded_by_name: Optional[str] = None
+    equivalent_coverage: Optional[float] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def calculate_equivalent_coverage(cls, data):
+        if not isinstance(data, dict):
+            loan = getattr(data, "loan", None)
+            if loan is not None:
+                daily_inst = getattr(loan, "daily_installment", None)
+                amount = getattr(data, "amount_paid", None)
+                if daily_inst and daily_inst > 0 and amount is not None:
+                    cov = float(amount) / float(daily_inst)
+                    setattr(data, "equivalent_coverage", round(cov, 2))
+        return data
 
     model_config = {"from_attributes": True}
-

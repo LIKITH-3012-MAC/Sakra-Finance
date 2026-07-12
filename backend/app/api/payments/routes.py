@@ -55,7 +55,6 @@ async def record_payment(
     loan = result.scalars().first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
-
     # 2. Record the payment (updates loan.remaining_balance in-memory & database)
     try:
         payment = await PaymentRepository.create(
@@ -65,9 +64,9 @@ async def record_payment(
             recorder_id=current_user.id,
             loan=loan,
         )
+        payment.loan = loan
     except PaymentError as e:
         raise HTTPException(status_code=e.status_code, detail=e.message)
-
     # 3. Locate and update matching loan schedule installment in memory
     schedule_entry = next((s for s in loan.schedules if s.due_date == payment_data.payment_date), None)
 
@@ -162,6 +161,12 @@ async def record_payment(
 
     payment_dict = PaymentResponse.model_validate(payment).model_dump(mode="json")
     payment_dict["payment_status"] = repayment_status
+
+    # Compute equivalent daily coverage for the recorded payment
+    equiv_coverage = None
+    if loan.daily_installment and float(loan.daily_installment) > 0:
+        equiv_coverage = round(float(payment_data.amount_paid) / float(loan.daily_installment), 2)
+    payment_dict["equivalent_coverage"] = equiv_coverage
 
     return APIResponse(
         success=True,
