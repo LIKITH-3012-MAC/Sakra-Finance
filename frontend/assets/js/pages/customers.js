@@ -606,6 +606,7 @@ function renderRegistry() {
 
   if (totalFiltered === 0) {
     tableContainer.classList.add("hidden");
+    mobileCardsContainer?.classList.add("hidden");
     emptyState.classList.remove("hidden");
     return;
   }
@@ -613,6 +614,7 @@ function renderRegistry() {
   emptyState.classList.add("hidden");
   errorState.classList.add("hidden");
   tableContainer.classList.remove("hidden");
+  mobileCardsContainer?.classList.remove("hidden");
 
   // Pagination bounds
   const totalPages = Math.ceil(totalFiltered / pageSize) || 1;
@@ -769,17 +771,19 @@ function renderRegistry() {
     const principal = activeLoan ? parseFloat(activeLoan.principal_amount) : 0;
     const remaining = activeLoan ? parseFloat(activeLoan.balance_summary.remaining_balance) : 0;
     const paid = activeLoan ? parseFloat(activeLoan.balance_summary.total_paid) : 0;
+    const repayable = activeLoan ? parseFloat(activeLoan.total_repayable_amount) : 0;
+    const completion = repayable > 0 ? (paid / repayable) * 100 : 0;
     const creditScore = c.aggregate?.credit_score || 700;
     
     // Risk Level
     let riskLevel = "MEDIUM RISK";
-    let riskClass = "text-amber-500";
+    let riskClass = "text-amber-500 bg-amber-500/10 border border-amber-500/20";
     if (creditScore >= 750) {
       riskLevel = "LOW RISK";
-      riskClass = "text-emerald-500";
+      riskClass = "text-emerald-500 bg-emerald-500/10 border border-emerald-500/20";
     } else if (creditScore < 650) {
       riskLevel = "HIGH RISK";
-      riskClass = "text-rose-500";
+      riskClass = "text-rose-500 bg-rose-500/10 border border-rose-500/20";
     }
 
     // Status
@@ -796,7 +800,7 @@ function renderRegistry() {
     }
 
     const statusBadge = `
-      <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-bold border ${badgeClass}">
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[8px] font-bold border uppercase ${badgeClass}">
         ${statusText}
       </span>
     `;
@@ -805,27 +809,56 @@ function renderRegistry() {
     let pendingBadge = "";
     if (pendingCount > 0) {
       pendingBadge = `
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 pending-trigger-badge" data-id="${c.id}">
-          <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
-          <span>${pendingCount} Behind</span>
+        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+          <span class="w-1 h-1 rounded-full bg-rose-500 animate-pulse mr-1"></span>
+          <span>${pendingCount} Missed</span>
         </span>
       `;
     } else {
       pendingBadge = `
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span class="w-1 h-1 rounded-full bg-emerald-500 mr-1"></span>
           <span>Perfect</span>
         </span>
       `;
     }
 
+    // Delinquency/equivalent paid calculations
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = activeLoan ? new Date(activeLoan.loan_start_date) : today;
+    startDate.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - startDate.getTime();
+    const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    const daysPassed = activeLoan ? Math.min(diffDays, activeLoan.duration_days) : 0;
+    const dailyInstallment = activeLoan ? parseFloat(activeLoan.daily_installment || 0) : 0;
+    const equivalentPaidDays = dailyInstallment > 0 ? (paid / dailyInstallment) : 0;
+    const behindDays = daysPassed - equivalentPaidDays;
+
+    let scheduleText = "";
+    let scheduleBadgeClass = "";
+    if (behindDays > 0) {
+      scheduleText = `${behindDays.toFixed(1)} Days Behind`;
+      scheduleBadgeClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+    } else if (behindDays < 0) {
+      scheduleText = `${Math.abs(behindDays).toFixed(1)} Days Ahead`;
+      scheduleBadgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    } else {
+      scheduleText = "On Schedule";
+      scheduleBadgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+    }
+
     const isSelected = c.id.toString() === selectedCustomerId?.toString();
     const cardSelectBorder = isSelected ? "border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.3)] scale-[1.01]" : "border-white/5";
 
+    // Pre-fetched details placeholder
+    const prefetchKey = `card-last-payment-${c.id}`;
+
     return `
-      <div class="glass-card p-5 border ${cardSelectBorder} flex flex-col gap-4 cursor-pointer hover:border-blue-500/40 transition-all duration-200" data-id="${c.id}">
+      <div class="glass-card p-4 border ${cardSelectBorder} flex flex-col gap-3 cursor-pointer hover:border-blue-500/40 transition-all duration-200" data-id="${c.id}">
+        <!-- Top row: Avatar, Name, Status -->
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2.5">
             <div class="relative shrink-0 w-[36px] h-[36px]">
               <div id="avatar-fallback-mobile-${c.id}" class="initials-avatar w-[36px] h-[36px] text-xs bg-gradient-to-br ${getInitialsGradient(c.name)}">
                 ${generateInitials(c.name)}
@@ -834,36 +867,90 @@ function renderRegistry() {
             </div>
             <div>
               <span class="text-[9px] font-mono text-text-muted">UID: #${c.id}</span>
-              <h4 class="text-xs font-bold text-text-primary font-sans">${c.name}</h4>
-              <p class="text-[10px] text-text-muted font-mono mt-0.5">${formatPhone(c.phone_number)}</p>
+              <h4 class="text-xs font-bold text-text-primary font-sans leading-tight">${c.name}</h4>
+              <p class="text-[9px] text-text-muted font-mono">${formatPhone(c.phone_number)}</p>
             </div>
           </div>
-          <div>
+          <div class="flex flex-col items-end gap-1">
             ${statusBadge}
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-mono font-bold border ${riskClass}">
+              ${riskLevel} (${creditScore})
+            </span>
           </div>
         </div>
+
         <div class="h-px bg-white/5"></div>
-        <div class="grid grid-cols-2 gap-3 text-[11px] font-medium text-text-secondary">
+
+        <!-- Middle row: Principal, Remaining, Completion Progress bar -->
+        <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-[10px] font-medium text-text-secondary">
           <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Remaining</span>
-            <span class="font-bold text-text-primary font-mono">${formatCurrency(remaining)}</span>
+            <span class="text-[8px] uppercase tracking-wider text-text-muted block">Remaining / Total</span>
+            <span class="font-bold text-text-primary font-mono">${formatCurrency(remaining)} <span class="text-[9px] text-text-muted">/ ${formatCurrency(repayable)}</span></span>
           </div>
           <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Principal</span>
-            <span class="font-semibold text-text-secondary font-mono">${formatCurrency(principal)}</span>
+            <span class="text-[8px] uppercase tracking-wider text-text-muted block">Coverage / Missed</span>
+            <span class="font-semibold text-text-secondary font-mono">${equivalentPaidDays.toFixed(1)} Days <span class="text-[9px] text-text-muted">/ ${pendingCount}</span></span>
           </div>
           <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Risk / Score</span>
-            <span class="font-bold font-mono ${riskClass}">${creditScore} (${riskLevel})</span>
+            <span class="text-[8px] uppercase tracking-wider text-text-muted block">Schedule Performance</span>
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold font-mono ${scheduleBadgeClass}">${scheduleText}</span>
           </div>
           <div>
-            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Pending</span>
-            <span class="inline-block mt-0.5">${pendingBadge}</span>
+            <span class="text-[8px] uppercase tracking-wider text-text-muted block">Last Payment</span>
+            <span id="${prefetchKey}" class="font-semibold text-text-secondary font-mono text-[9px]">Loading...</span>
           </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="flex flex-col gap-1 mt-1">
+          <div class="flex items-center justify-between text-[8px] text-text-muted font-bold">
+            <span>COLLECTION PROGRESS</span>
+            <span class="font-mono text-blue-400">${completion.toFixed(1)}%</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-white/5">
+            <div class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-500" style="width: ${completion}%"></div>
+          </div>
+        </div>
+
+        <!-- Quick Touch Actions -->
+        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-white/5">
+          <a href="/customer-profile.html?id=${c.id}" class="sakra-btn-tactile bg-blue-600/25 hover:bg-blue-600 text-blue-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-blue-500/20 select-none">
+            Profile
+          </a>
+          <a href="tel:${c.phone_number}" class="sakra-btn-tactile bg-emerald-600/25 hover:bg-emerald-600 text-emerald-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-emerald-500/20 select-none">
+            Call
+          </a>
+          <a href="/payments.html?customer_id=${c.id}" class="sakra-btn-tactile bg-purple-600/25 hover:bg-purple-600 text-purple-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-purple-500/20 select-none">
+            Pay
+          </a>
         </div>
       </div>
     `;
   }).join("");
+
+  // Trigger background detail pre-fetch for visible cards to load last payment dates
+  paginated.forEach(c => {
+    const prefetchKey = `card-last-payment-${c.id}`;
+    const targetEl = document.getElementById(prefetchKey);
+    if (!targetEl) return;
+
+    if (customerAnalyticsCache[c.id]) {
+      // Check cache first
+      updateCardWithPrefetchedData(c.id, customerAnalyticsCache[c.id], targetEl);
+    } else {
+      // Perform background fetch
+      api.get(`/customers/${c.id}`)
+        .then(res => {
+          const data = res.data || res;
+          customerAnalyticsCache[c.id] = data;
+          updateCardWithPrefetchedData(c.id, data, targetEl);
+        })
+        .catch(err => {
+          console.debug(`Prefetch failed for customer ${c.id}:`, err);
+          targetEl.innerText = "—";
+        });
+    }
+  });
 
   if (window.lucide) {
     window.lucide.createIcons();
@@ -2049,3 +2136,16 @@ function animateKPIs() {
   });
 }
 
+function updateCardWithPrefetchedData(customerId, data, targetEl) {
+  if (!targetEl) return;
+  const { aggregate_payments = [] } = data;
+  if (aggregate_payments.length > 0) {
+    const sorted = [...aggregate_payments].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
+    const last = sorted[0];
+    if (last) {
+      targetEl.innerText = `${last.payment_date} (₹${parseFloat(last.amount_paid).toLocaleString("en-IN")})`;
+      return;
+    }
+  }
+  targetEl.innerText = "No payment";
+}

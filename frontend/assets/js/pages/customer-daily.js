@@ -46,12 +46,12 @@ async function loadDailyLedger() {
 
       tableBody.innerHTML = payments.map(p => `
         <tr>
-          <td class="font-mono text-xs text-text-muted">#${p.id}</td>
-          <td class="font-semibold text-text-primary">Loan Account #${p.loan_id}</td>
-          <td class="text-xs text-text-muted font-mono">${new Date(p.created_at || p.payment_date).toLocaleTimeString(window.currentLanguage === "te" ? "te-IN" : "en-IN", { timeZone: "Asia/Kolkata" })}</td>
-          <td class="text-right font-bold text-success font-mono">${formatVal(p.amount_paid)}</td>
-          <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "CASH"}</td>
-          <td class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
+          <td data-label="Payment ID" class="font-mono text-xs text-text-muted">#${p.id}</td>
+          <td data-label="Loan Account" class="font-semibold text-text-primary">Loan Account #${p.loan_id}</td>
+          <td data-label="Time" class="text-xs text-text-muted font-mono">${new Date(p.created_at || p.payment_date).toLocaleTimeString(window.currentLanguage === "te" ? "te-IN" : "en-IN", { timeZone: "Asia/Kolkata" })}</td>
+          <td data-label="Paid" class="text-right font-bold text-success font-mono">${formatVal(p.amount_paid)}</td>
+          <td data-label="Method" class="text-xs text-text-secondary font-semibold">${p.payment_mode || "CASH"}</td>
+          <td data-label="Remarks" class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
         </tr>
       `).join("");
     }

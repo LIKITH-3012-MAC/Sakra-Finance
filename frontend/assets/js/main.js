@@ -161,6 +161,43 @@ async function initLayout(user) {
       });
     });
 
+    // Mobile Swipe Gestures for Sidebar Menu
+    let sidebarTouchStartX = 0;
+    let sidebarTouchEndX = 0;
+
+    mobileDrawer.addEventListener("touchstart", (e) => {
+      sidebarTouchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    mobileDrawer.addEventListener("touchend", (e) => {
+      sidebarTouchEndX = e.changedTouches[0].screenX;
+      if (sidebarTouchStartX - sidebarTouchEndX > 60) {
+        // Swipe left to dismiss menu
+        mobileDrawer.classList.remove("active");
+        mobileDrawerOverlay.classList.remove("active");
+      }
+    }, { passive: true });
+
+    document.addEventListener("touchstart", (e) => {
+      // Swipe from left edge (clientX < 30)
+      if (window.innerWidth < 768 && e.touches[0].clientX < 30) {
+        sidebarTouchStartX = e.touches[0].clientX;
+      } else {
+        sidebarTouchStartX = -1;
+      }
+    }, { passive: true });
+
+    document.addEventListener("touchend", (e) => {
+      if (sidebarTouchStartX !== -1) {
+        const diffX = e.changedTouches[0].clientX - sidebarTouchStartX;
+        if (diffX > 80) {
+          // Swipe right from left edge to open menu
+          mobileDrawer.classList.add("active");
+          mobileDrawerOverlay.classList.add("active");
+        }
+      }
+    }, { passive: true });
+
     document.getElementById("mobile-drawer-logout")?.addEventListener("click", logout);
     document.getElementById("sidebar-logout")?.addEventListener("click", logout);
   }
@@ -171,7 +208,7 @@ async function initLayout(user) {
     const currentLangText = window.currentLanguage === "te" ? "🇮🇳 TE" : "🇬🇧 EN";
 
     headerContainer.innerHTML = `
-      <header class="h-14 md:h-16 bg-slate-950/30 backdrop-blur-md border-b border-white/5 px-3 md:px-8 flex items-center justify-between shrink-0 relative z-10 select-none shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
+      <header class="h-14 md:h-16 bg-slate-950/30 backdrop-blur-md border-b border-white/5 px-3 md:px-8 flex items-center justify-between shrink-0 relative z-30 select-none shadow-[0_4px_12px_rgba(0,0,0,0.25)]">
         <div class="flex items-center gap-2 md:gap-3">
           <!-- Mobile Hamburger Menu -->
           <button id="mobile-hamburger-btn" class="md:hidden flex items-center justify-center w-10 h-10 rounded-lg bg-slate-900/50 hover:bg-slate-800/50 border border-white/5 text-slate-300 hover:text-white transition-all cursor-pointer" aria-label="Open menu">
@@ -241,6 +278,17 @@ async function initLayout(user) {
     `;
 
     document.getElementById("header-logout")?.addEventListener("click", logout);
+
+    // Mobile hamburger button toggle
+    const hamburgerBtn = document.getElementById("mobile-hamburger-btn");
+    const mobileDrawer = document.getElementById("mobile-sidebar-drawer");
+    const mobileDrawerOverlay = document.getElementById("mobile-sidebar-overlay");
+    if (hamburgerBtn && mobileDrawer && mobileDrawerOverlay) {
+      hamburgerBtn.addEventListener("click", () => {
+        mobileDrawer.classList.add("active");
+        mobileDrawerOverlay.classList.add("active");
+      });
+    }
 
     // Language switcher toggle & execution
     const langBtn = document.getElementById("lang-switcher-btn");
@@ -840,20 +888,42 @@ window.showToast = function(message, type = "info") {
 let notificationSseSource = null;
 
 async function initNotificationCenter(user) {
+  const isMobile = window.innerWidth < 768;
+
   // Check if drawer element already exists
   let drawer = document.getElementById("notifications-drawer");
   if (!drawer) {
     drawer = document.createElement("div");
     drawer.id = "notifications-drawer";
-    drawer.className = "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-slate-950/95 backdrop-blur-lg border-l border-white/10 z-[1000] shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col";
     document.body.appendChild(drawer);
+  }
+
+  // Handle mobile bottom-sheet styling vs desktop right sidebar
+  if (isMobile) {
+    drawer.className = "sakra-bottom-sheet flex flex-col";
+    
+    // Create sheet overlay if not exists
+    let sheetOverlay = document.getElementById("notifications-sheet-overlay");
+    if (!sheetOverlay) {
+      sheetOverlay = document.createElement("div");
+      sheetOverlay.id = "notifications-sheet-overlay";
+      sheetOverlay.className = "sakra-bottom-sheet-overlay";
+      document.body.appendChild(sheetOverlay);
+    }
+  } else {
+    drawer.className = "fixed top-0 right-0 bottom-0 w-full sm:w-[420px] bg-slate-950/95 backdrop-blur-lg border-l border-white/10 z-[1000] shadow-2xl transform translate-x-full transition-transform duration-300 flex flex-col";
+    
+    const sheetOverlay = document.getElementById("notifications-sheet-overlay");
+    if (sheetOverlay) sheetOverlay.remove();
   }
 
   // Load sound preference
   let soundEnabled = localStorage.getItem("sakra-notif-sound") !== "off";
 
-  // HTML structure
+  // HTML structure (Prepend handle for bottom sheet on mobile)
+  const dragHandleHtml = isMobile ? `<div class="sakra-bottom-sheet-handle shrink-0"></div>` : "";
   drawer.innerHTML = `
+    ${dragHandleHtml}
     <!-- Header -->
     <div class="p-4 border-b border-white/5 flex items-center justify-between">
       <div class="flex items-center gap-2">
@@ -916,18 +986,42 @@ async function initNotificationCenter(user) {
   // Toggle drawer listeners
   const bellBtn = document.getElementById("header-notifications-bell");
   const closeBtn = document.getElementById("close-notifications-drawer");
+  const sheetOverlay = document.getElementById("notifications-sheet-overlay");
 
   const openDrawer = () => {
     drawer.classList.add("active");
+    const overlay = document.getElementById("notifications-sheet-overlay");
+    if (overlay) overlay.classList.add("active");
     renderList();
   };
 
   const closeDrawer = () => {
     drawer.classList.remove("active");
+    const overlay = document.getElementById("notifications-sheet-overlay");
+    if (overlay) overlay.classList.remove("active");
   };
 
   bellBtn?.addEventListener("click", openDrawer);
   closeBtn?.addEventListener("click", closeDrawer);
+  if (sheetOverlay) {
+    sheetOverlay.addEventListener("click", closeDrawer);
+  }
+
+  // Swipe gesture to dismiss bottom sheet
+  let sheetTouchStartY = 0;
+  let sheetTouchEndY = 0;
+
+  drawer.addEventListener("touchstart", (e) => {
+    sheetTouchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+
+  drawer.addEventListener("touchend", (e) => {
+    sheetTouchEndY = e.changedTouches[0].screenY;
+    if (window.innerWidth < 768 && sheetTouchEndY - sheetTouchStartY > 75) {
+      // Swiped down
+      closeDrawer();
+    }
+  }, { passive: true });
 
   // sound toggle listener
   const soundToggle = document.getElementById("drawer-sound-toggle");
@@ -1151,19 +1245,103 @@ async function initNotificationCenter(user) {
     listContainer.innerHTML = html;
     if (window.lucide) window.lucide.createIcons({ node: listContainer });
 
-    // Item click listeners
+    // Item click, swipe, and long-press listeners
     listContainer.querySelectorAll(".notification-item").forEach(item => {
-      item.addEventListener("click", async () => {
-        const id = parseInt(item.getAttribute("data-notif-id"));
-        const notif = notificationsList.find(n => n.id === id);
-        if (notif) {
-          // Mark as read
+      const id = parseInt(item.getAttribute("data-notif-id"));
+      const notif = notificationsList.find(n => n.id === id);
+      if (!notif) return;
+
+      let startX = 0;
+      let startY = 0;
+      let isSwipeAction = false;
+      let longPressTimer = null;
+
+      item.addEventListener("touchstart", (e) => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isSwipeAction = false;
+        
+        // Long press detection (600ms)
+        longPressTimer = setTimeout(() => {
+          if (window.innerWidth < 768) {
+            item.style.transform = "scale(0.96)";
+            setTimeout(() => item.style.transform = "", 150);
+            
+            // Trigger simple action haptic menu
+            const act = confirm(`Mark this alert as ${notif.is_read ? 'UNREAD' : 'READ'}?`);
+            if (act) {
+              (async () => {
+                notif.is_read = !notif.is_read;
+                try {
+                  await api.patch(`/notifications/${notif.id}/read`);
+                } catch (err) {
+                  console.error(err);
+                }
+                updateBadges();
+                renderList();
+              })();
+            }
+          }
+        }, 600);
+      }, { passive: true });
+
+      item.addEventListener("touchmove", (e) => {
+        const moveX = e.touches[0].clientX;
+        const moveY = e.touches[0].clientY;
+        const diffX = startX - moveX;
+        const diffY = Math.abs(startY - moveY);
+
+        if (Math.abs(diffX) > 10 || diffY > 10) {
+          clearTimeout(longPressTimer);
+        }
+
+        if (window.innerWidth < 768 && diffX > 10 && diffY < 20) {
+          isSwipeAction = true;
+          item.style.transform = `translateX(-${diffX}px)`;
+        }
+      }, { passive: true });
+
+      item.addEventListener("touchend", async (e) => {
+        clearTimeout(longPressTimer);
+        
+        if (window.innerWidth < 768 && isSwipeAction) {
+          const endX = e.changedTouches[0].clientX;
+          const diffX = startX - endX;
+          if (diffX > 100) {
+            // Dismiss alert card
+            item.style.transition = "transform 0.2s ease, opacity 0.2s ease";
+            item.style.transform = "translateX(-120%)";
+            item.style.opacity = "0";
+            
+            setTimeout(async () => {
+              if (!notif.is_read) {
+                notif.is_read = true;
+                try {
+                  await api.patch(`/notifications/${notif.id}/read`);
+                } catch (err) {
+                  console.error(err);
+                }
+                updateBadges();
+              }
+              item.remove();
+            }, 200);
+          } else {
+            // Snap back
+            item.style.transition = "transform 0.2s ease";
+            item.style.transform = "";
+            setTimeout(() => { item.style.transition = ""; }, 200);
+          }
+          return; // Prevent click action
+        }
+
+        // Tap redirect/read execution
+        if (!isSwipeAction) {
           if (!notif.is_read) {
             notif.is_read = true;
             try {
               await api.patch(`/notifications/${notif.id}/read`);
-            } catch (e) {
-              console.error(e);
+            } catch (err) {
+              console.error(err);
             }
             updateBadges();
             renderList();
@@ -1185,7 +1363,7 @@ async function initNotificationCenter(user) {
             window.location.href = `/copilot.html`;
           }
         }
-      });
+      }, { passive: true });
     });
   };
 
@@ -1229,6 +1407,15 @@ async function initNotificationCenter(user) {
     console.debug("Notification stream disconnected. Retrying...");
   };
 }
+
+// Global Form Validation UX handler (autofocus / scroll and flash errors)
+document.addEventListener("invalid", (e) => {
+  e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+  e.target.classList.add("border-rose-500/50", "shadow-[0_0_10px_rgba(244,63,94,0.25)]");
+  setTimeout(() => {
+    e.target.classList.remove("border-rose-500/50", "shadow-[0_0_10px_rgba(244,63,94,0.25)]");
+  }, 2500);
+}, true);
 
 // Run bootstrap
 executeMain();

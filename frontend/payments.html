@@ -64,7 +64,7 @@
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <!-- LEFT PANEL: Customer + Loan Selector -->
-            <div class="lg:col-span-1 flex flex-col gap-4">
+            <div class="lg:col-span-1 flex flex-col gap-4 payments-customer-panel">
               
               <!-- Search box -->
               <div class="relative">
@@ -81,7 +81,7 @@
               </div>
 
               <!-- Customer Buttons List container -->
-              <div id="customer-list-card" class="glass-card flex flex-col gap-1 max-h-[35vh] overflow-y-auto bg-white/60 p-2">
+              <div id="customer-list-card" class="glass-card flex flex-col gap-1 max-h-[35vh] lg:max-h-[60vh] overflow-y-auto bg-white/60 p-2">
                 <!-- Loaded dynamically -->
               </div>
 
@@ -96,7 +96,7 @@
             </div>
 
             <!-- RIGHT PANEL: Record Form + History -->
-            <div class="lg:col-span-2 flex flex-col gap-6">
+            <div class="lg:col-span-2 flex flex-col gap-6 payments-workspace-panel mobile-hidden">
               
               <!-- Unselected Placeholder -->
               <div id="unselected-placeholder" class="glass-card text-center py-28 bg-white/60 p-6 flex flex-col items-center justify-center" style="border: 1px dashed rgba(59,130,246,0.25);">
@@ -110,6 +110,12 @@
               <!-- Active Workdesk -->
               <div id="active-workdesk" class="flex flex-col gap-6 hidden">
                 
+                <!-- Mobile Back Button -->
+                <button id="mobile-back-to-list-btn" class="mobile-back-btn">
+                  <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                  <span>Back to Customers</span>
+                </button>
+
                 <!-- Breadcrumbs -->
                 <div class="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-text-muted select-none">
                   <span class="hover:text-text-primary transition-colors cursor-pointer">Customers</span>
@@ -293,8 +299,8 @@
                     <h3 class="text-[10px] font-bold uppercase tracking-wider text-text-secondary" data-i18n="payments_recent_title">Recent Loan Payments</h3>
                   </div>
                   <div id="loan-payments-empty" class="p-12 text-center text-text-muted text-xs font-semibold hidden select-none" data-i18n="payments_empty_notes">No payments recorded for this account.</div>
-                  <div id="loan-payments-table-container" class="overflow-x-auto">
-                    <table class="sakra-table">
+                  <div id="loan-payments-table-container" class="overflow-x-auto hidden md:block">
+                    <table class="sakra-table sakra-responsive-table">
                       <thead>
                         <tr class="select-none text-[9px] uppercase font-bold tracking-wider">
                           <th data-i18n="payments_col_date">Date</th>
@@ -313,6 +319,9 @@
                       </tbody>
                     </table>
                   </div>
+
+                  <!-- Mobile Repayment Expandable Cards Container -->
+                  <div id="loan-payments-cards-container" class="md:hidden flex flex-col p-4 bg-slate-950/20"></div>
 
                 </div>
 

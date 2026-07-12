@@ -105,6 +105,14 @@ async function init() {
       }
     });
 
+    const backBtn = document.getElementById("mobile-back-to-list-btn");
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        document.querySelector(".payments-customer-panel")?.classList.remove("mobile-hidden");
+        document.querySelector(".payments-workspace-panel")?.classList.add("mobile-hidden");
+      });
+    }
+
     // Auto-select customer from URL query param if present
     const urlParams = new URLSearchParams(window.location.search);
     const paramCustId = urlParams.get("customer_id");
@@ -198,6 +206,10 @@ async function selectCustomer(c) {
   selectedLoan = null;
   customerLoans = [];
   loanPayments = [];
+  
+  // Mobile UI drill-down: toggle classes
+  document.querySelector(".payments-customer-panel")?.classList.add("mobile-hidden");
+  document.querySelector(".payments-workspace-panel")?.classList.remove("mobile-hidden");
   
   formError.classList.add("hidden");
   formSuccess.classList.add("hidden");
@@ -408,6 +420,8 @@ async function selectLoan(loan) {
 async function refreshLoanPayments() {
   if (!selectedLoan) return;
 
+  const cardsContainer = document.getElementById("loan-payments-cards-container");
+
   try {
     loanPayments = (aggregatePayments || []).filter(p => p.loan_id === selectedLoan.id);
     loanPayments.sort((a, b) => new Date(a.payment_date) - new Date(b.payment_date));
@@ -415,9 +429,11 @@ async function refreshLoanPayments() {
     if (loanPayments.length === 0) {
       paymentsEmpty.classList.remove("hidden");
       paymentsTable.classList.add("hidden");
+      if (cardsContainer) cardsContainer.classList.add("hidden");
     } else {
       paymentsEmpty.classList.add("hidden");
       paymentsTable.classList.remove("hidden");
+      if (cardsContainer) cardsContainer.classList.remove("hidden");
 
       const CHUNK_SIZE = 25;
       const initialChunk = loanPayments.slice(0, CHUNK_SIZE);
@@ -442,15 +458,15 @@ async function refreshLoanPayments() {
 
         return `
           <tr class="h-10 hover:bg-white/5 transition-all">
-            <td class="font-semibold text-text-primary text-xs py-2.5 px-4 font-mono">${p.payment_date}</td>
-            <td class="text-right font-mono text-xs text-text-secondary py-2.5 px-4">${formatVal(p.expected_amount)}</td>
-            <td class="text-right font-mono text-xs ${paidTextClass} py-2.5 px-4">${formatVal(p.amount_paid)}</td>
-            <td class="text-xs text-text-primary font-bold font-mono py-2.5 px-4">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
-            <td class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.payment_mode || "—"}</td>
-            <td class="py-2.5 px-4">${statusBadge}</td>
-            <td class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.recorded_by_name || "—"}</td>
-            <td class="text-xs text-text-muted font-mono py-2.5 px-4">${p.created_at || "—"}</td>
-            <td class="text-xs text-text-secondary italic py-2.5 px-4 max-w-[150px] truncate hover:whitespace-normal" title="${p.remarks || ''}">${p.remarks || "—"}</td>
+            <td data-label="Date" class="font-semibold text-text-primary text-xs py-2.5 px-4 font-mono">${p.payment_date}</td>
+            <td data-label="Expected" class="text-right font-mono text-xs text-text-secondary py-2.5 px-4">${formatVal(p.expected_amount)}</td>
+            <td data-label="Paid" class="text-right font-mono text-xs ${paidTextClass} py-2.5 px-4">${formatVal(p.amount_paid)}</td>
+            <td data-label="Coverage" class="text-xs text-text-primary font-bold font-mono py-2.5 px-4">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
+            <td data-label="Method" class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.payment_mode || "—"}</td>
+            <td data-label="Status" class="py-2.5 px-4">${statusBadge}</td>
+            <td data-label="Recorded By" class="text-xs text-text-secondary font-semibold py-2.5 px-4">${p.recorded_by_name || "—"}</td>
+            <td data-label="Time" class="text-xs text-text-muted font-mono py-2.5 px-4">${p.created_at || "—"}</td>
+            <td data-label="Notes" class="text-xs text-text-secondary italic py-2.5 px-4 max-w-[150px] truncate hover:whitespace-normal" title="${p.remarks || ''}">${p.remarks || "—"}</td>
           </tr>
         `;
       };
@@ -467,6 +483,93 @@ async function refreshLoanPayments() {
           if (window.lucide) {
             window.lucide.createIcons();
           }
+        });
+      }
+
+      // Render mobile cards
+      if (cardsContainer) {
+        const renderCardHtml = (p) => {
+          const norm = (p.payment_status || "PENDING").toUpperCase();
+          let badgeClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+          if (norm === "PAID") {
+            badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald";
+          } else if (norm === "PARTIALLY PAID") {
+            badgeClass = "bg-blue-500/10 text-blue-400 border-blue-500/20";
+          } else if (norm === "MISSED") {
+            badgeClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+          } else if (norm === "OVERDUE") {
+            badgeClass = "bg-rose-500/10 text-rose-400 border-rose-500/20 status-pill-rose animate-pulse";
+          } else if (norm === "COMPLETED") {
+            badgeClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 status-pill-emerald";
+          }
+          const statusBadge = `<span class="inline-block px-2 py-0.5 text-[9px] font-bold rounded border uppercase ${badgeClass}">${norm}</span>`;
+          const paidTextClass = parseFloat(p.amount_paid) > 0 ? "text-emerald-400 font-extrabold" : "text-text-muted";
+
+          return `
+            <div class="sakra-payment-card border border-white/5 rounded-lg bg-slate-950/40 overflow-hidden flex flex-col transition-all">
+              <div class="sakra-payment-card-header flex items-center justify-between p-4 cursor-pointer select-none min-h-[48px]">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-blue-400"></i>
+                  <span class="font-mono font-bold text-xs text-white">${p.payment_date}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  ${statusBadge}
+                  <i data-lucide="chevron-down" class="w-4 h-4 text-text-muted transition-transform duration-200 chevron-icon"></i>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-3 gap-2 px-4 pb-4 border-b border-white/5 bg-slate-950/20 py-2.5">
+                <div class="flex flex-col">
+                  <span class="text-[8px] text-text-muted uppercase tracking-wider font-bold">Expected</span>
+                  <span class="font-mono font-bold text-[11px] text-text-secondary">${formatVal(p.expected_amount)}</span>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[8px] text-text-muted uppercase tracking-wider font-bold">Paid</span>
+                  <span class="font-mono font-extrabold text-[11px] ${paidTextClass}">${formatVal(p.amount_paid)}</span>
+                </div>
+                <div class="flex flex-col">
+                  <span class="text-[8px] text-text-muted uppercase tracking-wider font-bold">Coverage</span>
+                  <span class="font-mono font-bold text-[11px] text-blue-400">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</span>
+                </div>
+              </div>
+
+              <div class="sakra-payment-card-details hidden p-4 bg-slate-950/70 space-y-2 text-[10px] border-t border-white/5">
+                <div class="flex justify-between items-center py-1 border-b border-white/5">
+                  <span class="text-text-muted">Payment Method</span>
+                  <span class="text-white font-bold">${p.payment_mode || "—"}</span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-white/5">
+                  <span class="text-text-muted">Recorded By</span>
+                  <span class="text-white font-semibold">${p.recorded_by_name || "—"}</span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-white/5">
+                  <span class="text-text-muted">Timestamp</span>
+                  <span class="text-text-secondary font-mono">${p.created_at || "—"}</span>
+                </div>
+                <div class="flex flex-col gap-1 py-1">
+                  <span class="text-text-muted">Remarks</span>
+                  <span class="text-text-secondary italic leading-normal">${p.remarks || "—"}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        };
+
+        cardsContainer.innerHTML = loanPayments.map(renderCardHtml).join("");
+
+        // Bind accordion click expand/collapse behavior
+        cardsContainer.querySelectorAll(".sakra-payment-card").forEach(card => {
+          const header = card.querySelector(".sakra-payment-card-header");
+          const details = card.querySelector(".sakra-payment-card-details");
+          header.addEventListener("click", () => {
+            if (card.classList.contains("expanded")) {
+              card.classList.remove("expanded");
+              details.classList.add("hidden");
+            } else {
+              card.classList.add("expanded");
+              details.classList.remove("hidden");
+            }
+          });
         });
       }
     }

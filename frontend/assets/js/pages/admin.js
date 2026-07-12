@@ -320,18 +320,18 @@ document.addEventListener("DOMContentLoaded", () => {
           const statusClass = e.status === "active" ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/20" : e.status === "INVITED" ? "bg-blue-950/40 text-blue-400 border-blue-500/20" : "bg-rose-950/40 text-rose-400 border-rose-500/20";
           return `
             <tr class="hover:bg-white/5 transition-all">
-              <td class="py-4 px-6">
+              <td data-label="Employee" class="py-4 px-6">
                 <div class="font-bold text-text-primary">${e.full_name || e.username}</div>
                 <div class="text-[10px] text-text-muted">${e.email}</div>
               </td>
-              <td class="py-4 px-6">
+              <td data-label="Branch" class="py-4 px-6">
                 <div class="text-text-secondary">${e.employee_code || "—"}</div>
                 <div class="text-[10px] text-text-muted">${e.branch || "—"}</div>
               </td>
-              <td class="py-4 px-6 text-text-secondary">${e.department || "—"} <span class="text-white/5">/</span> ${e.designation || "—"}</td>
-              <td class="py-4 px-6"><span class="px-2 py-0.5 rounded border border-white/5 bg-slate-900 text-text-muted font-bold text-[9px] uppercase tracking-wider">${e.role}</span></td>
-              <td class="py-4 px-6"><span class="px-2 py-0.5 rounded border ${statusClass} font-bold text-[9px] uppercase tracking-wider">${e.status}</span></td>
-              <td class="py-4 px-6 text-right space-x-2">
+              <td data-label="Title" class="py-4 px-6 text-text-secondary">${e.department || "—"} <span class="text-white/5">/</span> ${e.designation || "—"}</td>
+              <td data-label="Role" class="py-4 px-6"><span class="px-2 py-0.5 rounded border border-white/5 bg-slate-900 text-text-muted font-bold text-[9px] uppercase tracking-wider">${e.role}</span></td>
+              <td data-label="Status" class="py-4 px-6"><span class="px-2 py-0.5 rounded border ${statusClass} font-bold text-[9px] uppercase tracking-wider">${e.status}</span></td>
+              <td data-label="Actions" class="py-4 px-6 text-right space-x-2">
                 <button class="btn-edit-emp px-2 py-1 bg-slate-900 hover:bg-slate-800 border border-white/5 rounded font-bold uppercase tracking-widest text-[8px] cursor-pointer" 
                   data-id="${e.id}"
                   data-fullname="${e.full_name || ''}"
@@ -435,18 +435,18 @@ document.addEventListener("DOMContentLoaded", () => {
           const statusClass = i.status === "PENDING" ? "bg-blue-950/40 text-blue-400 border-blue-500/20" : i.status === "USED" ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/20" : i.status === "EMAIL_FAILED" ? "bg-rose-950/40 text-rose-400 border-rose-500/20" : "bg-slate-800 text-text-muted border-slate-700";
           return `
             <tr class="hover:bg-white/5 transition-all">
-              <td class="py-4 px-6">
+              <td data-label="Candidate" class="py-4 px-6">
                 <div class="font-bold text-text-primary">${i.name}</div>
                 <div class="text-[10px] text-text-muted">${dateStr}</div>
               </td>
-              <td class="py-4 px-6">
+              <td data-label="Email / Code" class="py-4 px-6">
                 <div class="text-text-secondary">${i.email}</div>
                 <div class="text-[10px] text-text-muted">Code: ${i.employee_code}</div>
               </td>
-              <td class="py-4 px-6 text-text-secondary">${i.department} <span class="text-white/5">/</span> ${i.branch}</td>
-              <td class="py-4 px-6"><span class="px-2 py-0.5 rounded border border-white/5 bg-slate-900 text-text-muted font-bold text-[9px] uppercase tracking-wider">${i.role}</span></td>
-              <td class="py-4 px-6"><span class="px-2 py-0.5 rounded border ${statusClass} font-bold text-[9px] uppercase tracking-wider">${i.status}</span></td>
-              <td class="py-4 px-6 text-right space-x-1">
+              <td data-label="Branch" class="py-4 px-6 text-text-secondary">${i.department} <span class="text-white/5">/</span> ${i.branch}</td>
+              <td data-label="Role" class="py-4 px-6"><span class="px-2 py-0.5 rounded border border-white/5 bg-slate-900 text-text-muted font-bold text-[9px] uppercase tracking-wider">${i.role}</span></td>
+              <td data-label="Status" class="py-4 px-6"><span class="px-2 py-0.5 rounded border ${statusClass} font-bold text-[9px] uppercase tracking-wider">${i.status}</span></td>
+              <td data-label="Actions" class="py-4 px-6 text-right space-x-1">
                 ${i.status === "PENDING" || i.status === "EMAIL_FAILED" ? `
                   <button class="btn-resend-invite px-2 py-1 bg-blue-950/20 text-blue-400 border border-blue-500/10 rounded font-bold uppercase tracking-widest text-[8px] hover:bg-blue-500/10 transition cursor-pointer" data-id="${i.id}">
                     Resend
@@ -537,14 +537,14 @@ document.addEventListener("DOMContentLoaded", () => {
           const activeStr = window.formatDateTime ? window.formatDateTime(s.last_active) : new Date(s.last_active).toLocaleString();
           return `
             <tr class="hover:bg-white/5 transition-all">
-              <td class="py-4 px-6">
+              <td data-label="User" class="py-4 px-6">
                 <div class="font-bold text-text-primary">${s.username}</div>
                 <div class="text-[10px] text-text-muted">${s.email}</div>
               </td>
-              <td class="py-4 px-6 text-text-secondary">${s.os} <span class="text-white/5">/</span> ${s.browser}</td>
-              <td class="py-4 px-6 font-mono text-text-muted text-[10px]">${s.ip_address} <span class="text-slate-600">(${s.country || 'IN'})</span></td>
-              <td class="py-4 px-6 text-text-muted text-[10px]">${activeStr}</td>
-              <td class="py-4 px-6 text-right">
+              <td data-label="Device" class="py-4 px-6 text-text-secondary">${s.os} <span class="text-white/5">/</span> ${s.browser}</td>
+              <td data-label="IP Address" class="py-4 px-6 font-mono text-text-muted text-[10px]">${s.ip_address} <span class="text-slate-600">(${s.country || 'IN'})</span></td>
+              <td data-label="Last Active" class="py-4 px-6 text-text-muted text-[10px]">${activeStr}</td>
+              <td data-label="Terminate" class="py-4 px-6 text-right">
                 <button class="btn-kill-session px-3 py-1 bg-slate-900 text-text-muted hover:bg-rose-950/30 hover:text-rose-400 border border-white/5 rounded font-bold uppercase tracking-widest text-[8px] cursor-pointer" data-sid="${s.session_id}">
                   Kill
                 </button>

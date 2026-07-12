@@ -110,20 +110,20 @@ async function loadAuditLogs() {
 
       return `
         <tr>
-          <td class="text-xs text-text-muted whitespace-nowrap font-mono">
+          <td data-label="Timestamp" class="text-xs text-text-muted whitespace-nowrap font-mono">
             ${window.formatDateTime ? window.formatDateTime(log.created_at) : new Date(log.created_at).toLocaleString()}
           </td>
-          <td class="font-semibold text-text-primary text-xs">${log.actor_username}</td>
-          <td>
+          <td data-label="Actor" class="font-semibold text-text-primary text-xs">${log.actor_username}</td>
+          <td data-label="Action">
             <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded border uppercase ${badgeClass}">
               ${log.action}
             </span>
           </td>
-          <td class="text-xs text-text-secondary font-semibold">
+          <td data-label="Target" class="text-xs text-text-secondary font-semibold">
             ${log.table_name} #${log.record_id}
           </td>
-          <td class="text-xs text-text-muted font-mono">${log.ip_address}</td>
-          <td>${detailsHtml}</td>
+          <td data-label="IP Address" class="text-xs text-text-muted font-mono">${log.ip_address}</td>
+          <td data-label="Changes">${detailsHtml}</td>
         </tr>
       `;
     }).join("");

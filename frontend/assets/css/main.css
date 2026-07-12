@@ -2552,6 +2552,131 @@ img, video, canvas, svg {
   height: auto;
 }
 
+/* ── PROFILE ACCORDIONS (MOBILE ONLY) ───────────────────────── */
+.sakra-profile-accordion {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(4, 8, 21, 0.4);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  transition: all 250ms ease;
+}
+
+@media (max-width: 767px) {
+  .profile-stats-grid {
+    display: flex !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory;
+    gap: 12px !important;
+    padding: 4px 4px 12px 4px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .profile-stats-grid .sakra-3d-card-wrapper {
+    flex: 0 0 140px !important;
+    scroll-snap-align: start;
+  }
+}
+
+.sakra-profile-accordion-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  user-select: none;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  color: var(--text-primary);
+  border-bottom: 1px solid transparent;
+  transition: all 200ms ease;
+}
+
+.sakra-profile-accordion.active {
+  border-color: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.sakra-profile-accordion.active .sakra-profile-accordion-header {
+  background: rgba(59, 130, 246, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+.sakra-profile-accordion-chevron {
+  transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-muted);
+}
+
+.sakra-profile-accordion.active .sakra-profile-accordion-chevron {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+.sakra-profile-accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sakra-profile-accordion.active .sakra-profile-accordion-content {
+  max-height: 2500px;
+  overflow-y: auto;
+}
+
+.sakra-profile-accordion-inner {
+  padding: 16px;
+}
+
+/* ── MOBILE EXPANDABLE REPAYMENT CARDS ─────────────────────── */
+.sakra-payment-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(4, 8, 21, 0.4);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sakra-payment-card.expanded {
+  background: rgba(4, 8, 21, 0.7);
+  border-color: rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.sakra-payment-card.expanded .chevron-icon {
+  transform: rotate(180deg);
+  color: var(--sakra-primary);
+}
+
+.sakra-payment-card-header {
+  padding: 14px 16px;
+  transition: background-color 200ms ease;
+}
+
+.sakra-payment-card-header:active {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sakra-payment-card-details {
+  animation: slideDown 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+
 
 
 

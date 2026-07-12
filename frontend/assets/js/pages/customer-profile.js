@@ -273,11 +273,11 @@ function renderProfile(data) {
       const variantClass = statusVariants[loan.status] || "bg-slate-50 text-slate-700 border-slate-100";
       return `
         <tr>
-          <td class="font-mono text-xs text-text-muted">#${loan.id}</td>
-          <td class="text-right font-bold text-text-primary font-mono">${formatCurrency(loan.principal_amount)}</td>
-          <td class="text-text-secondary font-semibold text-xs">${loan.interest_formula} @ ${formatInterestRate(loan.interest_rate)}</td>
-          <td class="text-xs text-text-secondary font-mono">${loan.loan_start_date} → ${loan.loan_end_date}</td>
-          <td class="text-center">
+          <td data-label="Loan ID" class="font-mono text-xs text-text-muted">#${loan.id}</td>
+          <td data-label="Principal" class="text-right font-bold text-text-primary font-mono">${formatCurrency(loan.principal_amount)}</td>
+          <td data-label="Formula" class="text-text-secondary font-semibold text-xs">${loan.interest_formula} @ ${formatInterestRate(loan.interest_rate)}</td>
+          <td data-label="Period" class="text-xs text-text-secondary font-mono">${loan.loan_start_date} → ${loan.loan_end_date}</td>
+          <td data-label="Status" class="text-center">
             <span class="inline-block px-2.5 py-0.5 text-[10px] font-bold rounded border uppercase ${variantClass}">
               ${loan.status}
             </span>
@@ -319,17 +319,17 @@ function renderProfile(data) {
 
       return `
         <tr>
-          <td class="text-text-muted font-mono text-xs">#${idx + 1}</td>
-          <td class="font-semibold text-text-primary text-xs">${p.payment_date}</td>
-          <td class="text-right font-mono text-xs text-text-secondary">${formatCurrency(p.expected_amount)}</td>
-          <td class="text-right font-mono text-xs ${paidTextClass}">${formatCurrency(p.amount_paid)}</td>
-          <td class="text-xs text-text-primary font-bold font-mono">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
-          <td class="text-xs text-text-secondary font-semibold">${p.payment_mode || "—"}</td>
-          <td>${statusBadge}</td>
-          <td class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>
-          <td class="text-xs text-text-muted font-mono">${p.created_at || "—"}</td>
-          <td class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
-          <td class="text-center select-none font-sans">
+          <td data-label="#" class="text-text-muted font-mono text-xs">#${idx + 1}</td>
+          <td data-label="Date" class="font-semibold text-text-primary text-xs">${p.payment_date}</td>
+          <td data-label="Expected" class="text-right font-mono text-xs text-text-secondary">${formatCurrency(p.expected_amount)}</td>
+          <td data-label="Paid" class="text-right font-mono text-xs ${paidTextClass}">${formatCurrency(p.amount_paid)}</td>
+          <td data-label="Coverage" class="text-xs text-text-primary font-bold font-mono">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</td>
+          <td data-label="Mode" class="text-xs text-text-secondary font-semibold">${p.payment_mode || "—"}</td>
+          <td data-label="Status">${statusBadge}</td>
+          <td data-label="Recorded By" class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>
+          <td data-label="Time" class="text-xs text-text-muted font-mono">${p.created_at || "—"}</td>
+          <td data-label="Notes" class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
+          <td data-label="Actions" class="text-center select-none font-sans">
             <div class="flex items-center justify-center gap-2">
               ${p.id ? `
                 <button class="edit-payment-btn p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors border-0 bg-transparent cursor-pointer" data-id="${p.id}" data-date="${p.payment_date}" data-amount="${p.amount_paid}" data-mode="${p.payment_mode}" data-remarks="${p.remarks || ''}" data-version="${p.version_id || 1}" title="Edit Payment">
@@ -473,6 +473,11 @@ function renderProfile(data) {
 
   if (window.lucide) {
     window.lucide.createIcons();
+  }
+
+  // Mobile accordion initialization
+  if (window.innerWidth < 768) {
+    initializeMobileAccordions(data);
   }
 }
 
@@ -656,6 +661,14 @@ function renderScatterPlot(loans, payments, customer) {
 
   let currentZoom = 1.0;
   let currentDocUrl = "";
+  let activeDocType = "";
+  
+  // Available doc types for swiping
+  const docTypesList = ["PROFILE_PHOTO", "AADHAAR", "PROMISSORY_NOTE"];
+
+  const getAvailableDocs = () => {
+    return docTypesList.filter(type => docsMeta[type] || (type === "PROFILE_PHOTO" && customer.has_profile_photo));
+  };
 
   const closeViewer = () => {
     viewerModal?.classList.add("hidden");
@@ -667,16 +680,22 @@ function renderScatterPlot(loans, payments, customer) {
     if (e.target === viewerModal) closeViewer();
   });
 
+  const updateZoom = () => {
+    if (viewerContainer) {
+      viewerContainer.style.transform = `scale(${currentZoom})`;
+    }
+  };
+
   zoomInBtn?.addEventListener("click", () => {
     currentZoom += 0.15;
-    if (currentZoom > 2.5) currentZoom = 2.5;
-    viewerContainer.style.transform = `scale(${currentZoom})`;
+    if (currentZoom > 3.0) currentZoom = 3.0;
+    updateZoom();
   });
 
   zoomOutBtn?.addEventListener("click", () => {
     currentZoom -= 0.15;
     if (currentZoom < 0.4) currentZoom = 0.4;
-    viewerContainer.style.transform = `scale(${currentZoom})`;
+    updateZoom();
   });
 
   printBtn?.addEventListener("click", () => {
@@ -695,16 +714,26 @@ function renderScatterPlot(loans, payments, customer) {
     if (!currentDocUrl) return;
     const a = document.createElement("a");
     a.href = currentDocUrl;
-    a.download = currentDocUrl.split("/").pop() || "document";
+    a.download = `${customer.name}_${activeDocType.toLowerCase()}`.replace(/\s+/g, "_");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   });
 
-  const openViewer = (title, endpoint, metaText) => {
+  const openViewer = (docType) => {
+    activeDocType = docType;
     currentZoom = 1.0;
-    viewerContainer.style.transform = "scale(1)";
-    viewerTitle.innerText = title;
+    updateZoom();
+
+    let title = docType.replace(/_/g, " ");
+    let endpoint = `/customers/${customer.id}/aadhaar`;
+    if (docType === "PROFILE_PHOTO") endpoint = `/customers/${customer.id}/photo`;
+    else if (docType === "PROMISSORY_NOTE") endpoint = `/customers/${customer.id}/promissory`;
+
+    const meta = docsMeta[docType] || {};
+    let metaText = meta.filename ? `${meta.filename} (${(meta.file_size / (1024 * 1024)).toFixed(2)} MB)` : "Live Photo Stream";
+
+    viewerTitle.innerText = `${customer.name} — ${title}`;
     viewerMeta.innerText = metaText;
 
     const viewerLoader = document.getElementById("viewer-loader");
@@ -720,7 +749,8 @@ function renderScatterPlot(loans, payments, customer) {
         if (blob.type === "application/pdf") {
           viewerContainer.innerHTML = `<iframe src="${objectUrl}" class="w-full h-[550px] border-0 bg-white"></iframe>`;
         } else {
-          viewerContainer.innerHTML = `<img src="${objectUrl}" class="max-w-full max-h-[550px] object-contain" />`;
+          viewerContainer.innerHTML = `<img src="${objectUrl}" class="max-w-full max-h-[550px] object-contain select-none" id="viewer-img" />`;
+          initZoomGestures();
         }
 
         viewerModal?.classList.remove("hidden");
@@ -733,13 +763,90 @@ function renderScatterPlot(loans, payments, customer) {
       });
   };
 
+  // Expose to window for accordion / card clicks
+  window.showDocumentViewer = (docIdOrType, filename, contentType) => {
+    let docType = docIdOrType;
+    if (!docTypesList.includes(docType)) {
+      docType = "AADHAAR";
+    }
+    openViewer(docType);
+  };
+
+  // Swipe gesture detection to navigate between available docs
+  let viewTouchStartX = 0;
+  let viewTouchEndX = 0;
+
+  viewerModal.addEventListener("touchstart", (e) => {
+    viewTouchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+
+  viewerModal.addEventListener("touchend", (e) => {
+    viewTouchEndX = e.changedTouches[0].screenX;
+    const diffX = viewTouchStartX - viewTouchEndX;
+    const available = getAvailableDocs();
+
+    if (Math.abs(diffX) > 100 && available.length > 1) {
+      let currentIndex = available.indexOf(activeDocType);
+      if (diffX > 0) {
+        // Swipe left -> view next doc
+        currentIndex = (currentIndex + 1) % available.length;
+      } else {
+        // Swipe right -> view prev doc
+        currentIndex = (currentIndex - 1 + available.length) % available.length;
+      }
+      openViewer(available[currentIndex]);
+    }
+  }, { passive: true });
+
+  // Double tap & Pinch zoom on the image
+  function initZoomGestures() {
+    const img = document.getElementById("viewer-img");
+    if (!img) return;
+
+    let lastTap = 0;
+    img.addEventListener("touchend", (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      if (tapLength < 300 && tapLength > 0) {
+        // Double tap!
+        e.preventDefault();
+        currentZoom = currentZoom === 1.0 ? 2.0 : 1.0;
+        updateZoom();
+      }
+      lastTap = currentTime;
+    });
+
+    let initialPinchDist = 0;
+    img.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2) {
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    }, { passive: true });
+
+    img.addEventListener("touchmove", (e) => {
+      if (e.touches.length === 2 && initialPinchDist > 0) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const scaleChange = dist / initialPinchDist;
+        currentZoom = Math.min(3.0, Math.max(0.5, currentZoom * scaleChange));
+        updateZoom();
+        initialPinchDist = dist;
+      }
+    }, { passive: true });
+  }
+
   // Preview Buttons Bindings
   document.getElementById("view-aadhaar-btn")?.addEventListener("click", () => {
     if (!aMeta) {
       alert("No document uploaded.");
       return;
     }
-    openViewer("Aadhaar Card Preview", `/customers/${customer.id}/aadhaar`, `${aMeta.filename} (${(aMeta.file_size / (1024*1024)).toFixed(2)} MB)`);
+    openViewer("AADHAAR");
   });
 
   document.getElementById("view-promissory-btn")?.addEventListener("click", () => {
@@ -747,7 +854,7 @@ function renderScatterPlot(loans, payments, customer) {
       alert("No document uploaded.");
       return;
     }
-    openViewer("Promissory Note Preview", `/customers/${customer.id}/promissory`, `${pMeta.filename} (${(pMeta.file_size / (1024*1024)).toFixed(2)} MB)`);
+    openViewer("PROMISSORY_NOTE");
   });
 
   // Document Replacement inputs setup
@@ -1255,5 +1362,365 @@ document.getElementById("edit-payment-form")?.addEventListener("submit", async (
     submitBtn.innerHTML = `<span>Save Changes</span>`;
   }
 });
+
+
+function initializeMobileAccordions(data) {
+  if (window.innerWidth >= 768) return;
+
+  const { customer, loans = [], aggregate_payments = [], credit_score } = data;
+  const activeLoan = loans.find(l => l.status === "ACTIVE" || l.status === "OVERDUE") || loans[0];
+
+  const parentContainer = document.getElementById("profile-content");
+  if (!parentContainer) return;
+
+  // Elements to hide on mobile
+  const chartSplit = parentContainer.querySelector(".grid.grid-cols-1.lg\\:grid-cols-3");
+  if (chartSplit) chartSplit.style.display = "none";
+
+  const kycCard = parentContainer.querySelector(".glass-card.bg-white\\/60.p-6.flex.flex-col.gap-4");
+  if (kycCard) kycCard.style.display = "none";
+
+  const loansTable = parentContainer.querySelector(".sakra-table-wrapper.bg-white\\/60");
+  if (loansTable) loansTable.style.display = "none";
+
+  const paymentsTable = parentContainer.querySelector(".sakra-table-wrapper.bg-white\\/60.backdrop-blur-md");
+  if (paymentsTable) paymentsTable.style.display = "none";
+
+  const collectionDash = document.getElementById("collection-intelligence-dashboard");
+  if (collectionDash) collectionDash.style.display = "none";
+
+  let accordionContainer = document.getElementById("mobile-profile-accordions");
+  if (!accordionContainer) {
+    accordionContainer = document.createElement("div");
+    accordionContainer.id = "mobile-profile-accordions";
+    accordionContainer.className = "flex flex-col gap-3 mt-6";
+    const statsGrid = parentContainer.querySelector(".profile-stats-grid");
+    if (statsGrid) {
+      statsGrid.parentNode.insertBefore(accordionContainer, statsGrid.nextSibling);
+    } else {
+      parentContainer.appendChild(accordionContainer);
+    }
+  }
+
+  // 1. Overview Accordion
+  const detailsHtml = `
+    <div class="flex flex-col gap-3">
+      <div class="flex justify-between items-center text-xs py-1.5 border-b border-white/5">
+        <span class="text-text-muted">DOB:</span>
+        <span class="text-text-primary font-mono font-bold">${customer.date_of_birth || "—"}</span>
+      </div>
+      <div class="flex justify-between items-center text-xs py-1.5 border-b border-white/5">
+        <span class="text-text-muted">Gender:</span>
+        <span class="text-text-primary font-bold">${customer.gender || "—"}</span>
+      </div>
+      <div class="flex justify-between items-center text-xs py-1.5 border-b border-white/5">
+        <span class="text-text-muted">Occupation:</span>
+        <span class="text-text-primary font-bold">${customer.occupation || "—"}</span>
+      </div>
+      <div class="flex flex-col text-xs py-1.5 border-b border-white/5 gap-1">
+        <span class="text-text-muted">Address:</span>
+        <span class="text-text-secondary leading-normal">${customer.address || "—"}</span>
+      </div>
+      <div class="flex flex-col text-xs py-1.5 border-b border-white/5 gap-1">
+        <span class="text-text-muted">Note Memos:</span>
+        <span class="text-text-secondary leading-normal italic">${customer.promissory_note || "—"}</span>
+      </div>
+      <div class="flex justify-between items-center text-xs py-1.5">
+        <span class="text-text-muted">Credit Score:</span>
+        <span class="font-mono font-extrabold text-blue-400">${credit_score || 700}</span>
+      </div>
+    </div>
+  `;
+
+  // 2. Collection Intelligence & Analytics Accordion
+  const analyticsHtml = `
+    <div class="flex flex-col gap-4">
+      <div class="bg-slate-950/40 p-3 rounded-lg border border-white/5">
+        <h4 class="text-[9px] uppercase tracking-wider text-text-muted mb-2 font-bold">Payment Distribution</h4>
+        <canvas id="mobileScatterChartCanvas" style="max-height: 160px; width: 100%;"></canvas>
+      </div>
+      <div class="flex flex-col gap-2">
+        <h4 class="text-[9px] uppercase tracking-wider text-text-muted font-bold">Collection Intelligence</h4>
+        <div id="mobile-collection-dashboard-body"></div>
+      </div>
+    </div>
+  `;
+
+  // 3. Loan Details Accordion
+  const loansHtml = `
+    <div class="flex flex-col gap-3">
+      ${loans.map(loan => {
+        const variantClass = loan.status === "ACTIVE" ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                             loan.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                             "bg-rose-500/10 text-rose-400 border-rose-500/20";
+        return `
+          <div class="bg-slate-950/30 p-3.5 rounded-lg border border-white/5 flex flex-col gap-2 font-mono text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-white font-bold">Loan #${loan.id}</span>
+              <span class="px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${variantClass}">${loan.status}</span>
+            </div>
+            <div class="h-px bg-white/5"></div>
+            <div class="grid grid-cols-2 gap-2 text-[10px]">
+              <div>
+                <span class="text-[8px] text-text-muted block uppercase">Principal</span>
+                <span class="font-bold text-text-secondary">${formatCurrency(loan.principal_amount)}</span>
+              </div>
+              <div>
+                <span class="text-[8px] text-text-muted block uppercase">Formula</span>
+                <span class="text-text-secondary">${loan.interest_formula} @ ${formatInterestRate(loan.interest_rate)}</span>
+              </div>
+              <div class="col-span-2">
+                <span class="text-[8px] text-text-muted block uppercase">Period</span>
+                <span class="text-text-secondary">${loan.loan_start_date} → ${loan.loan_end_date || '—'}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  // 4. Documents Accordion
+  const docsMeta = data.documents_metadata || {};
+  const docStatusHtml = `
+    <div class="flex flex-col gap-2.5">
+      ${["PROFILE_PHOTO", "AADHAAR", "PROMISSORY_NOTE"].map(docType => {
+        const doc = docsMeta[docType];
+        const title = docType.replace(/_/g, " ");
+        if (doc) {
+          return `
+            <div class="bg-slate-950/30 p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs">
+              <div class="flex items-center gap-2">
+                <i data-lucide="file-check" class="w-4 h-4 text-emerald-400"></i>
+                <div class="flex flex-col">
+                  <span class="font-bold text-text-primary text-[11px] uppercase">${title}</span>
+                  <span class="text-[8px] text-text-muted font-mono mt-0.5">${doc.filename}</span>
+                </div>
+              </div>
+              <button class="sakra-btn-tactile bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white px-2.5 py-1 rounded text-[9px] font-bold uppercase border border-blue-500/20 cursor-pointer preview-doc-btn" data-doc-type="${docType}">
+                Preview
+              </button>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="bg-slate-950/30 p-3 rounded-lg border border-white/5 flex justify-between items-center text-xs opacity-75">
+              <div class="flex items-center gap-2">
+                <i data-lucide="file-warning" class="w-4 h-4 text-amber-500"></i>
+                <div class="flex flex-col">
+                  <span class="font-bold text-text-primary text-[11px] uppercase">${title}</span>
+                  <span class="text-[8px] text-amber-500/80 font-semibold mt-0.5">Missing Document</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }).join("")}
+    </div>
+  `;
+
+  // 5. Repayment History Accordion
+  const repaymentsHtml = `
+    <div class="flex flex-col gap-3">
+      ${aggregate_payments.map((p, idx) => {
+        const norm = (p.payment_status || "PENDING").toUpperCase();
+        let badgeClass = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+        if (norm === "PAID") badgeClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+        else if (norm === "OVERDUE") badgeClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
+        
+        return `
+          <div class="bg-slate-950/30 p-3 rounded-lg border border-white/5 flex flex-col gap-2 font-mono text-xs">
+            <div class="flex justify-between items-center">
+              <span class="text-text-secondary font-bold">Transaction #${idx + 1} (${p.payment_date})</span>
+              <span class="px-1.5 py-0.5 rounded text-[8px] font-bold border ${badgeClass}">${norm}</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[10px] text-text-muted">
+              <div>
+                <span>Expected:</span> <span class="text-white">${formatCurrency(p.expected_amount)}</span>
+              </div>
+              <div>
+                <span>Paid:</span> <span class="text-success font-bold">${formatCurrency(p.amount_paid)}</span>
+              </div>
+              <div>
+                <span>Coverage:</span> <span class="text-blue-400">${p.equivalent_coverage != null ? Number(p.equivalent_coverage).toFixed(2) + ' Days' : '—'}</span>
+              </div>
+              <div>
+                <span>Mode:</span> <span class="text-white">${p.payment_mode || "CASH"}</span>
+              </div>
+            </div>
+            ${p.remarks ? `<p class="text-[9px] text-text-muted italic border-t border-white/5 pt-1.5 mt-1">Note: ${p.remarks}</p>` : ""}
+          </div>
+        `;
+      }).join("")}
+      ${aggregate_payments.length === 0 ? '<p class="text-center text-xs text-text-muted py-6">No payments recorded</p>' : ''}
+    </div>
+  `;
+
+  // 6. Loan Schedule Accordion
+  const schedules = activeLoan?.schedules || [];
+  const scheduleHtml = `
+    <div class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+      ${schedules.map(s => {
+        let badgeClass = s.remaining_amount <= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20";
+        let statusText = s.remaining_amount <= 0 ? "PAID" : "UNPAID";
+        return `
+          <div class="bg-slate-950/20 p-2.5 rounded-lg border border-white/5 flex justify-between items-center text-[11px] font-mono">
+            <div class="flex flex-col">
+              <span class="font-bold text-white">EMI #${s.installment_number}</span>
+              <span class="text-[9px] text-text-muted mt-0.5">Due: ${s.due_date}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="flex flex-col text-right">
+                <span class="text-white font-bold">${formatCurrency(s.expected_amount)}</span>
+                <span class="text-[9px] text-rose-400">Bal: ${formatCurrency(s.remaining_amount)}</span>
+              </div>
+              <span class="px-1.5 py-0.5 rounded text-[8px] font-bold border ${badgeClass}">${statusText}</span>
+            </div>
+          </div>
+        `;
+      }).join("")}
+      ${schedules.length === 0 ? '<p class="text-center text-xs text-text-muted py-6">No schedules active</p>' : ''}
+    </div>
+  `;
+
+  // 7. Security Logs Accordion
+  const securityHtml = `
+    <div class="flex flex-col gap-2 font-mono text-[10px] text-text-secondary">
+      <div class="p-2.5 bg-slate-950/20 border border-white/5 rounded-lg flex flex-col gap-1">
+        <span class="text-blue-400 font-bold uppercase text-[9px] tracking-wider">Account Creation</span>
+        <span>Registered by operator on ${formatDate(customer.created_at)}</span>
+      </div>
+      <div class="p-2.5 bg-slate-950/20 border border-white/5 rounded-lg flex flex-col gap-1 mt-1">
+        <span class="text-amber-400 font-bold uppercase text-[9px] tracking-wider">Profile Revision Trace</span>
+        <span>Database Version ID: #${customer.version_id}</span>
+        <span>Last updated: ${customer.updated_at ? formatDate(customer.updated_at) : 'No updates recorded'}</span>
+      </div>
+    </div>
+  `;
+
+  const accordions = [
+    { id: "overview", title: "Overview", icon: "user", content: detailsHtml },
+    { id: "analytics", title: "Collection Analytics", icon: "line-chart", content: analyticsHtml },
+    { id: "loans", title: "Loan Details", icon: "credit-card", content: loansHtml },
+    { id: "documents", title: "Documents", icon: "file-text", content: docStatusHtml },
+    { id: "history", title: "Repayment History", icon: "history", content: repaymentsHtml },
+    { id: "schedule", title: "Loan Schedule", icon: "calendar", content: scheduleHtml },
+    { id: "audit", title: "Security Logs", icon: "shield", content: securityHtml }
+  ];
+
+  accordionContainer.innerHTML = accordions.map(a => {
+    const savedState = localStorage.getItem(`sakra-profile-accordion-${a.id}`);
+    const isActive = savedState === "open";
+    const activeClass = isActive ? "active" : "";
+    return `
+      <div class="sakra-profile-accordion ${activeClass}" data-accordion-id="${a.id}">
+        <div class="sakra-profile-accordion-header">
+          <div class="flex items-center gap-2">
+            <i data-lucide="${a.icon}" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span>${a.title}</span>
+          </div>
+          <i data-lucide="chevron-down" class="w-4 h-4 sakra-profile-accordion-chevron"></i>
+        </div>
+        <div class="sakra-profile-accordion-content">
+          <div class="sakra-profile-accordion-inner">
+            ${a.content}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  accordionContainer.querySelectorAll(".sakra-profile-accordion").forEach(acc => {
+    const header = acc.querySelector(".sakra-profile-accordion-header");
+    header.addEventListener("click", () => {
+      const aId = acc.getAttribute("data-accordion-id");
+      if (acc.classList.contains("active")) {
+        acc.classList.remove("active");
+        localStorage.setItem(`sakra-profile-accordion-${aId}`, "closed");
+      } else {
+        acc.classList.add("active");
+        localStorage.setItem(`sakra-profile-accordion-${aId}`, "open");
+      }
+    });
+  });
+
+  const mobileCanvas = document.getElementById("mobileScatterChartCanvas");
+  if (mobileCanvas) {
+    renderScatterPlotOnMobile(loans, aggregate_payments, customer, mobileCanvas);
+  }
+
+  const mobileIntelBody = document.getElementById("mobile-collection-dashboard-body");
+  if (mobileIntelBody && collectionDash) {
+    mobileIntelBody.innerHTML = collectionDash.innerHTML;
+  }
+
+  accordionContainer.querySelectorAll(".preview-doc-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const docType = btn.getAttribute("data-doc-type");
+      const doc = docsMeta[docType];
+      if (doc && window.showDocumentViewer) {
+        window.showDocumentViewer(doc.id, doc.filename, doc.content_type);
+      }
+    });
+  });
+
+  if (window.lucide) {
+    window.lucide.createIcons({ node: accordionContainer });
+  }
+}
+
+function renderScatterPlotOnMobile(loans, payments, customer, canvas) {
+  if (!payments || payments.length === 0) return;
+  const firstLoanStart = loans.length > 0 ? new Date(loans[0].loan_start_date) : new Date();
+  
+  const chartData = payments.filter(p => parseFloat(p.amount_paid || 0) > 0).map(p => {
+    const payDate = new Date(p.payment_date);
+    const dayIndex = Math.max(0, Math.round((payDate - firstLoanStart) / (1000 * 60 * 60 * 24)));
+    return {
+      x: dayIndex,
+      y: parseFloat(p.amount_paid || 0),
+      date: p.payment_date
+    };
+  });
+
+  const ctx = canvas.getContext("2d");
+  new Chart(ctx, {
+    type: "scatter",
+    data: {
+      datasets: [{
+        label: "Payment Logs",
+        data: chartData,
+        backgroundColor: "rgba(37, 99, 235, 0.7)",
+        borderColor: "rgb(37, 99, 235)",
+        borderWidth: 1,
+        pointRadius: 5,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const item = context.raw;
+              return [
+                `Day: ${item.x}`,
+                `Date: ${item.date}`,
+                `Amount: ₹${item.y.toLocaleString("en-IN")}`
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { font: { size: 8 } } },
+        y: { ticks: { font: { size: 8 } } }
+      }
+    }
+  });
+}
 
 
