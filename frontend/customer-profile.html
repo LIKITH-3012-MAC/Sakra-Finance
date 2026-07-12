@@ -122,15 +122,27 @@
               </div>
             </div>
             <div class="sakra-3d-card-wrapper">
-              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
-                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Latest Payment Coverage</p>
-                <p id="stat-latest-coverage" class="text-xl font-bold mt-2 font-mono text-financial-number text-emerald-400">—</p>
-              </div>
-            </div>
-            <div class="sakra-3d-card-wrapper">
-              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60">
-                <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Largest Payment Coverage</p>
-                <p id="stat-largest-coverage" class="text-xl font-bold mt-2 font-mono text-financial-number text-indigo-400">—</p>
+              <div class="sakra-3d-card glass-card text-center py-4 bg-white/60 relative group" style="border: 1px solid rgba(59, 130, 246, 0.25); background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.08));">
+                <p class="text-[9px] font-bold uppercase tracking-widest text-blue-400">Equivalent Coverage</p>
+                <p id="stat-equivalent-coverage" class="text-xl font-bold mt-2 font-mono text-financial-number text-blue-400">—</p>
+                <!-- Hover tooltip showing formula -->
+                <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 rounded-lg text-left opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200 z-50" style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(59, 130, 246, 0.3); backdrop-filter: blur(12px);">
+                  <p class="text-[8px] font-bold uppercase tracking-wider text-blue-400 mb-1.5">Formula</p>
+                  <div class="flex justify-between text-[10px] mb-1">
+                    <span class="text-slate-400">Collected</span>
+                    <span id="tooltip-collected" class="text-white font-mono font-bold">—</span>
+                  </div>
+                  <div class="flex justify-between text-[10px] mb-1">
+                    <span class="text-slate-400">Daily Installment</span>
+                    <span id="tooltip-daily-installment" class="text-white font-mono font-bold">—</span>
+                  </div>
+                  <div class="border-t border-slate-700 my-1.5"></div>
+                  <div class="flex justify-between text-[10px]">
+                    <span class="text-blue-400 font-bold">Coverage</span>
+                    <span id="tooltip-coverage-calc" class="text-blue-300 font-mono font-bold">—</span>
+                  </div>
+                  <div class="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 rotate-45" style="background: rgba(15, 23, 42, 0.95); border-right: 1px solid rgba(59, 130, 246, 0.3); border-bottom: 1px solid rgba(59, 130, 246, 0.3);"></div>
+                </div>
               </div>
             </div>
           </div>

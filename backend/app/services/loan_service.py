@@ -269,6 +269,7 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
     total_paid_all = Decimal("0")
     total_due_all = Decimal("0")
     expected_till_today_all = Decimal("0")
+    total_daily_installment_all = Decimal("0")
     credit_scores = []
     next_due_date_candidate = None
 
@@ -292,6 +293,10 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
         expected_days = min(days_elapsed, duration)
         expected_paid_to_date = daily_due_amount * Decimal(str(expected_days))
         expected_till_today_all += expected_paid_to_date
+
+        # Accumulate daily installment for equivalent coverage calculation
+        if loan.daily_installment and loan.daily_installment > 0:
+            total_daily_installment_all += Decimal(str(loan.daily_installment))
 
         loan_score = calculate_credit_score(loan, payments, today)
         credit_scores.append(loan_score)
@@ -317,6 +322,11 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
 
     completion_percent = float((total_paid_all / total_due_all) * 100) if total_due_all > 0 else 100.0
 
+    # Equivalent Coverage: Total Collected ÷ Total Daily Installment
+    equivalent_coverage = None
+    if total_daily_installment_all > 0 and total_paid_all > 0:
+        equivalent_coverage = round(float(total_paid_all / total_daily_installment_all), 2)
+
     # Calculate collection intelligence delinquency metadata
     delinquency = compute_pending_installments_metadata(loans, today)
 
@@ -331,6 +341,8 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
         "risk_level": risk_level,
         "completion_percent": round(completion_percent, 2),
         "next_due_date": next_due_date_candidate.isoformat() if next_due_date_candidate else None,
+        "equivalent_coverage": equivalent_coverage,
+        "total_daily_installment": float(total_daily_installment_all),
         "pending_installments_count": delinquency["pending_installments_count"],
         "oldest_pending_date": delinquency["oldest_pending_date"],
         "latest_pending_date": delinquency["latest_pending_date"],
