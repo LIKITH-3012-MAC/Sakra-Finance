@@ -320,6 +320,7 @@
   "reports_no_logs_desc": "లావాదేవీల లాగ్‌లో మీ ప్రస్తుత ఫిల్టర్‌తో సరిపోలే ఎలాంటి ఈవెంట్ ఆనవాళ్లు లేవు.",
   "reports_col_target": "లక్ష్యం",
   "reports_col_changes": "మార్పులు",
+  "pending_installments_col": "వాయిదాలు పెండింగ్",
   "reports_filter_placeholder": "చర్య పేరు ద్వారా వడపోత (ఉదా. USER_LOGIN)...",
   "reports_filter_btn": "వడపోత లాగ్‌లు",
   "notifications_unread_only": "చదవనివి మాత్రమే చూపించు",

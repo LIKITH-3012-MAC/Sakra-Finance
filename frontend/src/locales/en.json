@@ -320,6 +320,7 @@
   "reports_no_logs_desc": "There are no operational event traces matching your current filter in the transaction log.",
   "reports_col_target": "Target",
   "reports_col_changes": "Changes",
+  "pending_installments_col": "Pending Installments",
   "reports_filter_placeholder": "Filter by action name (e.g. USER_LOGIN)...",
   "reports_filter_btn": "Filter Logs",
   "notifications_unread_only": "Show Unread Only",

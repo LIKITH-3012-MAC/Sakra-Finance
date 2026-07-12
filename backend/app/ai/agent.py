@@ -372,6 +372,18 @@ class SakraCopilotAgent:
         context += f"- Gender: {customer.gender or '—'}\n"
         context += f"- Remarks: {customer.remarks or '—'}\n"
 
+        # Calculate collection intelligence delinquency metadata
+        from app.services.loan_service import compute_pending_installments_metadata
+        delinquency = compute_pending_installments_metadata(loans, today)
+        context += f"- Pending Installments Count: {delinquency['pending_installments_count']}\n"
+        context += f"- Oldest Pending Date: {delinquency['oldest_pending_date'] or '—'}\n"
+        context += f"- Latest Pending Date: {delinquency['latest_pending_date'] or '—'}\n"
+        context += f"- Total Overdue Pending Amount: ₹{delinquency['pending_amount']:,}\n"
+        if delinquency["pending_dates"]:
+            context += f"- Detailed Missed Installments:\n"
+            for d in delinquency["pending_dates"]:
+                context += f"  * {d['date']}: Expected ₹{d['expected_amount']:,} - Status: {d['status']}\n"
+
         # Fetch notifications for this customer
         stmt_notif = select(Notification).filter(Notification.customer_id == customer.id).order_by(Notification.sent_at.desc()).limit(5)
         res_notif = await db.execute(stmt_notif)
@@ -587,6 +599,37 @@ class SakraCopilotAgent:
                         context += f"{count}. **{cust.name}** (ID: {cust.id}) - Loan ID: {c_loan.id}, Disbursed: ₹{c_loan.principal_amount:,}, Fully Settled.\n"
             if count == 0:
                 context += "No completed loans found in record.\n"
+
+        # Pending Installment Analytics context for AI Copilot
+        # Compile a list of all active customers and their pending installments
+        from app.services.loan_service import compute_pending_installments_metadata
+        
+        stmt_active_custs = select(Customer).filter(Customer.is_deleted == False).options(
+            selectinload(Customer.loans).selectinload(Loan.payments),
+            selectinload(Customer.loans).selectinload(Loan.schedules)
+        )
+        res_active_custs = await db.execute(stmt_active_custs)
+        active_custs = res_active_custs.scalars().all()
+        
+        context += "\n#### SAKRA CUSTOMERS COLLECTION INTELLIGENCE (PENDING INSTALLMENTS):\n"
+        context += "| Rank | Customer Name | ID | Pending Installments | Oldest Missed Date | Latest Missed Date | Total Overdue Amount | Missed Installments Dates |\n"
+        context += "|---|---|---|---|---|---|---|---|\n"
+        
+        cust_delinquencies = []
+        for cust in active_custs:
+            meta = compute_pending_installments_metadata(cust.loans, today)
+            if meta["pending_installments_count"] > 0:
+                cust_delinquencies.append((cust, meta))
+        
+        # Sort by pending_installments_count descending
+        cust_delinquencies.sort(key=lambda x: x[1]["pending_installments_count"], reverse=True)
+        
+        if cust_delinquencies:
+            for rank, (cust, meta) in enumerate(cust_delinquencies, 1):
+                missed_dates_str = ", ".join(d["date"] for d in meta["pending_dates"])
+                context += f"| {rank} | {cust.name} | {cust.id} | {meta['pending_installments_count']} | {meta['oldest_pending_date'] or '—'} | {meta['latest_pending_date'] or '—'} | ₹{meta['pending_amount']:,} | {missed_dates_str} |\n"
+        else:
+            context += "No customers have any pending or missed installments.\n"
 
         return context
 

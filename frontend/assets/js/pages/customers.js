@@ -270,6 +270,19 @@ async function init() {
     renderRegistry();
   });
 
+  const sortPendingHeader = document.getElementById("sort-pending");
+  sortPendingHeader?.addEventListener("click", () => {
+    if (activeSort === "pending_installments") {
+      activeSortDir = activeSortDir === "asc" ? "desc" : "asc";
+    } else {
+      activeSort = "pending_installments";
+      activeSortDir = "desc";
+    }
+    if (sortSelect) sortSelect.value = "pending_installments";
+    if (sortDirSelect) sortDirSelect.value = activeSortDir;
+    renderRegistry();
+  });
+
   // Filter Buttons binding
   document.querySelectorAll(".sakra-filter-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -391,6 +404,9 @@ function getFilteredAndSorted() {
     if (activeSort === "name") {
       valA = a.name || "";
       valB = b.name || "";
+    } else if (activeSort === "pending_installments") {
+      valA = a.pending_installments_count || 0;
+      valB = b.pending_installments_count || 0;
     } else if (activeSort === "principal") {
       valA = activeLoanA ? parseFloat(activeLoanA.principal_amount) : 0;
       valB = activeLoanB ? parseFloat(activeLoanB.principal_amount) : 0;
@@ -501,6 +517,36 @@ function renderRegistry() {
       }
     }
 
+    const pendingCount = c.pending_installments_count || 0;
+    let pendingBadgeClass = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+    let pendingDot = "🟢";
+    let pendingLabel = "Perfect 0";
+    if (pendingCount >= 15) {
+      pendingBadgeClass = "bg-rose-500/20 text-rose-600 border-rose-500/30 animate-pulse";
+      pendingDot = "🔴";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 8) {
+      pendingBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/25";
+      pendingDot = "🔴";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 4) {
+      pendingBadgeClass = "bg-orange-500/10 text-orange-600 border-orange-500/25";
+      pendingDot = "🟠";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 1) {
+      pendingBadgeClass = "bg-amber-500/10 text-amber-600 border-amber-500/25";
+      pendingDot = "🟡";
+      pendingLabel = `${pendingCount}`;
+    }
+
+    const pendingBadge = `
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer select-none transition-all hover:scale-105 active:scale-95 pending-trigger-badge ${pendingBadgeClass}" 
+            data-id="${c.id}">
+        <span>${pendingDot}</span>
+        <span class="${pendingCount >= 15 ? 'animate-pulse font-extrabold text-rose-600' : ''}">${pendingLabel}</span>
+      </span>
+    `;
+
     const statusBadge = `
       <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold border ${badgeClass}">
         ${statusText}
@@ -517,6 +563,9 @@ function renderRegistry() {
         <td class="font-mono text-xs text-text-secondary">${c.phone_number}</td>
         <td class="text-right font-mono text-xs font-semibold text-text-secondary">${formatCurrency(principal)}</td>
         <td class="text-right font-mono text-xs font-bold text-text-primary">${formatCurrency(remaining)}</td>
+        <td class="text-center">
+          ${pendingBadge}
+        </td>
         <td class="text-center">
           ${statusBadge}
         </td>
@@ -563,6 +612,36 @@ function renderRegistry() {
       </span>
     `;
 
+    const pendingCount = c.pending_installments_count || 0;
+    let pendingBadgeClass = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+    let pendingDot = "🟢";
+    let pendingLabel = "Perfect 0";
+    if (pendingCount >= 15) {
+      pendingBadgeClass = "bg-rose-500/20 text-rose-600 border-rose-500/30 animate-pulse";
+      pendingDot = "🔴";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 8) {
+      pendingBadgeClass = "bg-rose-500/10 text-rose-600 border-rose-500/25";
+      pendingDot = "🔴";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 4) {
+      pendingBadgeClass = "bg-orange-500/10 text-orange-600 border-orange-500/25";
+      pendingDot = "🟠";
+      pendingLabel = `${pendingCount}`;
+    } else if (pendingCount >= 1) {
+      pendingBadgeClass = "bg-amber-500/10 text-amber-600 border-amber-500/25";
+      pendingDot = "🟡";
+      pendingLabel = `${pendingCount}`;
+    }
+
+    const pendingBadge = `
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer select-none pending-trigger-badge ${pendingBadgeClass}" 
+            data-id="${c.id}">
+        <span>${pendingDot}</span>
+        <span class="${pendingCount >= 15 ? 'animate-pulse font-extrabold text-rose-600' : ''}">${pendingLabel}</span>
+      </span>
+    `;
+
     return `
       <div class="glass-card p-5 border border-border-default/45 flex flex-col gap-4 cursor-pointer hover:border-primary/50 transition-all duration-150" data-id="${c.id}">
         <div class="flex items-center justify-between">
@@ -593,6 +672,10 @@ function renderRegistry() {
             <span class="text-[9px] uppercase tracking-wider text-text-muted block">Disbursed Due</span>
             <span class="font-mono text-text-secondary">${activeLoan ? activeLoan.loan_end_date : "—"}</span>
           </div>
+          <div>
+            <span class="text-[9px] uppercase tracking-wider text-text-muted block">Pending Installments</span>
+            <span class="inline-block mt-0.5">${pendingBadge}</span>
+          </div>
         </div>
       </div>
     `;
@@ -604,7 +687,11 @@ function renderRegistry() {
 
   // Row selection setup (Desktop rows)
   tableBody.querySelectorAll("tr").forEach(row => {
-    row.addEventListener("click", () => {
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".pending-trigger-badge")) {
+        e.stopPropagation();
+        return;
+      }
       const id = row.getAttribute("data-id");
       tableBody.querySelectorAll("tr").forEach(r => r.classList.remove("bg-blue-50/40", "border-l-4", "border-primary"));
       row.classList.add("bg-blue-50/40", "border-l-4", "border-primary");
@@ -614,11 +701,274 @@ function renderRegistry() {
 
   // Card selection setup (Mobile cards)
   mobileCardsContainer.querySelectorAll(".glass-card").forEach(card => {
-    card.addEventListener("click", () => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".pending-trigger-badge")) {
+        e.stopPropagation();
+        return;
+      }
       const id = card.getAttribute("data-id");
       mobileCardsContainer.querySelectorAll(".glass-card").forEach(c => c.classList.remove("border-primary"));
       card.classList.add("border-primary");
       selectCustomer(id);
+    });
+  });
+
+  // Pending badges interactivity (Hover / Tap)
+  initPendingBadgeListeners();
+}
+
+function initPendingBadgeListeners() {
+  const badges = document.querySelectorAll(".pending-trigger-badge");
+  
+  // Make sure we have a tooltip element for hover preview
+  let tooltip = document.getElementById("pending-installments-tooltip");
+  if (!tooltip) {
+    tooltip = document.createElement("div");
+    tooltip.id = "pending-installments-tooltip";
+    tooltip.className = "sakra-dark-tooltip transition-all duration-150 transform scale-95 opacity-0 fixed hidden z-50 pointer-events-none";
+    document.body.appendChild(tooltip);
+  }
+
+  // Make sure we have the inspection panel elements
+  let overlay = document.getElementById("pending-inspection-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "pending-inspection-overlay";
+    document.body.appendChild(overlay);
+  }
+
+  function openInspectionPanel(customer) {
+    // Lock body scroll
+    document.body.classList.add("overflow-hidden");
+
+    const isMobile = window.innerWidth < 768;
+
+    // Set overlay layout based on mobile/desktop
+    if (isMobile) {
+      overlay.className = "fixed inset-0 z-55 bg-[#020617]/70 backdrop-blur-sm flex items-end justify-center hidden opacity-0 transition-opacity duration-200";
+    } else {
+      overlay.className = "fixed inset-0 z-55 bg-[#020617]/70 backdrop-blur-sm flex items-center justify-center hidden opacity-0 transition-opacity duration-200";
+    }
+
+    const meta = {
+      pending_installments_count: customer.pending_installments_count || 0,
+      oldest_pending_date: customer.oldest_pending_date,
+      latest_pending_date: customer.latest_pending_date,
+      pending_amount: customer.pending_amount || 0,
+      pending_dates: customer.pending_dates || []
+    };
+
+    let itemsHtml = "";
+    if (meta.pending_dates && meta.pending_dates.length > 0) {
+      itemsHtml = meta.pending_dates.map((d, index) => {
+        const divider = index > 0 ? `<div class="border-t border-white/5 my-3.5"></div>` : "";
+        
+        // Calculate days overdue
+        const today = new Date();
+        const scheduleDate = new Date(d.date);
+        const diffTime = today.getTime() - scheduleDate.getTime();
+        const daysOverdue = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+        return `
+          ${divider}
+          <div class="flex items-center justify-between text-xs py-1">
+            <div class="flex flex-col gap-1">
+              <span class="text-[11px] font-bold text-white font-mono tracking-wide">${d.date}</span>
+              <span class="text-[10px] text-text-muted">Overdue: <span class="font-mono font-bold text-blue-400">${daysOverdue} Days</span></span>
+            </div>
+            <div class="flex flex-col items-end gap-1.5 font-sans">
+              <span class="font-mono font-bold text-white">${formatCurrency(d.expected_amount)}</span>
+              <span class="px-2 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase border ${
+                d.status === 'OVERDUE' 
+                  ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
+                  : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+              }">${d.status}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    } else {
+      itemsHtml = `<p class="text-center text-xs text-text-muted py-8 select-none">No pending installments recorded.</p>`;
+    }
+
+    const panelClass = isMobile
+      ? "relative bg-slate-900 border-t border-blue-500/30 shadow-[0_-4px_30px_rgba(59,130,246,0.2)] rounded-t-2xl w-full max-w-md overflow-hidden transform translate-y-full transition-all duration-200 flex flex-col max-h-[85vh]"
+      : "relative bg-slate-900 border border-blue-500/30 shadow-[0_0_30px_rgba(59,130,246,0.25)] rounded-2xl w-full max-w-md overflow-hidden transform scale-98 transition-all duration-200 flex flex-col max-h-[80vh]";
+
+    const dragHandle = isMobile
+      ? `<div class="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-3 shrink-0"></div>`
+      : "";
+
+    overlay.innerHTML = `
+      <div class="${panelClass}" id="pending-inspection-panel">
+        ${dragHandle}
+        <!-- Sticky Header -->
+        <div class="px-5 py-4 border-b border-white/10 flex justify-between items-center shrink-0 bg-slate-950/40 select-none">
+          <div class="flex flex-col">
+            <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Pending Installments</span>
+            <span class="text-sm font-bold text-white mt-0.5">${customer.name} (ID: ${customer.id})</span>
+          </div>
+          <button id="close-inspection-panel" class="text-text-muted hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500" aria-label="Close panel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Scrollable Content Area -->
+        <div id="inspection-panel-body" class="overflow-y-auto p-5 flex-1 overscroll-contain select-text">
+          <div class="space-y-1">
+            ${itemsHtml}
+          </div>
+        </div>
+
+        <!-- Sticky Footer Summary -->
+        <div class="px-5 py-4 border-t border-white/10 shrink-0 bg-slate-950/60 select-none">
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <span class="text-[9px] font-bold text-text-muted uppercase tracking-wider block font-sans">Total Missed</span>
+              <span class="text-xs font-bold text-white mt-1 block">${meta.pending_installments_count} Installments</span>
+            </div>
+            <div>
+              <span class="text-[9px] font-bold text-text-muted uppercase tracking-wider block font-sans">Total Pending</span>
+              <span class="text-xs font-bold text-rose-500 mt-1 block">${formatCurrency(meta.pending_amount)}</span>
+            </div>
+            <div>
+              <span class="text-[9px] font-bold text-text-muted uppercase tracking-wider block font-sans">Oldest Date</span>
+              <span class="text-[10px] font-bold text-amber-500 mt-1 block font-mono">${meta.oldest_pending_date || '—'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Event listeners for close
+    const closeBtn = overlay.querySelector("#close-inspection-panel");
+    const panel = overlay.querySelector("#pending-inspection-panel");
+    const body = overlay.querySelector("#inspection-panel-body");
+
+    // Prevent page scroll when pointer is inside body
+    if (body) {
+      body.addEventListener("wheel", (e) => {
+        const scrollTop = body.scrollTop;
+        const scrollHeight = body.scrollHeight;
+        const height = body.clientHeight;
+        const delta = e.deltaY;
+
+        if ((delta > 0 && scrollTop + height >= scrollHeight) || (delta < 0 && scrollTop <= 0)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+    }
+
+    function closePanel() {
+      // Release body scroll
+      document.body.classList.remove("overflow-hidden");
+
+      overlay.classList.add("opacity-0");
+      if (isMobile) {
+        panel.classList.add("translate-y-full");
+      } else {
+        panel.classList.add("scale-98");
+      }
+
+      document.removeEventListener("keydown", handleEsc);
+
+      setTimeout(() => {
+        overlay.classList.add("hidden");
+      }, 200);
+    }
+
+    function handleEsc(e) {
+      if (e.key === "Escape") {
+        closePanel();
+      }
+    }
+
+    closeBtn.addEventListener("click", closePanel);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        closePanel();
+      }
+    });
+
+    document.addEventListener("keydown", handleEsc);
+
+    // Show overlay
+    overlay.classList.remove("hidden");
+    setTimeout(() => {
+      overlay.classList.add("opacity-100");
+      overlay.classList.remove("opacity-0");
+      if (isMobile) {
+        panel.classList.remove("translate-y-full");
+        panel.classList.add("translate-y-0");
+      } else {
+        panel.classList.remove("scale-98");
+        panel.classList.add("scale-100");
+      }
+      closeBtn.focus();
+    }, 10);
+  }
+
+  // Bind trigger elements
+  badges.forEach(badge => {
+    badge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Hide preview tooltip immediately
+      tooltip.classList.add("hidden");
+      tooltip.classList.remove("scale-100", "opacity-100");
+
+      const id = badge.getAttribute("data-id");
+      const customer = customerRegistry.find(c => c.id == id);
+      if (!customer) return;
+
+      openInspectionPanel(customer);
+    });
+
+    badge.addEventListener("mouseenter", (e) => {
+      if (window.innerWidth < 768) return; // Skip on mobile
+      const id = badge.getAttribute("data-id");
+      const customer = customerRegistry.find(c => c.id == id);
+      if (!customer) return;
+
+      tooltip.innerHTML = `
+        <div class="text-[10px] font-bold text-white tracking-wider flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-blue-500/25 shadow-lg rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-blue-400 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <span>Click to inspect details</span>
+        </div>
+      `;
+
+      tooltip.classList.remove("hidden");
+      const rect = badge.getBoundingClientRect();
+      const tooltipHeight = tooltip.offsetHeight;
+      const tooltipWidth = tooltip.offsetWidth;
+      
+      let top = rect.top - tooltipHeight - 8;
+      let left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
+
+      if (top < 10) {
+        top = rect.bottom + 8;
+      }
+      if (left < 10) {
+        left = 10;
+      }
+      if (left + tooltipWidth > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipWidth - 10;
+      }
+
+      tooltip.style.top = `${top + window.scrollY}px`;
+      tooltip.style.left = `${left + window.scrollX}px`;
+
+      tooltip.classList.remove("scale-95", "opacity-0");
+      tooltip.classList.add("scale-100", "opacity-100");
+    });
+
+    badge.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("scale-100", "opacity-100");
+      tooltip.classList.add("scale-95", "opacity-0");
+      setTimeout(() => {
+        if (tooltip.classList.contains("opacity-0")) {
+          tooltip.classList.add("hidden");
+        }
+      }, 150);
     });
   });
 }

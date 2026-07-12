@@ -81,4 +81,11 @@ class CustomerResponse(BaseModel):
     has_aadhaar: bool = False
     has_promissory_note: bool = False
 
+    # Dynamic collection intelligence fields
+    pending_installments_count: Optional[int] = 0
+    oldest_pending_date: Optional[str] = None
+    latest_pending_date: Optional[str] = None
+    pending_amount: Optional[float] = 0.0
+    pending_dates: Optional[list[dict]] = []
+
     model_config = {"from_attributes": True}

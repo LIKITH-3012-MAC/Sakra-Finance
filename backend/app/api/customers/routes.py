@@ -115,9 +115,15 @@ async def list_customers(
 
     customers, total = await CustomerRepository.list_customers(db, search, skip, limit)
 
+    from app.services.loan_service import compute_pending_installments_metadata
     customers_data = []
     for customer in customers:
         customer_dict = CustomerResponse.model_validate(customer).model_dump(mode="json")
+        
+        # Calculate collection intelligence delinquency metadata
+        today = today_ist()
+        delinquency = compute_pending_installments_metadata(customer.loans, today)
+        customer_dict.update(delinquency)
 
         # Check document presence
         customer_dict["has_profile_photo"] = any(d.document_type == "PROFILE_PHOTO" for d in customer.documents)
@@ -394,6 +400,12 @@ async def get_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     customer_dict = CustomerResponse.model_validate(customer).model_dump(mode="json")
+
+    # Calculate collection intelligence delinquency metadata
+    from app.services.loan_service import compute_pending_installments_metadata
+    today = today_ist()
+    delinquency = compute_pending_installments_metadata(customer.loans, today)
+    customer_dict.update(delinquency)
 
     # Check document presence
     customer_dict["has_profile_photo"] = any(d.document_type == "PROFILE_PHOTO" for d in customer.documents)

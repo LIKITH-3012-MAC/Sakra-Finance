@@ -313,18 +313,24 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int) -> di
 
     completion_percent = float((total_paid_all / total_due_all) * 100) if total_due_all > 0 else 100.0
 
+    # Calculate collection intelligence delinquency metadata
+    delinquency = compute_pending_installments_metadata(loans, today)
+
     return {
         "total_principal": float(total_principal_all),
         "total_interest": float(total_interest_all),
         "total_repayable": float(total_due_all),
         "total_paid": float(total_paid_all),
         "remaining_balance": float(remaining_balance_all),
-        "expected_till_today": float(expected_till_today_all),
         "pending_amount": float(pending_amount_all),
         "credit_score": avg_score,
         "risk_level": risk_level,
         "completion_percent": round(completion_percent, 2),
         "next_due_date": next_due_date_candidate.isoformat() if next_due_date_candidate else None,
+        "pending_installments_count": delinquency["pending_installments_count"],
+        "oldest_pending_date": delinquency["oldest_pending_date"],
+        "latest_pending_date": delinquency["latest_pending_date"],
+        "pending_dates": delinquency["pending_dates"]
     }
 
 
@@ -442,3 +448,69 @@ async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
         "overdue_customers_count": len(overdue_customers_set),
         "collection_efficiency": round(collection_efficiency, 2),
     }
+
+
+def compute_pending_installments_metadata(loans, today: date) -> dict:
+    """
+    Compute collection intelligence delinquency metadata for a list of loans.
+    Only active/overdue loans are included.
+    Only installments whose due date has passed (< today) and remain unpaid are counted.
+    """
+    pending_installments_count = 0
+    oldest_pending_date = None
+    latest_pending_date = None
+    pending_amount = Decimal("0")
+    pending_dates = []
+
+    for loan in loans:
+        if loan.is_deleted or loan.status not in ("ACTIVE", "OVERDUE"):
+            continue
+
+        payments = list(loan.payments)
+        total_paid = sum((p.amount_paid for p in payments), Decimal("0"))
+        
+        interest = loan.interest_amount if loan.interest_amount is not None else calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
+        total_due = loan.total_repayable_amount if loan.total_repayable_amount is not None else (loan.principal_amount + interest)
+        remaining_balance = max(total_due - total_paid, Decimal("0"))
+
+        if remaining_balance == 0:
+            continue
+
+        schedules = sorted(loan.schedules, key=lambda x: x.installment_number)
+        payments_dict = {p.payment_date: p for p in payments}
+
+        for s in schedules:
+            p = payments_dict.get(s.due_date)
+            amount_paid = p.amount_paid if p else Decimal("0")
+            
+            if s.due_date < today:
+                is_unpaid = (amount_paid < s.expected_amount)
+                if s.remaining_amount > 0 or is_unpaid:
+                    is_loan_overdue = (loan.loan_end_date and today > loan.loan_end_date)
+                    status = "OVERDUE" if is_loan_overdue else "MISSED"
+
+                    unpaid_part = s.remaining_amount if s.remaining_amount is not None else max(s.expected_amount - amount_paid, Decimal("0"))
+                    pending_amount += unpaid_part
+                    pending_installments_count += 1
+                    
+                    pending_dates.append({
+                        "date": s.due_date.isoformat(),
+                        "expected_amount": float(s.expected_amount),
+                        "status": status
+                    })
+                    
+                    if oldest_pending_date is None or s.due_date < oldest_pending_date:
+                        oldest_pending_date = s.due_date
+                    if latest_pending_date is None or s.due_date > latest_pending_date:
+                        latest_pending_date = s.due_date
+
+    pending_dates.sort(key=lambda x: x["date"])
+
+    return {
+        "pending_installments_count": pending_installments_count,
+        "oldest_pending_date": oldest_pending_date.isoformat() if oldest_pending_date else None,
+        "latest_pending_date": latest_pending_date.isoformat() if latest_pending_date else None,
+        "pending_amount": float(pending_amount),
+        "pending_dates": pending_dates
+    }
+

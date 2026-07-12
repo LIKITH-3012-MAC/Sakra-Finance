@@ -83,6 +83,7 @@
                   <option value="credit_score">Credit Score</option>
                   <option value="due_date">Due Date</option>
                   <option value="status">Status</option>
+                  <option value="pending_installments" data-i18n="pending_installments_col">Pending Installments</option>
                 </select>
                 <select id="sort-dir-select" class="sakra-input-tactile h-[44px] text-xs font-semibold uppercase tracking-wider px-3 w-32 font-sans">
                   <option value="desc">Desc</option>
@@ -127,6 +128,12 @@
                     <th class="py-3 px-6">Phone Number</th>
                     <th class="py-3 px-6 text-right">Principal</th>
                     <th class="py-3 px-6 text-right">Remaining Balance</th>
+                    <th class="py-3 px-6 text-center cursor-pointer select-none group" id="sort-pending" style="width: 170px;">
+                      <div class="flex items-center justify-center gap-1">
+                        <span data-i18n="pending_installments_col">Pending Installments</span>
+                        <i data-lucide="chevrons-up-down" class="w-3 h-3 text-text-muted group-hover:text-primary transition-colors" id="sort-pending-icon"></i>
+                      </div>
+                    </th>
                     <th class="py-3 px-6 text-center">Status</th>
                   </tr>
                 </thead>
