@@ -276,11 +276,134 @@ function renderProfile(data) {
           <td class="text-xs text-text-secondary font-semibold">${p.recorded_by_name || "—"}</td>
           <td class="text-xs text-text-muted font-mono">${p.created_at || "—"}</td>
           <td class="text-xs text-text-secondary italic">${p.remarks || "—"}</td>
+          <td class="text-center select-none font-sans">
+            <div class="flex items-center justify-center gap-2">
+              ${p.id ? `
+                <button class="edit-payment-btn p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-950/30 rounded transition-colors border-0 bg-transparent cursor-pointer" data-id="${p.id}" data-date="${p.payment_date}" data-amount="${p.amount_paid}" data-mode="${p.payment_mode}" data-remarks="${p.remarks || ''}" data-version="${p.version_id || 1}" title="Edit Payment">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-edit-2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </button>
+                <button class="delete-payment-btn p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded transition-colors border-0 bg-transparent cursor-pointer" data-id="${p.id}" data-amount="${p.amount_paid}" data-date="${p.payment_date}" title="Delete Payment">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                </button>
+              ` : `
+                <button class="record-payment-btn p-1 px-2 text-[9px] font-extrabold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/30 rounded border border-emerald-500/20 bg-transparent cursor-pointer transition-colors" data-loan-id="${p.loan_id}" data-date="${p.payment_date}" title="Record Payment">
+                  Record
+                </button>
+              `}
+            </div>
+          </td>
         </tr>
       `;
     }).join("");
   }
 
+  // 8. Collection Intelligence Dashboard
+  const activeLoans = loans.filter(l => l.status === "ACTIVE" || l.status === "OVERDUE");
+  const dashboardEl = document.getElementById("collection-intelligence-dashboard");
+  if (activeLoans.length > 0) {
+    dashboardEl.classList.remove("hidden");
+    dashboardEl.innerHTML = activeLoans.map(loan => {
+      // 1. Calendar Progress
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const startDate = new Date(loan.loan_start_date);
+      startDate.setHours(0, 0, 0, 0);
+
+      const diffTime = today.getTime() - startDate.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      const daysPassed = Math.min(diffDays, loan.duration_days);
+
+      // 2. Expected Collection Till Today
+      const dailyInstallment = parseFloat(loan.daily_installment || 0);
+      const expectedCollection = daysPassed * dailyInstallment;
+
+      // 3. Actual Collection
+      const totalPaid = parseFloat(loan.balance_summary?.total_paid || 0);
+
+      // 4. Equivalent Paid Days (total_paid / daily_installment)
+      const equivalentPaidDays = dailyInstallment > 0 ? (totalPaid / dailyInstallment) : 0;
+
+      // 5. Compare Them (behind_days = days_passed - equivalent_paid_days)
+      const behindDays = daysPassed - equivalentPaidDays;
+      let progressText = "";
+      let progressClass = "";
+      if (behindDays > 0) {
+        progressText = `🔴 ${behindDays.toFixed(2)} Days Behind`;
+        progressClass = "text-rose-400";
+      } else if (behindDays < 0) {
+        progressText = `🟢 ${Math.abs(behindDays).toFixed(2)} Days Ahead`;
+        progressClass = "text-emerald-400";
+      } else {
+        progressText = `🟢 On Schedule`;
+        progressClass = "text-emerald-400";
+      }
+
+      // 6. Pending Collection Till Today (expected - total_paid, min 0)
+      const pendingToday = Math.max(0, expectedCollection - totalPaid);
+
+      // 7. Remaining Balance
+      const remainingBalance = parseFloat(loan.remaining_balance || 0);
+
+      return `
+        <div class="glass-card p-6 bg-slate-950/40 border border-white/5 shadow-deep rounded-xl flex flex-col gap-5">
+          <div class="flex items-center justify-between border-b border-white/5 pb-3 select-none">
+            <div class="flex items-center gap-2">
+              <i data-lucide="activity" class="w-5 h-5 text-blue-400 animate-pulse animate-duration-1000"></i>
+              <span class="text-xs font-bold text-white uppercase tracking-widest">Collection Intelligence — Loan #${loan.id}</span>
+            </div>
+            <span class="px-2.5 py-0.5 text-[9px] font-bold rounded border uppercase bg-blue-950/50 text-blue-400 border-blue-500/20">
+              Daily Installment: ${formatCurrency(dailyInstallment)}
+            </span>
+          </div>
+          
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Loan Duration</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="duration" data-val="${loan.duration_days}">0 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Days Passed</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="days-passed" data-val="${daysPassed}">0 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Expected Collection Till Today</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-white" data-animate="expected" data-val="${expectedCollection}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Actual Collection</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-success" data-animate="actual" data-val="${totalPaid}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Equivalent Installments Covered</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-blue-400" data-animate="equivalent" data-val="${equivalentPaidDays}">0.00 Days</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm col-span-1">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Collection Progress</p>
+              <p id="progress-val-loan-${loan.id}" class="text-xl font-bold mt-2 font-mono text-financial-number ${progressClass}">${progressText}</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Pending Collection Till Today</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-400" data-animate="pending" data-val="${pendingToday}">₹0.00</p>
+            </div>
+            <div class="glass-card text-center py-4 bg-white/5 border border-white/10 rounded-lg shadow-sm">
+              <p class="text-[9px] font-bold uppercase tracking-widest text-text-muted">Remaining Loan Balance</p>
+              <p class="text-xl font-bold mt-2 font-mono text-financial-number text-rose-500" data-animate="balance" data-val="${remainingBalance}">₹0.00</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+    
+    // Animate numbers
+    setTimeout(animateKPIs, 50);
+  } else {
+    dashboardEl.classList.add("hidden");
+    dashboardEl.innerHTML = "";
+  }
+
+  // Bind actions for payment table action buttons
+  bindPaymentActions();
 
   if (window.lucide) {
     window.lucide.createIcons();
@@ -870,4 +993,206 @@ function bindPendingKpiListeners(customer) {
     openInspectionPanel();
   });
 }
+
+
+function animateKPIs() {
+  const elements = document.querySelectorAll("[data-animate]");
+  elements.forEach(el => {
+    const targetVal = parseFloat(el.getAttribute("data-val") || 0);
+    const type = el.getAttribute("data-animate");
+    
+    // Store the previous value in a custom attribute to avoid restarting from 0 if refreshed
+    const prevVal = parseFloat(el.getAttribute("data-prev") || 0);
+    el.setAttribute("data-prev", targetVal);
+    
+    if (prevVal === targetVal) {
+      if (type === "duration" || type === "days-passed") {
+        el.innerText = `${Math.round(targetVal)} Days`;
+      } else if (type === "equivalent") {
+        el.innerText = `${targetVal.toFixed(2)} Days`;
+      } else {
+        el.innerText = formatCurrency(targetVal);
+      }
+      return;
+    }
+    
+    let duration = 600; // ms
+    let startTimestamp = null;
+    
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const current = prevVal + progress * (targetVal - prevVal);
+      
+      if (type === "duration" || type === "days-passed") {
+        el.innerText = `${Math.round(current)} Days`;
+      } else if (type === "equivalent") {
+        el.innerText = `${current.toFixed(2)} Days`;
+      } else {
+        el.innerText = formatCurrency(current);
+      }
+      
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    };
+    window.requestAnimationFrame(step);
+  });
+}
+
+function bindPaymentActions() {
+  // Record Buttons
+  document.querySelectorAll(".record-payment-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const loanId = btn.getAttribute("data-loan-id");
+      const date = btn.getAttribute("data-date");
+      
+      document.getElementById("rp-loan-id").value = loanId;
+      document.getElementById("rp-payment-date").value = date;
+      document.getElementById("rp-amount-paid").value = "";
+      document.getElementById("rp-remarks").value = "";
+      
+      document.getElementById("rp-error").classList.add("hidden");
+      document.getElementById("rp-success").classList.add("hidden");
+      
+      document.getElementById("record-payment-modal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    });
+  });
+  
+  // Edit Buttons
+  document.querySelectorAll(".edit-payment-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-id");
+      const date = btn.getAttribute("data-date");
+      const amount = btn.getAttribute("data-amount");
+      const mode = btn.getAttribute("data-mode");
+      const remarks = btn.getAttribute("data-remarks");
+      const version = btn.getAttribute("data-version");
+      
+      document.getElementById("ep-payment-id").value = id;
+      document.getElementById("ep-version-id").value = version;
+      document.getElementById("ep-payment-date").value = date;
+      document.getElementById("ep-amount-paid").value = amount;
+      document.getElementById("ep-payment-mode").value = mode;
+      document.getElementById("ep-remarks").value = remarks;
+      
+      document.getElementById("ep-error").classList.add("hidden");
+      document.getElementById("ep-success").classList.add("hidden");
+      
+      document.getElementById("edit-payment-modal").classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    });
+  });
+  
+  // Delete Buttons
+  document.querySelectorAll(".delete-payment-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-id");
+      const amount = btn.getAttribute("data-amount");
+      const date = btn.getAttribute("data-date");
+      
+      if (!confirm(`Are you sure you want to permanently delete the payment of ₹${parseFloat(amount).toLocaleString('en-IN')} for ${date}?`)) {
+        return;
+      }
+      
+      try {
+        await api.delete(`/payments/${id}`);
+        await window.refreshPageData();
+      } catch (err) {
+        alert("Failed to delete payment: " + (err.message || err.detail || JSON.stringify(err)));
+      }
+    });
+  });
+}
+
+// Modal close triggers
+document.getElementById("close-record-payment-modal")?.addEventListener("click", () => {
+  document.getElementById("record-payment-modal").classList.add("hidden");
+  document.body.style.overflow = "";
+});
+document.getElementById("close-edit-payment-modal")?.addEventListener("click", () => {
+  document.getElementById("edit-payment-modal").classList.add("hidden");
+  document.body.style.overflow = "";
+});
+
+// Forms submit triggers
+document.getElementById("record-payment-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = document.getElementById("submit-record-payment");
+  const errorEl = document.getElementById("rp-error");
+  const successEl = document.getElementById("rp-success");
+  
+  errorEl.classList.add("hidden");
+  successEl.classList.add("hidden");
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span>Recording...</span>`;
+  
+  const payload = {
+    loan_id: parseInt(form.querySelector('[name="loan_id"]').value),
+    payment_date: form.querySelector('[name="payment_date"]').value,
+    amount_paid: parseFloat(form.querySelector('[name="amount_paid"]').value),
+    payment_mode: form.querySelector('[name="payment_mode"]').value,
+    remarks: form.querySelector('[name="remarks"]').value || undefined
+  };
+  
+  try {
+    await api.post("/payments", payload);
+    successEl.innerText = "Payment recorded successfully!";
+    successEl.classList.remove("hidden");
+    
+    setTimeout(async () => {
+      document.getElementById("record-payment-modal").classList.add("hidden");
+      document.body.style.overflow = "";
+      await window.refreshPageData();
+    }, 800);
+  } catch (err) {
+    errorEl.innerText = err.message || err.detail || "Failed to record payment.";
+    errorEl.classList.remove("hidden");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<span>Record Payment</span>`;
+  }
+});
+
+document.getElementById("edit-payment-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = document.getElementById("submit-edit-payment");
+  const errorEl = document.getElementById("ep-error");
+  const successEl = document.getElementById("ep-success");
+  
+  errorEl.classList.add("hidden");
+  successEl.classList.add("hidden");
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<span>Saving...</span>`;
+  
+  const paymentId = form.querySelector('[name="payment_id"]').value;
+  const payload = {
+    amount_paid: parseFloat(form.querySelector('[name="amount_paid"]').value),
+    payment_mode: form.querySelector('[name="payment_mode"]').value,
+    remarks: form.querySelector('[name="remarks"]').value || undefined,
+    version_id: parseInt(form.querySelector('[name="version_id"]').value)
+  };
+  
+  try {
+    await api.put(`/payments/${paymentId}`, payload);
+    successEl.innerText = "Payment updated successfully!";
+    successEl.classList.remove("hidden");
+    
+    setTimeout(async () => {
+      document.getElementById("edit-payment-modal").classList.add("hidden");
+      document.body.style.overflow = "";
+      await window.refreshPageData();
+    }, 800);
+  } catch (err) {
+    errorEl.innerText = err.message || err.detail || "Failed to modify payment.";
+    errorEl.classList.remove("hidden");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<span>Save Changes</span>`;
+  }
+});
+
 

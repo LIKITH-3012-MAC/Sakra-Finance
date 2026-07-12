@@ -403,3 +403,96 @@ async def export_payments_csv(
     except Exception as e:
         logger.error("CSV export failed: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+@router.delete("/{payment_id}", response_model=APIResponse)
+async def delete_payment(
+    payment_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(PermissionRequirement(ADMIN_ROLES)),
+):
+    """
+    Delete a payment record and revert its balance and schedule effects.
+    """
+    from sqlalchemy.orm import selectinload
+    from app.models.loan import Loan
+    from app.models.payment import Payment
+    from app.models.loan_schedule import LoanSchedule
+
+    # 1. Fetch payment
+    payment = await PaymentRepository.get_by_id(db, payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    loan_id = payment.loan_id
+    amount_paid = payment.amount_paid
+    payment_date = payment.payment_date
+
+    # 2. Fetch loan along with schedules and payments in a single DB query
+    stmt = select(Loan).filter(Loan.id == loan_id).options(
+        selectinload(Loan.schedules),
+        selectinload(Loan.payments)
+    )
+    result = await db.execute(stmt)
+    loan = result.scalars().first()
+    if not loan:
+        raise HTTPException(status_code=404, detail="Loan not found")
+
+    # 3. Update loan remaining balance and status
+    loan.remaining_balance = Decimal(str(loan.remaining_balance)) + Decimal(str(amount_paid))
+    loan.status = "ACTIVE"
+
+    # 4. Locate and revert matching loan schedule installment
+    schedule_entry = next((s for s in loan.schedules if s.due_date == payment_date), None)
+    if schedule_entry:
+        schedule_entry.paid_amount = Decimal("0")
+        schedule_entry.remaining_amount = schedule_entry.expected_amount
+        if payment_date < today_ist():
+            schedule_entry.status = "MISSED"
+        else:
+            schedule_entry.status = "PENDING"
+
+    # 5. Delete the payment record
+    await db.delete(payment)
+    await db.commit()
+
+    # Invalidate cache
+    if settings.CACHE_ENABLED:
+        import asyncio
+        from app.services.background_tasks import invalidate_cache_background
+        asyncio.create_task(
+            invalidate_cache_background(
+                patterns=["payments:*", "loans:*", f"customers:summary:{loan.customer_id}"],
+                keys=[f"customers:detail:{loan.customer_id}"]
+            )
+        )
+
+    # Log audit
+    ip_address = None
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip_address = forwarded_for.split(",")[0].strip()
+    elif request.client:
+        ip_address = request.client.host
+    user_agent = request.headers.get("user-agent")
+
+    from app.services.background_tasks import log_audit_background
+    import asyncio
+    asyncio.create_task(
+        log_audit_background(
+            actor_id=current_user.id,
+            action="DELETE_PAYMENT",
+            table_name="payments",
+            record_id=payment_id,
+            new_values={},
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+    )
+
+    return APIResponse(
+        success=True,
+        message="Payment deleted successfully",
+    )
+
