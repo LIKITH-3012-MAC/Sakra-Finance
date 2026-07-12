@@ -1268,6 +1268,21 @@ async function selectCustomer(id) {
   document.getElementById("kpi-interest").innerText = formatCurrency(interest);
   document.getElementById("kpi-repayable").innerText = formatCurrency(repayable);
   document.getElementById("kpi-collected").innerText = formatCurrency(paid);
+
+  // Equivalent Coverage KPI (Total Collected ÷ Daily Installment)
+  const equivCov = summary.equivalent_coverage;
+  const totalDailyInst = summary.total_daily_installment || 0;
+  const kpiCovEl = document.getElementById("kpi-equivalent-coverage");
+  if (kpiCovEl) {
+    kpiCovEl.innerText = (equivCov != null && equivCov > 0) ? `${Number(equivCov).toFixed(2)} Days` : "—";
+  }
+  const kpiTTCollected = document.getElementById("kpi-tooltip-collected");
+  const kpiTTDaily = document.getElementById("kpi-tooltip-daily");
+  const kpiTTResult = document.getElementById("kpi-tooltip-result");
+  if (kpiTTCollected) kpiTTCollected.innerText = formatCurrency(paid);
+  if (kpiTTDaily) kpiTTDaily.innerText = formatCurrency(totalDailyInst);
+  if (kpiTTResult) kpiTTResult.innerText = (equivCov != null && equivCov > 0) ? `${Number(equivCov).toFixed(2)} Days` : "—";
+
   document.getElementById("kpi-remaining").innerText = formatCurrency(remaining);
   document.getElementById("kpi-completion").innerText = `${completion.toFixed(2)}%`;
   document.getElementById("kpi-credit-score").innerText = cScore;
