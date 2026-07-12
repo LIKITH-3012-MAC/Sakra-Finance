@@ -1,6 +1,57 @@
 import api, { customFetch } from "../api.js";
 import { formatCurrency, formatDate, formatInterestRate } from "../helpers.js";
+import { API_BASE_URL } from "../config.js";
 
+
+async function customFetchBlob(url, options = {}) {
+  const absoluteUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+  options.headers = options.headers || {};
+  
+  const token = localStorage.getItem("access_token") || localStorage.getItem("sakra_access_token");
+  if (token) {
+    options.headers["Authorization"] = `Bearer ${token}`;
+  }
+  options.credentials = "include";
+
+  const response = await fetch(absoluteUrl, options);
+  if (response.status === 401) {
+    const rToken = localStorage.getItem("refresh_token");
+    if (rToken) {
+      const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rToken }),
+        credentials: "include"
+      });
+      if (refreshResponse.ok) {
+        const refreshPayload = await refreshResponse.json();
+        const newAccessToken = refreshPayload.data.token.access_token;
+        localStorage.setItem("access_token", newAccessToken);
+        options.headers["Authorization"] = `Bearer ${newAccessToken}`;
+        return customFetchBlob(url, options);
+      }
+    }
+  }
+  
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Access Denied: VIEWER role is blocked from viewing identity documents.");
+    }
+    throw new Error("HTTP error " + response.status);
+  }
+  return response.blob();
+}
+
+async function loadSecureImage(imgElement, url, fallbackSvg) {
+  if (!imgElement) return;
+  try {
+    const blob = await customFetchBlob(url);
+    const objectUrl = URL.createObjectURL(blob);
+    imgElement.src = objectUrl;
+  } catch (err) {
+    if (fallbackSvg) imgElement.src = fallbackSvg;
+  }
+}
 
 let profileId = null;
 
@@ -89,7 +140,9 @@ function renderProfile(data) {
   bindPendingKpiListeners(customer);
 
   // 3. Customer Details block
-  document.getElementById("profile-photo-img").src = `/api/v1/customers/${customer.id}/photo?t=${new Date().getTime()}`;
+  const profilePhotoImg = document.getElementById("profile-photo-img");
+  const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1' style='background:%23f1f5f9;'><path fill-rule='evenodd' d='M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z' clip-rule='evenodd' /></svg>`;
+  loadSecureImage(profilePhotoImg, `/customers/${customer.id}/photo`, fallbackSvg);
 
   const dobEl = document.getElementById("details-dob");
   const dobRow = document.getElementById("details-dob-row");
@@ -633,6 +686,11 @@ function renderScatterPlot(loans, payments, customer) {
     printWindow?.print();
   });
 
+  document.getElementById("viewer-open-new-tab")?.addEventListener("click", () => {
+    if (!currentDocUrl) return;
+    window.open(currentDocUrl, "_blank");
+  });
+
   downloadBtn?.addEventListener("click", () => {
     if (!currentDocUrl) return;
     const a = document.createElement("a");
@@ -652,24 +710,8 @@ function renderScatterPlot(loans, payments, customer) {
     const viewerLoader = document.getElementById("viewer-loader");
     viewerLoader?.classList.remove("hidden");
 
-    const token = localStorage.getItem("sakra_access_token") || sessionStorage.getItem("sakra_access_token") || localStorage.getItem("access_token") || sessionStorage.getItem("access_token");
-    const apiBase = "/api/v1";
-    const absoluteUrl = `${apiBase}${endpoint}`;
-
-    fetch(absoluteUrl, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          if (response.status === 403) {
-            throw new Error("Access Denied: VIEWER role is blocked from viewing identity documents.");
-          }
-          throw new Error("HTTP error " + response.status);
-        }
-        const blob = await response.blob();
+    customFetchBlob(endpoint)
+      .then((blob) => {
         const objectUrl = URL.createObjectURL(blob);
         currentDocUrl = objectUrl;
 
@@ -693,12 +735,18 @@ function renderScatterPlot(loans, payments, customer) {
 
   // Preview Buttons Bindings
   document.getElementById("view-aadhaar-btn")?.addEventListener("click", () => {
-    if (!aMeta) return;
+    if (!aMeta) {
+      alert("No document uploaded.");
+      return;
+    }
     openViewer("Aadhaar Card Preview", `/customers/${customer.id}/aadhaar`, `${aMeta.filename} (${(aMeta.file_size / (1024*1024)).toFixed(2)} MB)`);
   });
 
   document.getElementById("view-promissory-btn")?.addEventListener("click", () => {
-    if (!pMeta) return;
+    if (!pMeta) {
+      alert("No document uploaded.");
+      return;
+    }
     openViewer("Promissory Note Preview", `/customers/${customer.id}/promissory`, `${pMeta.filename} (${(pMeta.file_size / (1024*1024)).toFixed(2)} MB)`);
   });
 

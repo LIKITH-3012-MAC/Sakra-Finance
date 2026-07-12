@@ -1,6 +1,59 @@
 import api, { customFetch } from "../api.js";
 import { getCachedUser } from "../auth.js";
 import { formatCurrency } from "../helpers.js";
+import { API_BASE_URL } from "../config.js";
+
+
+async function customFetchBlob(url, options = {}) {
+  const absoluteUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+  options.headers = options.headers || {};
+  
+  const token = localStorage.getItem("access_token") || localStorage.getItem("sakra_access_token");
+  if (token) {
+    options.headers["Authorization"] = `Bearer ${token}`;
+  }
+  options.credentials = "include";
+
+  const response = await fetch(absoluteUrl, options);
+  if (response.status === 401) {
+    const rToken = localStorage.getItem("refresh_token");
+    if (rToken) {
+      const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rToken }),
+        credentials: "include"
+      });
+      if (refreshResponse.ok) {
+        const refreshPayload = await refreshResponse.json();
+        const newAccessToken = refreshPayload.data.token.access_token;
+        localStorage.setItem("access_token", newAccessToken);
+        options.headers["Authorization"] = `Bearer ${newAccessToken}`;
+        return customFetchBlob(url, options);
+      }
+    }
+  }
+  
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("Access Denied: VIEWER role is blocked from viewing identity documents.");
+    }
+    throw new Error("HTTP error " + response.status);
+  }
+  return response.blob();
+}
+
+async function loadSecureImage(imgElement, url, fallbackSvg) {
+  if (!imgElement) return;
+  try {
+    const blob = await customFetchBlob(url);
+    const objectUrl = URL.createObjectURL(blob);
+    imgElement.src = objectUrl;
+  } catch (err) {
+    if (fallbackSvg) imgElement.src = fallbackSvg;
+  }
+}
+
 
 
 let customerRegistry = [];
@@ -556,7 +609,7 @@ function renderRegistry() {
     return `
       <tr class="cursor-pointer hover:bg-slate-50" data-id="${c.id}">
         <td class="text-center">
-          <img src="/api/v1/customers/${c.id}/photo" class="w-8 h-8 rounded-full border border-border-default/45 shadow-sm object-cover mx-auto select-none" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%23cbd5e1\' style=\'background:%23f1f5f9;\'><path fill-rule=\'evenodd\' d=\'M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z\' clip-rule=\'evenodd\' /></svg>'" />
+          <img data-secure-src="/customers/${c.id}/photo" class="w-8 h-8 rounded-full border border-border-default/45 shadow-sm object-cover mx-auto select-none" />
         </td>
         <td class="font-mono text-xs text-text-muted">#${c.id}</td>
         <td class="font-semibold text-text-primary text-xs">${c.name}</td>
@@ -684,6 +737,13 @@ function renderRegistry() {
   if (window.lucide) {
     window.lucide.createIcons();
   }
+
+  // Load secure photos for table row images
+  tableBody.querySelectorAll("img[data-secure-src]").forEach(img => {
+    const src = img.getAttribute("data-secure-src");
+    const fallback = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1' style='background:%23f1f5f9;'><path fill-rule='evenodd' d='M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z' clip-rule='evenodd' /></svg>`;
+    loadSecureImage(img, src, fallback);
+  });
 
   // Row selection setup (Desktop rows)
   tableBody.querySelectorAll("tr").forEach(row => {
@@ -1225,7 +1285,9 @@ async function selectCustomer(id) {
     profileBtn.href = `/customer-profile.html?id=${customer.id}`;
   }
 
-  document.getElementById("detail-profile-photo").src = `/api/v1/customers/${customer.id}/photo?t=${new Date().getTime()}`;
+  const detailPhotoImg = document.getElementById("detail-profile-photo");
+  const fallbackSvg = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cbd5e1' style='background:%23f1f5f9;'><path fill-rule='evenodd' d='M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A9.75 9.75 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z' clip-rule='evenodd' /></svg>`;
+  loadSecureImage(detailPhotoImg, `/customers/${customer.id}/photo`, fallbackSvg);
   document.getElementById("detail-profile-name").innerText = customer.name;
   document.getElementById("detail-profile-phone").innerText = customer.phone_number;
   document.getElementById("detail-profile-aadhar").innerText = customer.aadhar_masked || "—";
