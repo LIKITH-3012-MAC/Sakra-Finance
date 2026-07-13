@@ -355,80 +355,63 @@ async def get_customer_summary_details(db: AsyncSession, customer_id: int, loans
 async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
     """
     Calculate comprehensive dashboard metrics dynamically from live DB.
-    Optimized to run counts and queries in parallel using asyncio.gather().
+    Optimized to run all counts and queries in parallel using a single DB query.
     """
     from app.models.customer import Customer
     from app.models.loan import Loan
     from app.models.payment import Payment
     from app.models.loan_schedule import LoanSchedule
+    from sqlalchemy import or_
 
     today = today_ist()
 
-    cust_res = await db.execute(select(func.count(Customer.id)).filter(Customer.is_deleted == False))
-    loan_res = await db.execute(select(func.count(Loan.id)).filter(Loan.is_deleted == False))
-    disbursed_res = await db.execute(select(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False))
-    collected_res = await db.execute(select(func.sum(Payment.amount_paid)))
-    today_collected_res = await db.execute(select(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today))
-    all_loans_res = await db.execute(select(Loan).filter(Loan.is_deleted == False))
-    pending_payments_res = await db.execute(select(func.count(LoanSchedule.id)).filter(
-        LoanSchedule.due_date == today,
-        LoanSchedule.remaining_amount > 0
-    ))
+    # Consolidate 11 queries/aggregates into a single, high-performance SELECT statement
+    stmt = select(
+        select(func.count(Customer.id)).filter(Customer.is_deleted == False).scalar_subquery(),
+        select(func.count(Loan.id)).filter(Loan.is_deleted == False).scalar_subquery(),
+        select(func.sum(Loan.principal_amount)).filter(Loan.is_deleted == False).scalar_subquery(),
+        select(func.sum(Payment.amount_paid)).scalar_subquery(),
+        select(func.sum(Payment.amount_paid)).filter(Payment.payment_date == today).scalar_subquery(),
+        select(func.count(LoanSchedule.id)).filter(
+            LoanSchedule.due_date == today,
+            LoanSchedule.remaining_amount > 0
+        ).scalar_subquery(),
+        select(func.sum(Loan.total_repayable_amount)).filter(Loan.is_deleted == False).scalar_subquery(),
+        select(func.sum(Loan.remaining_balance)).filter(Loan.is_deleted == False).scalar_subquery(),
+        select(func.count(Loan.id)).filter(
+            Loan.is_deleted == False,
+            or_(Loan.remaining_balance <= 0, Loan.status.in_(["COMPLETED", "CLOSED"]))
+        ).scalar_subquery(),
+        select(func.count(Loan.id)).filter(
+            Loan.is_deleted == False,
+            Loan.loan_end_date < today,
+            Loan.remaining_balance > 0,
+            Loan.status != "CLOSED"
+        ).scalar_subquery(),
+        select(func.count(func.distinct(Loan.customer_id))).filter(
+            Loan.is_deleted == False,
+            Loan.loan_end_date < today,
+            Loan.remaining_balance > 0,
+            Loan.status != "CLOSED"
+        ).scalar_subquery()
+    )
 
-    total_customers = cust_res.scalar() or 0
-    total_loans = loan_res.scalar() or 0
+    res = await db.execute(stmt)
+    row = res.first()
 
-    disbursed_result = disbursed_res.scalar()
-    disbursed_principal = Decimal(str(disbursed_result)) if disbursed_result else Decimal("0")
+    total_customers = row[0] or 0
+    total_loans = row[1] or 0
+    disbursed_principal = Decimal(str(row[2])) if row[2] is not None else Decimal("0")
+    total_collected = Decimal(str(row[3])) if row[3] is not None else Decimal("0")
+    today_collection = Decimal(str(row[4])) if row[4] is not None else Decimal("0")
+    pending_payments_count = row[5] or 0
+    total_due = Decimal(str(row[6])) if row[6] is not None else Decimal("0")
+    outstanding_balance = Decimal(str(row[7])) if row[7] is not None else Decimal("0")
+    active_principal = outstanding_balance
+    completed_loans_count = row[8] or 0
+    overdue_count = row[9] or 0
+    overdue_customers_count = row[10] or 0
 
-    collected_result = collected_res.scalar()
-    total_collected = Decimal(str(collected_result)) if collected_result else Decimal("0")
-
-    today_collected_result = today_collected_res.scalar()
-    today_collection = Decimal(str(today_collected_result)) if today_collected_result else Decimal("0")
-
-    all_loans = list(all_loans_res.scalars().all())
-    loan_ids = [loan.id for loan in all_loans]
-
-    # Batch fetch all payments for these loans
-    payments_by_loan = defaultdict(list)
-    if loan_ids:
-        stmt = select(Payment).filter(Payment.loan_id.in_(loan_ids))
-        res = await db.execute(stmt)
-        all_payments = res.scalars().all()
-        for p in all_payments:
-            payments_by_loan[p.loan_id].append(p)
-
-    total_due = Decimal("0")
-    active_principal = Decimal("0")
-    completed_loans_count = 0
-    overdue_count = 0
-    overdue_customers_set = set()
-
-    for loan in all_loans:
-        # Calculate due
-        interest = loan.interest_amount if loan.interest_amount is not None else calculate_interest(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan.duration_days)
-        loan_total_due = loan.principal_amount + interest
-        total_due += loan_total_due
-
-        # Process payments in memory
-        loan_payments = payments_by_loan[loan.id]
-        loan_total_paid = sum((p.amount_paid for p in loan_payments), Decimal("0"))
-        loan_remaining = max(loan_total_due - loan_total_paid, Decimal("0"))
-
-        # Remaining principal balance calculation
-        bal_sum = get_loan_balance_summary(loan.principal_amount, loan.interest_rate, loan.interest_formula, loan_total_paid, loan.duration_days)
-        active_principal += bal_sum["remaining_balance"]
-
-        # Loan counts
-        if loan_remaining == 0:
-            completed_loans_count += 1
-        elif loan.loan_end_date and today > loan.loan_end_date and loan_remaining > 0:
-            overdue_count += 1
-            overdue_customers_set.add(loan.customer_id)
-
-    outstanding_balance = max(total_due - total_collected, Decimal("0"))
-    pending_payments_count = pending_payments_res.scalar() or 0
     collection_efficiency = float((total_collected / total_due) * 100) if total_due > 0 else 100.0
 
     return {
@@ -443,7 +426,7 @@ async def get_dashboard_metrics_details(db: AsyncSession) -> dict:
         "today_collection": float(today_collection),
         "completed_loans_count": completed_loans_count,
         "pending_payments_count": pending_payments_count,
-        "overdue_customers_count": len(overdue_customers_set),
+        "overdue_customers_count": overdue_customers_count,
         "collection_efficiency": round(collection_efficiency, 2),
     }
 

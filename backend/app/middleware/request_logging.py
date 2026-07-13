@@ -61,6 +61,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             client_ip,
         )
 
+        # Output timing logs format (e.g. GET /customers ........ 78 ms)
+        path_str = request.url.path
+        if request.url.query:
+            path_str += f"?{request.url.query}"
+        log_line = f"{request.method} {path_str}"
+        dots = "." * max(2, 40 - len(log_line))
+        print(f"\033[1;36m{log_line} {dots} {duration_ms:.0f} ms\033[0m")
+
         # Add request ID to response headers for traceability
         response.headers["X-Request-ID"] = request_id
         return response

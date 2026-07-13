@@ -37,7 +37,7 @@ async def list_notifications(
     """
     stmt = select(Notification).filter(
         Notification.user_id == current_user.id,
-    ).order_by(Notification.sent_at.desc())
+    ).order_by(Notification.sent_at.desc()).limit(50)
     result = await db.execute(stmt)
     notifications = result.scalars().all()
 
