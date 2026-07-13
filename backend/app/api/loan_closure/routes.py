@@ -124,7 +124,12 @@ async def verify_auth_passkey(
     """
     Verify the manager authorization passkey server-side.
     """
-    configured_secret = settings.LOAN_CLOSURE_SECRET or "shiva"
+    configured_secret = settings.LOAN_CLOSURE_SECRET
+    if not configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server configuration error: LOAN_CLOSURE_SECRET is not configured."
+        )
     
     if payload.passkey != configured_secret:
         # Record a failed authorization audit event
@@ -162,7 +167,12 @@ async def execute_loan_closure(
     Securely settle and close a loan, creating archival entries and audit trails.
     """
     # 1. Verify passkey
-    configured_secret = settings.LOAN_CLOSURE_SECRET or "shiva"
+    configured_secret = settings.LOAN_CLOSURE_SECRET
+    if not configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server configuration error: LOAN_CLOSURE_SECRET is not configured."
+        )
     if payload.passkey != configured_secret:
         await log_audit(
             db=db,

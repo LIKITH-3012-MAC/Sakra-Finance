@@ -177,6 +177,8 @@ async def on_startup():
         raise RuntimeError("CONFIGURATION ERROR: AES_ENCRYPTION_KEY is missing.")
 
     # 2. Check AI & Resend Service Keys
+    if not settings.LOAN_CLOSURE_SECRET:
+        raise RuntimeError("CONFIGURATION ERROR: LOAN_CLOSURE_SECRET environment variable is not configured.")
     if not settings.GROQ_API_KEY:
         raise RuntimeError("CONFIGURATION ERROR: GROQ_API_KEY environment variable is not configured.")
     if not settings.RESEND_API_KEY:
