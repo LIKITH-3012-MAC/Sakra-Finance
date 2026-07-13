@@ -99,10 +99,8 @@ class CustomerRepository:
 
         count_stmt = select(func.count()).select_from(Customer).filter(*where_clauses)
 
-        res_task = db.execute(stmt)
-        count_task = db.execute(count_stmt)
-
-        res, count_res = await asyncio.gather(res_task, count_task)
+        res = await db.execute(stmt)
+        count_res = await db.execute(count_stmt)
         customers = list(res.scalars().all())
         total = count_res.scalar() or 0
 

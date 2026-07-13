@@ -78,11 +78,8 @@ async def list_loans(
         stmt = stmt.filter(*where_clauses)
         count_stmt = count_stmt.filter(*where_clauses)
 
-    import asyncio
-    res_task = db.execute(stmt.order_by(Loan.created_at.desc()).offset(skip).limit(limit))
-    count_task = db.execute(count_stmt)
-
-    res, count_res = await asyncio.gather(res_task, count_task)
+    res = await db.execute(stmt.order_by(Loan.created_at.desc()).offset(skip).limit(limit))
+    count_res = await db.execute(count_stmt)
     loans = res.scalars().all()
     total = count_res.scalar() or 0
 

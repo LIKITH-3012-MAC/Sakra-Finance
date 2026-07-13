@@ -66,11 +66,8 @@ async def get_audit_logs(
     # Pagination calculation
     skip = (page - 1) * limit
     
-    # Run queries in parallel
-    res_task = db.execute(stmt.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
-    count_task = db.execute(count_stmt)
-
-    res, count_res = await asyncio.gather(res_task, count_task)
+    res = await db.execute(stmt.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
+    count_res = await db.execute(count_stmt)
     logs_result = res.all()
     total = count_res.scalar() or 0
 
