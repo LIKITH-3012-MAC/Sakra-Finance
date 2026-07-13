@@ -82,6 +82,17 @@ async def login(
         )
         db.add(log)
         
+        # Create audit entry
+        await log_audit(
+            db=db,
+            actor_id=user.id if user else 0,
+            action="LOGIN_FAILED",
+            table_name="users",
+            record_id=user.id if user else None,
+            old_values={"username": credentials.username, "reason": "INVALID_PASSWORD"},
+            request=request
+        )
+        
         # Create notifications
         from app.services.notification_service import create_system_notification, push_realtime_notifications
         notifs = await create_system_notification(
@@ -111,6 +122,18 @@ async def login(
             reason=f"ACCOUNT_LOCKED_{user.status.upper()}"
         )
         db.add(log)
+        
+        # Create audit entry
+        await log_audit(
+            db=db,
+            actor_id=user.id,
+            action="LOGIN_FAILED",
+            table_name="users",
+            record_id=user.id,
+            old_values={"username": user.username, "reason": f"ACCOUNT_LOCKED_{user.status.upper()}"},
+            request=request
+        )
+        
         await db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -147,6 +170,16 @@ async def login(
         reason="LOGIN_SUCCESS"
     )
     db.add(log)
+    
+    # Create audit entry
+    await log_audit(
+        db=db,
+        actor_id=user.id,
+        action="LOGIN_SUCCESS",
+        table_name="users",
+        record_id=user.id,
+        request=request
+    )
     
     # Create notifications
     from app.services.notification_service import create_system_notification, push_realtime_notifications
@@ -297,6 +330,17 @@ async def logout(
         except Exception:
             pass
 
+    # Create audit entry
+    await log_audit(
+        db=db,
+        actor_id=current_user.id,
+        action="LOGOUT",
+        table_name="users",
+        record_id=current_user.id,
+        request=request
+    )
+    await db.commit()
+
     return APIResponse(success=True, message="Logged out successfully")
 
 
@@ -419,6 +463,16 @@ async def activate_account(
         f"New employee account activated: {user.username} (Role: {user.role}, Name: {user.full_name})"
     )
 
+    # Log user creation audit
+    await log_audit(
+        db=db,
+        actor_id=user.id,
+        action="CREATE_USER",
+        table_name="users",
+        record_id=user.id,
+        request=request
+    )
+
     # Update invite record status
     invite.status = "USED"
     await db.commit()
@@ -460,6 +514,17 @@ async def activate_account(
         reason="ACTIVATION_SUCCESS"
     )
     db.add(log)
+    
+    # Log login success audit
+    await log_audit(
+        db=db,
+        actor_id=user.id,
+        action="LOGIN_SUCCESS",
+        table_name="users",
+        record_id=user.id,
+        request=request
+    )
+    
     await db.commit()
 
     # Generate and set cookies
