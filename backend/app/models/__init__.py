@@ -18,3 +18,4 @@ from app.models.credit_score import CreditScore
 from app.models.ai_log import AIAuditLog
 from app.models.copilot_session import CopilotSession
 from app.models.copilot_message import CopilotMessage
+from app.models.loan_closure import LoanClosure

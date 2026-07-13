@@ -1,6 +1,7 @@
 import api, { customFetch } from "../api.js";
 import { formatCurrency, formatDate, formatInterestRate } from "../helpers.js";
 import { API_BASE_URL } from "../config.js";
+import { renderActivityTimeline } from "./loan-closure.js";
 
 
 async function customFetchBlob(url, options = {}) {
@@ -479,6 +480,94 @@ function renderProfile(data) {
   if (window.innerWidth < 768) {
     initializeMobileAccordions(data);
   }
+
+  // Check for CLOSED loan
+  const closedLoan = loans.find(l => l.status === "CLOSED");
+  const bannerContainer = document.getElementById("closure-banner-container");
+  
+  if (closedLoan && bannerContainer) {
+    bannerContainer.classList.remove("hidden");
+    api.get(`/loan-closure/${closedLoan.id}/certificate`)
+      .then(res => {
+        const cert = res.data || res;
+        bannerContainer.innerHTML = `
+          <div class="glass-card bg-emerald-500/10 border-emerald-500/20 text-emerald-400 p-5 rounded-lg flex items-center justify-between gap-4 border mb-6 flex-wrap shadow-md select-none">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <i data-lucide="shield-check" class="w-5 h-5 text-emerald-400"></i>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold uppercase tracking-wider text-text-primary">✓ LOAN SUCCESSFULLY SETTLED</h4>
+                <p class="text-[11px] text-text-muted font-mono mt-0.5">
+                  Settlement Date: ${cert.settlement_date} · Closed By: ${cert.closed_by} · Amount: ₹${cert.settlement_amount.toLocaleString("en-IN")} · Ref: ${cert.settlement_reference}
+                </p>
+              </div>
+            </div>
+            <button type="button" class="sakra-btn-tactile bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 border-0 cursor-pointer" id="profile-cert-download-btn">
+              <i data-lucide="download" class="w-4 h-4"></i> Download Certificate
+            </button>
+          </div>
+        `;
+        
+        document.getElementById("profile-cert-download-btn").addEventListener("click", () => {
+          const printWindow = window.open("", "_blank");
+          printWindow.document.write(\`
+            <html>
+              <head>
+                <title>SAKRA FINANCE | Settlement Certificate</title>
+                <link rel="stylesheet" href="/assets/css/main.css">
+                <style>
+                  body { background: white !important; color: black !important; padding: 3rem; }
+                  .settlement-certificate { border: 4px double #333; padding: 2rem; }
+                  .no-print { display: none !important; }
+                </style>
+              </head>
+              <body>
+                <div class="settlement-certificate">
+                  <div style="text-align: center; margin-bottom: 2rem; border-bottom: 2px solid #333; padding-bottom: 1rem;">
+                    <h2 style="margin: 0; font-family: sans-serif; letter-spacing: 2px;">LOAN SETTLEMENT CERTIFICATE</h2>
+                    <span style="font-size: 10px; text-transform: uppercase;">SAKRA FINANCE CORP</span>
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 14px; line-height: 2;">
+                    <tr><td><strong>Borrower Name:</strong></td><td>\${cert.customer_name}</td></tr>
+                    <tr><td><strong>Customer ID:</strong></td><td>#\${cert.customer_id}</td></tr>
+                    <tr><td><strong>Loan Reference ID:</strong></td><td>#\${cert.loan_id}</td></tr>
+                    <tr><td><strong>Principal Repaid:</strong></td><td>₹\${cert.principal.toLocaleString("en-IN")}</td></tr>
+                    <tr><td><strong>Interest Repaid:</strong></td><td>₹\${cert.interest.toLocaleString("en-IN")}</td></tr>
+                    <tr><td><strong>Settlement Amount:</strong></td><td>₹\${cert.settlement_amount.toLocaleString("en-IN")}</td></tr>
+                    <tr><td><strong>Total Amount Paid:</strong></td><td>₹\${cert.total_paid.toLocaleString("en-IN")}</td></tr>
+                    <tr><td><strong>Settlement Date:</strong></td><td>\${cert.settlement_date} \${cert.settlement_time}</td></tr>
+                    <tr><td><strong>Verification Code:</strong></td><td>\${cert.digital_verification_id}</td></tr>
+                    <tr><td><strong>Settlement Reference ID:</strong></td><td>\${cert.settlement_reference}</td></tr>
+                  </table>
+                  <div style="margin-top: 3rem; text-align: right; font-size: 12px; font-weight: bold;">
+                    Authorized Signature<br>Sakra Finance Corp
+                  </div>
+                </div>
+                <script>
+                  window.onload = function() {
+                    window.print();
+                    setTimeout(() => window.close(), 1000);
+                  }
+                </script>
+              </body>
+            </html>
+          \`);
+          printWindow.document.close();
+        });
+
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      })
+      .catch(err => console.debug("No closure certificate available or loaded:", err));
+  } else if (bannerContainer) {
+    bannerContainer.classList.add("hidden");
+    bannerContainer.innerHTML = "";
+  }
+
+  // Render chronological timeline
+  renderActivityTimeline(customer.id, "profile-timeline-container");
 }
 
 function renderScatterPlot(loans, payments, customer) {

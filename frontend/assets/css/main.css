@@ -2680,6 +2680,189 @@ img, video, canvas, svg {
   }
 }
 
+/* ── LOAN CLOSURE WORKFLOW SYSTEM STYLES ────────────────────── */
+
+/* Wizard Overlay and Modal Backdrop */
+.wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(3, 7, 18, 0.85);
+  backdrop-filter: blur(8px);
+  transition: opacity 300ms ease;
+}
+
+.wizard-modal {
+  width: 95%;
+  max-width: 650px;
+  background: rgba(10, 18, 36, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalReveal 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.wizard-step {
+  display: none;
+  animation: fadeIn 250ms ease-in-out forwards;
+}
+
+.wizard-step.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Green Glow & Badges for Closed Loans */
+.closed-card-glow {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.08) !important;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(10, 18, 36, 0.45)) !important;
+}
+
+.status-pill-closed {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #10b981 !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+}
+
+/* Chronological Activity Center Timeline */
+.activity-timeline {
+  position: relative;
+  padding-left: 2rem;
+}
+
+.activity-timeline::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.timeline-event {
+  position: relative;
+  padding-bottom: 2rem;
+}
+
+.timeline-event:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -28px;
+  top: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-dot.closure {
+  background: #10b981;
+  border-color: #059669;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+.timeline-dot.payment {
+  background: #8b5cf6;
+  border-color: #7c3aed;
+}
+
+.timeline-dot.audit {
+  background: #3b82f6;
+  border-color: #2563eb;
+}
+
+/* Success Checkmark Animation */
+.success-checkmark-svg {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+}
+
+.success-checkmark-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 2;
+  stroke-miterlimit: 10;
+  stroke: #10b981;
+  fill: none;
+  animation: strokeCircle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.success-checkmark-check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke-width: 3;
+  stroke: #10b981;
+  fill: none;
+  animation: strokeCheck 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+@keyframes strokeCircle {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes strokeCheck {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Print Certificate Optimization */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .settlement-certificate, .settlement-certificate * {
+    visibility: visible;
+  }
+  .settlement-certificate {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    color: black !important;
+    padding: 3rem !important;
+    border: 4px double #333 !important;
+  }
+  .settlement-certificate * {
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+
 
 
 

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAKRA FINANCE | Customer Lifecycle History</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#050816">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="relative">
+  
+  <!-- Ambient Environmental Elements -->
+  <div class="sakra-financial-grid"></div>
+  <div class="sakra-ambient-glow"></div>
+
+  <div class="app-container relative z-10">
+    <!-- Sidebar Placeholder -->
+    <div id="sidebar-container"></div>
+    
+    <div class="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <!-- Header Placeholder -->
+      <div id="header-container"></div>
+      
+      <!-- MAIN WORKSPACE -->
+      <main class="main-content flex-1 overflow-y-auto font-sans p-4 md:p-8">
+        <div id="global-page-loader" class="h-full w-full flex items-center justify-center py-20">
+          <i data-lucide="loader-2" class="w-10 h-10 animate-spin text-primary"></i>
+        </div>
+
+        <div id="history-content" class="flex flex-col gap-6 w-full sa-reveal hidden">
+          <!-- Breadcrumb -->
+          <div>
+            <a href="/customers.html" class="inline-flex items-center gap-2 text-xs text-text-secondary hover:text-primary transition-colors font-bold uppercase tracking-wider w-fit">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Customer Registry
+            </a>
+          </div>
+
+          <!-- Customer Identity Overview Card -->
+          <div class="glass-card flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-6">
+            <div class="flex items-center gap-5">
+              <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-md shrink-0 bg-slate-100 flex items-center justify-center select-none" id="history-avatar-container">
+                <span id="history-avatar-fallback" class="font-bold text-lg text-slate-500 uppercase">CS</span>
+              </div>
+              <div>
+                <h2 id="history-name" class="text-xl font-extrabold text-text-primary tracking-tight">—</h2>
+                <p class="text-xs text-text-secondary mt-1 flex items-center gap-3 flex-wrap font-mono font-bold select-none">
+                  <span class="inline-flex items-center gap-1.5"><i data-lucide="phone" class="w-3.5 h-3.5 text-text-muted"></i><span id="history-phone">—</span></span>
+                  <span class="inline-flex items-center gap-1.5"><i data-lucide="credit-card" class="w-3.5 h-3.5 text-text-muted"></i><span id="history-aadhar">—</span></span>
+                </p>
+              </div>
+            </div>
+            <div class="text-xs text-text-muted font-mono font-bold select-none uppercase tracking-wider text-right">
+              <div>Customer ID: <span id="history-customer-id" class="text-text-primary">—</span></div>
+              <div class="mt-1">Active Loan: <span id="history-loan-id" class="text-text-primary">—</span></div>
+            </div>
+          </div>
+
+          <!-- Stats Quick Summary Grid -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-card p-4 flex flex-col gap-1 select-none">
+              <span class="text-[9px] uppercase tracking-wider text-text-muted font-bold">Principal Loan Amount</span>
+              <span class="text-lg font-extrabold text-text-primary font-mono" id="history-stat-principal">₹0.00</span>
+            </div>
+            <div class="glass-card p-4 flex flex-col gap-1 select-none">
+              <span class="text-[9px] uppercase tracking-wider text-text-muted font-bold">Interest Payable</span>
+              <span class="text-lg font-extrabold text-text-primary font-mono" id="history-stat-interest">₹0.00</span>
+            </div>
+            <div class="glass-card p-4 flex flex-col gap-1 select-none">
+              <span class="text-[9px] uppercase tracking-wider text-text-muted font-bold">Total Collected (Paid)</span>
+              <span class="text-lg font-extrabold text-emerald-400 font-mono" id="history-stat-collected">₹0.00</span>
+            </div>
+            <div class="glass-card p-4 flex flex-col gap-1 select-none">
+              <span class="text-[9px] uppercase tracking-wider text-text-muted font-bold">Account Lifecycle State</span>
+              <span class="text-xs font-extrabold inline-flex items-center w-fit px-2 py-0.5 rounded border uppercase mt-1" id="history-stat-status">UNKNOWN</span>
+            </div>
+          </div>
+
+          <!-- Timeline & Archive Section -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Timeline Feed (Left / Center) -->
+            <div class="lg:col-span-2 flex flex-col gap-4">
+              <div class="glass-card p-6 flex flex-col gap-6">
+                <div class="flex items-center justify-between border-b border-white/5 pb-4">
+                  <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary flex items-center gap-2">
+                    <i data-lucide="history" class="w-4 h-4 text-blue-400"></i>
+                    <span>Customer Activity Center (Chronological Audit)</span>
+                  </h3>
+                  <span class="text-[9px] font-mono font-bold bg-slate-950 border border-white/5 text-text-muted px-2 py-0.5 rounded">Real-Time Sync</span>
+                </div>
+                <!-- Timeline container -->
+                <div id="history-timeline-container" class="flex flex-col gap-4">
+                  <!-- Events rendered dynamically -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Lifecycle Details / Documents Archival Details (Right Sidebar) -->
+            <div class="flex flex-col gap-6">
+              <!-- Personal details -->
+              <div class="glass-card p-6 flex flex-col gap-4">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary border-b border-white/5 pb-3">Archived Bio-Data</h3>
+                <div class="flex flex-col gap-3 text-xs font-medium text-text-secondary font-mono">
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Occupation / Income</span>
+                    <span id="history-bio-job">—</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Gender / Age</span>
+                    <span id="history-bio-gender-age">—</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Registered Address</span>
+                    <span id="history-bio-address" class="font-sans leading-relaxed text-text-primary">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Risk Analysis snapshot -->
+              <div class="glass-card p-6 flex flex-col gap-4">
+                <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary border-b border-white/5 pb-3">Analytics Ledger State</h3>
+                <div class="flex flex-col gap-3 text-xs font-medium text-text-secondary font-mono">
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Equivalent Coverage</span>
+                    <span id="history-anal-coverage">—</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Days Behind Expected</span>
+                    <span id="history-anal-behind">—</span>
+                  </div>
+                  <div>
+                    <span class="text-[9px] uppercase tracking-wider text-text-muted block font-sans">Latest Credit Score</span>
+                    <span id="history-anal-credit">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/js/main.js"></script>
+  <script type="module" src="/assets/js/pages/history.js"></script>
+</body>
+</html>

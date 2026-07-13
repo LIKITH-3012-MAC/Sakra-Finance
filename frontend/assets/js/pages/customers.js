@@ -2,6 +2,7 @@ import api, { customFetch } from "../api.js";
 import { getCachedUser } from "../auth.js";
 import { formatCurrency } from "../helpers.js";
 import { API_BASE_URL } from "../config.js";
+import { LoanClosureWizard } from "./loan-closure.js";
 
 
 async function customFetchBlob(url, options = {}) {
@@ -714,6 +715,8 @@ function renderRegistry() {
     const isSelected = c.id.toString() === selectedCustomerId?.toString();
     const rowSelectionClass = isSelected ? "selected-active-row" : "";
 
+    const isClosedLoan = activeLoan && (activeLoan.status === "CLOSED" || remaining <= 0);
+
     return `
       <tr class="registry-row-card ${rowSelectionClass}" data-id="${c.id}">
         <td class="py-4 px-6 text-left">
@@ -759,6 +762,15 @@ function renderRegistry() {
         </td>
         <td class="py-4 px-6 text-center">
           ${statusBadge}
+        </td>
+        <td class="py-4 px-6 text-center">
+          <div class="flex items-center justify-center gap-1.5 flex-wrap">
+            <a href="/customer-profile.html?id=${c.id}" class="px-2 py-1 rounded text-[8px] uppercase font-bold bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 transition-all select-none">Profile</a>
+            <a href="tel:${c.phone_number}" class="px-2 py-1 rounded text-[8px] uppercase font-bold bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/20 transition-all select-none">Call</a>
+            <a href="/payments.html?customer_id=${c.id}" class="px-2 py-1 rounded text-[8px] uppercase font-bold bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/20 transition-all select-none">Pay</a>
+            <a href="/history.html?id=${c.id}" class="px-2 py-1 rounded text-[8px] uppercase font-bold bg-cyan-600/20 hover:bg-cyan-600 text-cyan-400 hover:text-white border border-cyan-500/20 transition-all select-none">History</a>
+            ${(activeLoan && activeLoan.status === "ACTIVE" && remaining > 0) ? `<button type="button" class="loan-cleared-btn px-2 py-1 rounded text-[8px] uppercase font-bold bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/20 transition-all select-none cursor-pointer" data-loan-id="${activeLoan.id}" data-customer-id="${c.id}">Loan Cleared</button>` : (activeLoan && (activeLoan.status === "CLOSED" || remaining <= 0)) ? `<span class="px-2 py-1 rounded text-[8px] uppercase font-bold status-pill-closed select-none flex items-center gap-1"><i data-lucide="check-circle" class="w-3 h-3"></i> Loan Closed</span>` : ''}
+          </div>
         </td>
       </tr>
     `;
@@ -854,8 +866,11 @@ function renderRegistry() {
     // Pre-fetched details placeholder
     const prefetchKey = `card-last-payment-${c.id}`;
 
+    const isClosedLoan = activeLoan && (activeLoan.status === "CLOSED" || remaining <= 0);
+    const closedGlowClass = isClosedLoan ? "closed-card-glow" : "";
+
     return `
-      <div class="glass-card p-4 border ${cardSelectBorder} flex flex-col gap-3 cursor-pointer hover:border-blue-500/40 transition-all duration-200" data-id="${c.id}">
+      <div class="glass-card p-4 border ${cardSelectBorder} ${closedGlowClass} flex flex-col gap-3 cursor-pointer hover:border-blue-500/40 transition-all duration-200" data-id="${c.id}">
         <!-- Top row: Avatar, Name, Status -->
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5">
@@ -923,6 +938,12 @@ function renderRegistry() {
           <a href="/payments.html?customer_id=${c.id}" class="sakra-btn-tactile bg-purple-600/25 hover:bg-purple-600 text-purple-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-purple-500/20 select-none">
             Pay
           </a>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <a href="/history.html?id=${c.id}" class="sakra-btn-tactile bg-cyan-600/25 hover:bg-cyan-600 text-cyan-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-cyan-500/20 select-none">
+            Call History
+          </a>
+          ${(activeLoan && activeLoan.status === "ACTIVE" && remaining > 0) ? `<button type="button" class="loan-cleared-btn sakra-btn-tactile bg-amber-600/25 hover:bg-amber-600 text-amber-400 hover:text-white py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 border border-amber-500/20 select-none cursor-pointer" data-loan-id="${activeLoan.id}" data-customer-id="${c.id}">Loan Cleared</button>` : (activeLoan && (activeLoan.status === "CLOSED" || remaining <= 0)) ? `<span class="py-1.5 rounded text-[9px] uppercase font-bold flex items-center justify-center gap-1 status-pill-closed select-none"><i data-lucide="check-circle" class="w-3 h-3"></i> Loan Closed</span>` : `<span></span>`}
         </div>
       </div>
     `;
@@ -1014,7 +1035,7 @@ function renderRegistry() {
   // Row selection setup (Desktop rows)
   tableBody.querySelectorAll("tr").forEach(row => {
     row.addEventListener("click", (e) => {
-      if (e.target.closest(".pending-trigger-badge")) {
+      if (e.target.closest(".pending-trigger-badge") || e.target.closest("a") || e.target.closest("button")) {
         e.stopPropagation();
         return;
       }
@@ -1030,10 +1051,23 @@ function renderRegistry() {
     });
   });
 
+  // Loan Cleared button handlers (Desktop + Mobile)
+  document.querySelectorAll(".loan-cleared-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const loanId = btn.getAttribute("data-loan-id");
+      if (!loanId) return;
+      const wizard = new LoanClosureWizard(parseInt(loanId), () => {
+        loadCustomers();
+      });
+      wizard.init();
+    });
+  });
+
   // Card selection setup (Mobile cards)
   mobileCardsContainer.querySelectorAll(".glass-card").forEach(card => {
     card.addEventListener("click", (e) => {
-      if (e.target.closest(".pending-trigger-badge")) {
+      if (e.target.closest(".pending-trigger-badge") || e.target.closest("a") || e.target.closest("button")) {
         e.stopPropagation();
         return;
       }

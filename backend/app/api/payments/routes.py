@@ -55,6 +55,8 @@ async def record_payment(
     loan = result.scalars().first()
     if not loan:
         raise HTTPException(status_code=404, detail="Loan not found")
+    if loan.status == "CLOSED":
+        raise HTTPException(status_code=400, detail="Cannot record payments for a closed loan.")
     # 2. Record the payment (updates loan.remaining_balance in-memory & database)
     try:
         payment = await PaymentRepository.create(

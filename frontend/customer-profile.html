@@ -54,6 +54,9 @@
             </a>
           </div>
 
+          <!-- Loan Closure Details Banner -->
+          <div id="closure-banner-container" class="hidden"></div>
+
           <!-- Identity Header -->
           <div class="glass-card flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 p-6">
             <div class="flex items-center gap-5">
@@ -391,7 +394,21 @@
                 </tbody>
               </table>
             </div>
+          </div>
 
+          <!-- Customer Activity Center (Chronological Audit Timeline) -->
+          <div class="glass-card p-6 flex flex-col gap-6">
+            <div class="flex items-center justify-between border-b border-white/5 pb-4 select-none">
+              <h3 class="text-xs font-bold uppercase tracking-widest text-text-primary flex items-center gap-2">
+                <i data-lucide="history" class="w-4 h-4 text-blue-400"></i>
+                <span>Customer Activity Center (Chronological Audit)</span>
+              </h3>
+              <span class="text-[9px] font-mono font-bold bg-slate-950 border border-white/5 text-text-muted px-2 py-0.5 rounded">Timeline Audit Logs</span>
+            </div>
+            <!-- Timeline container -->
+            <div id="profile-timeline-container" class="flex flex-col gap-4">
+              <!-- Events rendered dynamically -->
+            </div>
           </div>
 
         </div>

@@ -35,6 +35,7 @@ from app.models.audit_log import AuditLog
 from app.models.ai_log import AIAuditLog
 from app.models.copilot_session import CopilotSession
 from app.models.copilot_message import CopilotMessage
+from app.models.loan_closure import LoanClosure
 
 
 
@@ -49,6 +50,7 @@ from app.api.analytics.routes import router as analytics_router
 from app.api.audit.routes import router as audit_router
 from app.api.copilot.routes import router as copilot_router
 from app.api.admin_control.routes import router as admin_router
+from app.api.loan_closure.routes import router as loan_closure_router
 
 
 
@@ -157,6 +159,7 @@ app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics")
 app.include_router(audit_router, prefix=f"{settings.API_V1_STR}/audit")
 app.include_router(copilot_router, prefix=f"{settings.API_V1_STR}/copilot")
 app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin")
+app.include_router(loan_closure_router, prefix=f"{settings.API_V1_STR}/loan-closure")
 app.include_router(admin_router, prefix=settings.API_V1_STR)
 
 

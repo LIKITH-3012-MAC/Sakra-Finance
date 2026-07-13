@@ -72,6 +72,9 @@ class Settings(BaseSettings):
     DATABASE_POOL_TIMEOUT: int = 30
     ENABLE_GZIP: bool = True
 
+    # ── Loan Closure ──────────────────────────────────────────────
+    LOAN_CLOSURE_SECRET: str = ""
+
 
 # Singleton settings instance
 settings = Settings()
