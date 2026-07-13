@@ -93,7 +93,8 @@ class CustomerRepository:
 
         stmt = select(Customer).filter(*where_clauses).options(
             selectinload(Customer.documents),
-            selectinload(Customer.loans).selectinload(Loan.payments)
+            selectinload(Customer.loans).selectinload(Loan.payments),
+            selectinload(Customer.loans).selectinload(Loan.schedules)
         ).order_by(Customer.created_at.desc()).offset(skip).limit(limit)
 
         count_stmt = select(func.count()).select_from(Customer).filter(*where_clauses)
